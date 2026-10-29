@@ -56,7 +56,7 @@ export function titleScreen(app: App) {
 export function spritePreview(app: App, getSpecies: () => { id: string; shiny: boolean }) {
   const c = h('canvas', { class: 'preview' });
   c.width = 220;
-  c.height = 150;
+  c.height = 118;
   const g = c.getContext('2d')!;
   let t = 0;
   app.onFrame = (dt) => {
@@ -70,11 +70,11 @@ export function spritePreview(app: App, getSpecies: () => { id: string; shiny: b
     const d = dirs[Math.floor(t / 1.2) % 8];
     const anim = set.walk;
     const f = anim.frameAt(t);
-    const scale = Math.min(4, Math.floor(110 / anim.fh));
+    const scale = Math.min(3, Math.floor(96 / anim.fh));
     g.imageSmoothingEnabled = false;
     g.fillStyle = 'rgba(0,0,0,0.18)';
-    g.beginPath(); g.ellipse(110, 122, 22, 7, 0, 0, Math.PI * 2); g.fill();
-    g.drawImage(anim.img, f * anim.fw, (dirRow(d[0], d[1]) % anim.rows) * anim.fh, anim.fw, anim.fh, 110 - (anim.fw * scale) / 2, 122 - (anim.fh * scale) / 2 - 6 * scale, anim.fw * scale, anim.fh * scale);
+    g.beginPath(); g.ellipse(110, 100, 22, 7, 0, 0, Math.PI * 2); g.fill();
+    g.drawImage(anim.img, f * anim.fw, (dirRow(d[0], d[1]) % anim.rows) * anim.fh, anim.fw, anim.fh, 110 - (anim.fw * scale) / 2, 100 - (anim.fh * scale) / 2 - 6 * scale, anim.fw * scale, anim.fh * scale);
   };
   return c;
 }

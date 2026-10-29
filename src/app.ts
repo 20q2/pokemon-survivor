@@ -37,6 +37,7 @@ export class App {
   private endTimer = 0;
   private bossMusic = false;
   private autoT = 0;
+  private tutorial: { at: number; text: string }[] = [];
   /** Last chosen Elite-mode toggle. */
   eliteMode = false;
   net: NetHost | NetClient | null = null;
@@ -172,6 +173,12 @@ export class App {
     audio.playMusic(STAGE[s.stage.id].music);
     const me = s.world.players[s.localId];
     banner(`Go! ${SPECIES[me.speciesId].name.toUpperCase()}!`, false, 1800);
+    this.tutorial = this.save.stats.runs === 0 ? [
+      { at: 2.5, text: 'Moves fire automatically — just move to survive!' },
+      { at: 9, text: 'Grab Exp. Candy to level up and learn new moves.' },
+      { at: 20, text: 'Super-effective moves deal double damage. Mind the types!' },
+      { at: 45, text: 'Max a move, hold its type item, then open a treasure to master it!' },
+    ] : [];
   }
 
   endRun() {
@@ -336,6 +343,7 @@ export class App {
       const m = s.paused || this.ended ? { x: 0, y: 0 } : this.input.move();
       s.step(dt, m.x, m.y, this.renderer.viewW, this.renderer.viewH);
       for (const ev of s.drainEvents()) this.handleEvent(ev, s);
+      if (this.tutorial.length && s.world.time >= this.tutorial[0].at && s.phase() === 'play') banner(this.tutorial.shift()!.text, false, 3600);
       if (this.bossMusic && !s.world.enemies.some((e) => e.boss && e.alive)) {
         this.bossMusic = false;
         audio.playMusic(STAGE[s.stage.id].music);
