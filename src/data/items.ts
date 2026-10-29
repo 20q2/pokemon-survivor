@@ -49,7 +49,7 @@ export const ITEM_LIST: ItemDef[] = [
   { id: 'scope-lens', name: 'Scope Lens', stat: 'crit', perLevel: 0.05, desc: (l) => `+${pct(0.05 * l)} critical-hit chance.` },
   { id: 'razor-claw', name: 'Razor Claw', stat: 'critDmg', perLevel: 0.2, desc: (l) => `Critical hits deal +${pct(0.2 * l)} more damage.` },
   { id: 'wide-lens', name: 'Wide Lens', stat: 'area', perLevel: 0.09, desc: (l) => `Move area +${pct(0.09 * l)}.` },
-  { id: 'loaded-dice', name: 'Loaded Dice', stat: 'count', perLevel: 0.4, desc: (l) => `Multi-target moves fire +${Math.floor(0.4 * l)} extra (bonus at Lv3 and Lv5).` },
+  { id: 'loaded-dice', name: 'Loaded Dice', stat: 'count', perLevel: 0.4, desc: (l) => `Multi-target moves fire +${l >= 3 ? 2 : 1} extra${l < 3 ? ' (+2 at Lv3)' : ''}.` },
   { id: 'metronome', name: 'Metronome', stat: 'duration', perLevel: 0.1, desc: (l) => `Move duration +${pct(0.1 * l)}.` },
   { id: 'leftovers', name: 'Leftovers', stat: 'regen', perLevel: 0.003, desc: (l) => `Restore ${(0.3 * l).toFixed(1)}% max HP per second.` },
   { id: 'shell-bell', name: 'Shell Bell', stat: 'lifesteal', perLevel: 0.008, desc: (l) => `Heal ${(0.8 * l).toFixed(1)}% of damage dealt.` },

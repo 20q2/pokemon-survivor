@@ -63,7 +63,7 @@ export function derivePlayerStats(p: Player, level: number, time: number): Deriv
       case 'maxHp': s.maxHp *= 1 + v; break;
       case 'pickup': s.pickup *= 1 + v; break;
       case 'duration': s.duration += v; break;
-      case 'count': s.countBonus = Math.floor(v + 1e-6); break;
+      case 'count': s.countBonus = it.level >= 3 ? 2 : 1; break;
       case 'focus': s.focus += v; break;
       case 'lifeOrb': s.lifeOrb += v; s.physDmg += v; s.specDmg += v; break;
     }
