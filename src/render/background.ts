@@ -259,3 +259,32 @@ export class Background {
     g.fillRect(x0, y0, w, h);
   }
 }
+
+const thumbs = new Map<string, HTMLCanvasElement>();
+
+/** A small real render of a stage's ground and decor, for menus (cached). */
+export function stageThumbnail(stage: StageDef, w = 132, h = 46): HTMLCanvasElement {
+  const key = `${stage.id}/${w}x${h}`;
+  const hit = thumbs.get(key);
+  if (hit) return hit;
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const g = c.getContext('2d')!;
+  g.imageSmoothingEnabled = false;
+  const bg = new Background(stage);
+  const ox = 3 * DECOR_CELL, oy = 2 * DECOR_CELL; // away from the cleared spawn area
+  g.translate(-ox, -oy);
+  bg.drawGround(g, ox, oy, w, h);
+  const items: { s: DecorSprite; x: number; y: number }[] = [];
+  for (let cx = Math.floor(ox / DECOR_CELL) - 1; cx <= Math.ceil((ox + w) / DECOR_CELL) + 1; cx++) {
+    for (let cy = Math.floor(oy / DECOR_CELL) - 1; cy <= Math.ceil((oy + h) / DECOR_CELL) + 2; cy++) {
+      const d = bg.decorAt(cx, cy);
+      if (d) items.push(d);
+    }
+  }
+  items.sort((a, b) => Number(a.s.tall) - Number(b.s.tall) || a.y - b.y);
+  for (const d of items) g.drawImage(d.s.c, Math.round(d.x - d.s.ax), Math.round(d.y - d.s.ay));
+  thumbs.set(key, c);
+  return c;
+}

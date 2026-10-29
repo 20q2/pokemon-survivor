@@ -38,6 +38,7 @@ export class App {
   private bossMusic = false;
   private autoT = 0;
   private tutorial: { at: number; text: string }[] = [];
+  private alphasDown = 0;
   /** Last chosen Elite-mode toggle. */
   eliteMode = false;
   net: NetHost | NetClient | null = null;
@@ -173,6 +174,7 @@ export class App {
     audio.playMusic(STAGE[s.stage.id].music);
     const me = s.world.players[s.localId];
     banner(`Go! ${SPECIES[me.speciesId].name.toUpperCase()}!`, false, 1800);
+    this.alphasDown = 0;
     this.tutorial = this.save.stats.runs === 0 ? [
       { at: 2.5, text: 'Moves fire automatically — just move to survive!' },
       { at: 9, text: 'Grab Exp. Candy to level up and learn new moves.' },
@@ -229,6 +231,7 @@ export class App {
       bosses: (s.world as unknown as { bossesDefeated?: number }).bossesDefeated ?? 0,
       died: !cleared && !quit,
       defeatedChansey: (defeated.get('chansey') ?? 0) > 0,
+      alphas: this.alphasDown,
     });
     const rewards: RunRewards = applyRun(this.save, summary, s.seen(), defeated);
     this.persist();
@@ -343,6 +346,7 @@ export class App {
         else toast('Alpha spotted!', `An Alpha ${SPECIES[ev.species!].name} roams nearby. Defeat it for big rewards!`, assets.portraitUrl(ev.species!));
         break;
       case 'alphaDown':
+        this.alphasDown++;
         banner(`The Alpha ${SPECIES[ev.species].name.toUpperCase()} was defeated!`, false, 2400);
         audio.sfx('chest');
         break;

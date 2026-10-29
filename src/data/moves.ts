@@ -289,5 +289,5 @@ export const MASTERY_OF: Record<string, MoveDef> = Object.fromEntries(
 /** Moves sold as TMs in the shop; once owned they join every Pokémon's learnset. */
 export const TM_MOVES = [
   'swords-dance', 'agility', 'double-team', 'rest', 'focus-energy', 'calm-mind', 'reflect',
-  'aerial-ace', 'shadow-ball', 'rock-slide', 'swift', 'pay-day', 'thunder-wave', 'iron-defense',
+  'aerial-ace', 'shadow-ball', 'rock-slide', 'swift', 'pay-day', 'thunder-wave', 'iron-defense', 'hyper-voice',
 ] as const;

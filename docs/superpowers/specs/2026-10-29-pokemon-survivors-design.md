@@ -128,7 +128,7 @@ events, and its own music track.
   clear any stage at max friendship *or* clear Cerulean Cave with that line → shiny
   toggle (cosmetic sparkle, alt palette sprite, +10% Poké Dollars).
 - **Elite mode** (cleared routes): +60% enemy HP, +30% damage, denser waves; ×1.75 ₽, ×1.5 friendship.
-- Wild shiny enemies appear rarely (1/512 spawns), flee, and drop a treasure.
+- Wild shiny enemies appear rarely (1/3000 spawns), flee, and drop a treasure.
 - **Pokédex**: tracks species seen/defeated; filling it is itself an achievement set.
 
 ## Roster (14 lines)
@@ -173,3 +173,34 @@ Dratini, Eevee, Treecko, Torchic, Mudkip, Larvitar, Ralts (unlock via achievemen
 Sprites & portraits: PMD SpriteCollab contributors, CC BY-NC 4.0 — in-game Credits
 screen lists authors per sprite. Pokémon is © Nintendo/Creatures/GAME FREAK; this is
 a non-commercial fan project. Music and SFX are original.
+
+## Revision 2 (playtest feedback, 2026-10-29)
+
+Feedback: camera jitter; a 12-minute first run earned ~12,000 ₽ and "broke the game";
+upgrades ran out by 5–6 minutes; wanted a VS-style minimap, better music, everything
+matching the PMD art, Mega Evolution as a late-game burst, Alpha Pokémon to hunt,
+bigger candy from big foes, bigger damage numbers, hover tooltips, no hard upgrade cap.
+
+- **Camera**: render interpolation between 60 Hz sim steps, camera locked to the
+  interpolated partner with an eased look-ahead snapped to screen pixels, 1:1 device
+  pixels at fractional DPR.
+- **Progression**: moves Lv1–8 (Lv6–8 from per-behaviour late tables), mastery at Lv8;
+  past the cap, limit breaks (+35%·ln(1+n) power) and vitamins (scale·ln(1+n)) fill
+  offers. XP need 5+4k+0.9k² (+cubic after 25). Chests: 1/3/5 upgrades at 82/15/3%.
+- **Difficulty**: enemy HP ×(1+0.15m+0.025m²+0.0025m³)·(1+0.006·(level−1)); foes speed
+  up after 5:00; set-pieces recur from 10:00. Tuned with a headless bot so good play
+  survives 15:00 under real pressure and sloppy play falls at 8–12 minutes.
+- **Economy**: shinies were 1/450 *spawns* (~30/run, each with coins + a chest) — now
+  1/3000. Kill coins 1%. Run bonus scales with route tier. A full Viridian clear ≈ 800 ₽.
+- **Map content**: treasure caches every ~2 min (guardians appear on approach), Alphas
+  every ~2.5 min (territorial, leashed, 44× HP, radial stomps; chest + Rare Candy), the
+  Mega Stone at 5:30. Minimap pins all of them.
+- **Mega Evolution**: meter = 1/200 per s + 1/4000 per kill (+elite/boss bonuses) +
+  0.6 per max-HP of damage taken; 20 s of ×1.5 damage, +35% haste, −50% damage taken,
+  a type-coloured shockwave and a short rainbow-sphere cinematic.
+- **Music**: research pointed to plan-then-write in a symbolic notation plus mechanical
+  validation. Songs are hand-written MML (Game Boy-style 4 channels), tested for bar
+  lengths, key, range, leaps and lead/bass consonance, and level-checked offline.
+- **Look**: one PMD window skin for all UI; effects rendered on a world-resolution layer
+  upscaled with nearest-neighbour so they share the sprites' pixel grid; real route
+  thumbnails; hand-drawn pixel digits for damage numbers.

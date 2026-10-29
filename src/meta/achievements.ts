@@ -24,6 +24,8 @@ export interface RunSummary {
   defeatedChansey: boolean;
   died: boolean;
   elite: boolean;
+  megas: number;          // Mega Evolutions this run
+  alphas: number;         // Alpha Pokémon defeated by the team this run
 }
 
 export type Reward = { line: string } | { money: number } | { tm: string };
@@ -57,6 +59,10 @@ export const ACHIEVEMENTS: Achievement[] = [
   A({ id: 'mastery-1', name: 'Move Tutor', desc: 'Master a move (max level + matching held item, then open a treasure).', icon: 'tm-fire', reward: { money: 300 }, check: (s) => s.stats.masteries >= 1 }),
   A({ id: 'mastery-3', name: 'Empath', desc: 'Master 3 moves in total.', icon: 'species:ralts', reward: { line: 'ralts' }, check: (s) => s.stats.masteries >= 3 }),
   A({ id: 'mastery-2run', name: 'Double Mastery', desc: 'Master 2 moves in a single run.', icon: 'tm-psychic', reward: { tm: 'calm-mind' }, check: (_s, r) => !!r && r.masteries >= 2 }),
+  A({ id: 'mega-1', name: 'Bond Beyond Evolution', desc: 'Mega Evolve during a run.', icon: 'key-stone', reward: { money: 400 }, check: (_s, r) => !!r && r.megas >= 1 }),
+  A({ id: 'mega-4', name: 'Mega Marathon', desc: 'Mega Evolve 4 times in a single run.', icon: 'mega-ring', reward: { money: 900 }, check: (_s, r) => !!r && r.megas >= 4 }),
+  A({ id: 'alpha-1', name: 'Alpha Challenger', desc: 'Defeat an Alpha Pokémon.', icon: 'big-nugget', reward: { money: 300 }, check: (_s, r) => !!r && r.alphas >= 1 }),
+  A({ id: 'alpha-3', name: 'Alpha Hunter', desc: 'Defeat 3 Alpha Pokémon in a single run.', icon: 'comet-shard', reward: { tm: 'hyper-voice' }, check: (_s, r) => !!r && r.alphas >= 3 }),
   A({ id: 'bosses-5', name: 'Boss Rush', desc: 'Defeat 5 bosses in total.', icon: 'species:torchic', reward: { line: 'torchic' }, check: (s) => s.stats.bosses >= 5 }),
   A({ id: 'super-500', name: 'It’s Super Effective!', desc: 'Land 500 super-effective hits in one run.', icon: 'expert-belt', reward: { tm: 'focus-energy' }, check: (_s, r) => !!r && r.superEff >= 500 }),
   A({ id: 'full-moves', name: 'Full Moveset', desc: 'Have 4 moves at max level (or mastered) in one run.', icon: 'pp-max', reward: { tm: 'swords-dance' }, check: (_s, r) => !!r && r.maxedMoves >= 4 }),

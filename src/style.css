@@ -3,15 +3,20 @@
 @import '@fontsource/pixelify-sans/600.css';
 
 :root {
-  --bg: #14182b;
-  --panel: #f8f8f0;
-  --panel-2: #e8e8dc;
-  --ink: #1e2233;
-  --ink-soft: #4b5068;
-  --border: #2d3350;
-  --accent: #ef5350;
-  --accent-2: #ffcb05;
-  --blue: #3d7dca;
+  --dither: repeating-conic-gradient(rgba(255,255,255,0.028) 0 25%, transparent 0 50%) 0 0 / 4px 4px;
+  /* PMD-style windows: deep blue glass, a bright pixel frame, white text, gold highlights. */
+  --bg: #0d1230;
+  --panel: #1e3184;
+  --panel-2: #2a42a6;
+  --panel-hi: #3557c8;
+  --frame: #d6e4ff;
+  --frame-dim: #7d9be0;
+  --ink: #f4f7ff;
+  --ink-soft: #a9b8e6;
+  --border: #070b24;
+  --accent: #ff5d4f;
+  --accent-2: #ffd94a;
+  --blue: #8fc1ff;
   --good: #48d26a;
   --shadow: 0 4px 0 rgba(0, 0, 0, 0.35);
   --head: 'Press Start 2P', monospace;
@@ -101,7 +106,8 @@ img.px, .px img { image-rendering: pixelated; }
 .stages { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; width: min(1100px, 100%); }
 .stage { cursor: pointer; overflow: hidden; padding: 0; outline: none; transition: transform 0.06s; }
 .stage:hover, .stage:focus-visible, .stage.focus { transform: translateY(-3px); }
-.stage .swatch { height: 86px; position: relative; image-rendering: pixelated; }
+.stage .swatch { height: 92px; position: relative; overflow: hidden; border-bottom: 2px solid var(--border); }
+.stage .swatch .thumb { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
 .stage .swatch .bosses { position: absolute; bottom: 4px; right: 6px; display: flex; }
 .stage .swatch .bosses { gap: 4px; }
 .stage .swatch .bosses img { width: 44px; image-rendering: pixelated; border-radius: 8px; border: 2px solid rgba(0,0,0,0.6); box-shadow: 2px 2px 0 rgba(0,0,0,0.35); }
@@ -281,3 +287,64 @@ table.dmg td.n { text-align: right; font-variant-numeric: tabular-nums; }
   .hud-left { transform: scale(0.85); transform-origin: top left; }
   .hud-stats { font-size: 8px; }
 }
+
+
+/* ───────── PMD window skin ─────────
+   One shared look for every panel, button, card, dialog and toast so the UI sits with the
+   PMD sprites: a two-tone pixel frame (dark outline, light rim, faint inner bevel), a deep
+   blue glass fill with a fine dither, white pixel text and a gold cursor arrow on focus. */
+.panel, .btn, .mon, .toast, .dialog, .money-chip, .lobby-player, .code, .minimap, .hud-tip {
+  --win: linear-gradient(180deg, rgba(44, 72, 170, 0.96), rgba(22, 36, 104, 0.96));
+  background: var(--dither), var(--win);
+  color: var(--ink);
+  border: 2px solid var(--frame);
+  border-radius: 6px;
+  box-shadow: 0 0 0 2px var(--border), inset 0 0 0 2px var(--border), inset 0 0 0 4px rgba(143, 183, 255, 0.28), 0 5px 0 2px rgba(0, 0, 0, 0.42);
+}
+.panel { padding: 14px; }
+.btn { position: relative; padding: 13px 18px; }
+.btn:hover, .btn:focus-visible, .btn.focus, .mon:hover, .mon:focus-visible, .mon.focus, .card:hover, .card:focus-visible, .card.focus {
+  --win: linear-gradient(180deg, rgba(70, 104, 214, 0.98), rgba(36, 58, 150, 0.98));
+  background: var(--dither), var(--win);
+  border-color: #fff;
+}
+.btn:hover::before, .btn:focus-visible::before, .btn.focus::before, .card.focus::after, .card:hover::after {
+  content: ''; position: absolute; left: -16px; top: 50%; margin-top: -6px; width: 0; height: 0;
+  border-left: 9px solid var(--accent-2); border-top: 6px solid transparent; border-bottom: 6px solid transparent;
+  filter: drop-shadow(1px 1px 0 #000); animation: cursor 0.6s steps(2) infinite;
+}
+.card.focus::after, .card:hover::after { top: 22px; left: -18px; }
+@keyframes cursor { 50% { transform: translateX(3px); } }
+.btn.primary { --win: linear-gradient(180deg, #ff6e5a, #c8352a); background: var(--dither), var(--win); border-color: #ffe0d8; color: #fff; }
+.btn.primary:hover, .btn.primary:focus-visible, .btn.primary.focus { --win: linear-gradient(180deg, #ff8a74, #dc4436); background: var(--dither), var(--win); }
+.mon.sel, .mon.sel:hover, .mon.sel.focus { --win: linear-gradient(180deg, rgba(232, 92, 74, 0.95), rgba(140, 32, 44, 0.95)); background: var(--dither), var(--win); border-color: var(--accent-2); }
+.mon img { background: rgba(255, 255, 255, 0.1); }
+.mon.locked .nm, .hint, .card .key { color: var(--ink-soft); }
+.detail .preview { background: radial-gradient(ellipse at 50% 85%, rgba(0,0,0,0.25), transparent 60%), linear-gradient(#6fa6ef, #b9d8ff); border: 2px solid var(--border); box-shadow: inset 0 0 0 2px rgba(255,255,255,0.5); }
+.statbar .bar { background: rgba(0, 0, 0, 0.4); border-radius: 0; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.6); }
+.pips i { background: rgba(0, 0, 0, 0.35); border: 1px solid var(--frame-dim); border-radius: 0; }
+.pips i.on { background: var(--accent-2); border-color: #fff3b0; }
+.ach.done { --win: linear-gradient(180deg, rgba(40, 132, 86, 0.95), rgba(20, 84, 56, 0.95)); background: var(--dither), var(--win); border-color: #c8ffd8; }
+.ach .rw, .toast b, .chest-pop h3 { color: var(--accent-2); }
+.card { min-height: 250px; }
+.card .ic { border: 2px solid var(--frame); box-shadow: 0 0 0 2px var(--border); border-radius: 6px; }
+.card .ic.item { background: #e8efff; }
+.card .tag { color: var(--accent-2); }
+.card .tag.new { color: #8dff9e; }
+.card .stab { color: #ffc76b; }
+.card .ds, .upg .ds, .ach .ds { color: var(--ink-soft); }
+.dialog { font-size: clamp(10px, 1.5vw, 14px); padding: 14px 22px; }
+.dialog.boss { --win: linear-gradient(180deg, rgba(150, 30, 40, 0.97), rgba(80, 12, 22, 0.97)); background: var(--dither), var(--win); border-color: #ffd0cc; box-shadow: 0 0 0 2px var(--border), inset 0 0 0 2px var(--border), 0 5px 0 2px rgba(0,0,0,0.42); }
+.toast { border-radius: 6px; }
+.chest-pop .mastery, .matchup.good { color: #8dff9e; }
+.matchup.bad { color: #ff9b8f; }
+table.dmg td { border-bottom: 1px solid rgba(143, 183, 255, 0.25); }
+input[type=text], textarea { background: rgba(0, 0, 0, 0.35); color: var(--ink); border: 2px solid var(--frame-dim); border-radius: 4px; }
+.code { color: var(--accent-2); border-style: solid; }
+.money-chip { border-radius: 6px; }
+.slot.item { background: rgba(225, 235, 255, 0.92); }
+.hud-mon { background: rgba(22, 36, 104, 0.8); border: 2px solid var(--frame); border-radius: 6px; box-shadow: 0 0 0 2px var(--border); }
+.vit { background: rgba(22, 36, 104, 0.8); }
+.minimap { padding: 4px; }
+.stage .body { background: transparent; }
+.screen.dim { background: radial-gradient(ellipse at center, rgba(13, 18, 48, 0.5), rgba(6, 8, 24, 0.92)); }

@@ -11,6 +11,7 @@ import type { RunSummary } from '../meta/achievements.ts';
 import { exportSave, freshSave, importSave } from '../meta/save.ts';
 import { FRIENDSHIP_MAX, FRIENDSHIP_PERKS, SHOP, TM_COST, TM_LIST, upgradeCost } from '../meta/shop.ts';
 import { assets, ASSET_BASE } from '../render/assets.ts';
+import { stageThumbnail } from '../render/background.ts';
 import { dirRow } from '../engine/math.ts';
 import type { RunSession } from '../game/session.ts';
 import type { Player } from '../game/types.ts';
@@ -167,11 +168,10 @@ function matchupHint(lineId: string, routeTypes: PType[]) {
 }
 
 function stageSwatch(stage: (typeof STAGES)[number]) {
-  const [a, b, c] = stage.ground;
-  return h('div', {
-    class: 'swatch',
-    style: `background: radial-gradient(circle at 20% 30%, ${c}55 0 12%, transparent 13%), radial-gradient(circle at 70% 60%, ${b} 0 20%, transparent 21%), linear-gradient(135deg, ${a}, ${b})`,
-  }, h('div', { class: 'bosses' }, stage.bosses.map((bs) => img(assets.portraitUrl(bs.species)))));
+  const thumb = stageThumbnail(stage);
+  const c = h('canvas', { class: 'thumb', width: thumb.width, height: thumb.height }) as HTMLCanvasElement;
+  c.getContext('2d')!.drawImage(thumb, 0, 0);
+  return h('div', { class: 'swatch' }, c, h('div', { class: 'bosses' }, stage.bosses.map((bs) => img(assets.portraitUrl(bs.species)))));
 }
 
 export function stageScreen(app: App, lineId: string, onStart: (stageId: string) => void, onBack?: () => void) {

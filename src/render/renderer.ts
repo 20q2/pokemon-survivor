@@ -33,6 +33,9 @@ type Drawable = { y: number; k: 0; e: Enemy } | { y: number; k: 1; p: Player } |
 export class Renderer {
   readonly canvas: HTMLCanvasElement;
   private g: CanvasRenderingContext2D;
+  /** World-resolution effects layer, upscaled with nearest-neighbour so effects share the sprites' pixel grid. */
+  private fx = document.createElement('canvas');
+  private fxg = this.fx.getContext('2d')!;
   zoom = 2;
   viewW = 960;
   viewH = 540;
@@ -216,7 +219,10 @@ export class Renderer {
     this.drawFlatDecor(L, T, W, H);
 
     // ground-level effects
+    const fxL = Math.floor(L), fxT = Math.floor(T);
+    this.beginFx(W, H, fxL, fxT);
     for (const pr of world.projectiles) if (isGroundFx(pr)) this.drawGroundFx(pr, world);
+    this.endFx(fxL, fxT);
     for (const pk of world.pickups) if (inView(pk.x, pk.y, L, T, W, H, 20)) this.drawPickup(pk, world.time);
 
     // shadows + y-sorted sprites
@@ -238,13 +244,17 @@ export class Renderer {
     }
 
     // projectiles & effects above sprites
+    this.beginFx(W, H, fxL, fxT);
     for (const pr of world.projectiles) if (!isGroundFx(pr) && inView(pr.x, pr.y, L, T, W, H, pr.len + pr.r + 60)) this.drawProjectile(pr, world);
     this.drawChains(dt);
     this.drawBooms(dt);
-    this.particles.draw(g, false);
-    g.globalCompositeOperation = 'lighter';
-    this.particles.draw(g, true);
-    g.globalCompositeOperation = 'source-over';
+    this.particles.draw(this.g, false);
+    this.endFx(fxL, fxT);
+    this.beginFx(W, H, fxL, fxT);
+    this.g.globalCompositeOperation = 'lighter';
+    this.particles.draw(this.g, true);
+    this.g.globalCompositeOperation = 'source-over';
+    this.endFx(fxL, fxT, 'lighter');
     this.drawStatusOverlays(world, L, T, W, H);
     this.numbers.draw(g);
     for (const p of world.players) this.drawPlayerBars(p, world.players.length > 1);
@@ -266,6 +276,33 @@ export class Renderer {
     if (world.cine?.kind === 'evolve') this.drawEvolution(world.cine, world);
     if (world.cine?.kind === 'mega') this.drawMegaEvolution(world.cine, world);
     this.restore();
+  }
+
+  private mainG: CanvasRenderingContext2D | null = null;
+
+  /** Redirect drawing into the low-res effects layer (world pixels, origin at fxL/fxT). */
+  private beginFx(W: number, H: number, fxL: number, fxT: number) {
+    const w = Math.ceil(W) + 2, h = Math.ceil(H) + 2;
+    if (this.fx.width !== w || this.fx.height !== h) {
+      this.fx.width = w;
+      this.fx.height = h;
+    }
+    const g = this.fxg;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, w, h);
+    g.setTransform(1, 0, 0, 1, -fxL, -fxT);
+    g.imageSmoothingEnabled = false;
+    this.mainG = this.g;
+    this.g = g;
+  }
+
+  private endFx(fxL: number, fxT: number, op: GlobalCompositeOperation = 'source-over') {
+    if (!this.mainG) return;
+    this.g = this.mainG;
+    this.mainG = null;
+    this.g.globalCompositeOperation = op;
+    this.g.drawImage(this.fx, fxL, fxT);
+    this.g.globalCompositeOperation = 'source-over';
   }
 
   /** Temporarily move entities to their interpolated positions; restore() puts them back. */

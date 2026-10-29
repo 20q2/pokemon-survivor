@@ -60,7 +60,7 @@ export function offerCard(o: UpgradeOffer, p: Player, index: number, onPick: () 
     case 'newItem':
     case 'itemUp': {
       const def = ITEMS[o.id];
-      icon = h('div', { class: 'ic', style: 'background:#fff' }, img(assets.itemUrl(o.id)));
+      icon = h('div', { class: 'ic item' }, img(assets.itemUrl(o.id)));
       name = def.name;
       tag = o.kind === 'newItem' ? 'NEW ITEM' : `Lv ${o.level}`;
       desc = def.desc(o.level);
@@ -69,11 +69,11 @@ export function offerCard(o: UpgradeOffer, p: Player, index: number, onPick: () 
       break;
     }
     case 'heal':
-      icon = h('div', { class: 'ic', style: 'background:#fff' }, img(assets.itemUrl('oran-berry')));
+      icon = h('div', { class: 'ic item' }, img(assets.itemUrl('oran-berry')));
       name = 'Oran Berry'; tag = 'HEAL'; desc = 'Restore 30% of your max HP.';
       break;
     default:
-      icon = h('div', { class: 'ic', style: 'background:#fff' }, img(assets.itemUrl(o.id)));
+      icon = h('div', { class: 'ic item' }, img(assets.itemUrl(o.id)));
       name = VITAMIN[o.id].name; tag = o.level > 1 ? `×${o.level}` : 'VITAMIN'; desc = vitaminDesc(o.id, o.level);
   }
   return h('button', { class: 'panel card', 'data-nav': true, onclick: () => { audio.sfx('select'); onPick(); } },

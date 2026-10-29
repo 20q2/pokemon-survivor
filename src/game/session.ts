@@ -111,7 +111,7 @@ export class LocalSession implements RunSession {
 }
 
 /** Build the per-player summary used for saves/achievements. */
-export function summarize(session: RunSession, p: Player, cleared: boolean, extra: { bosses: number; died: boolean; defeatedChansey: boolean }): RunSummary {
+export function summarize(session: RunSession, p: Player, cleared: boolean, extra: { bosses: number; died: boolean; defeatedChansey: boolean; alphas: number }): RunSummary {
   const w = session.world;
   const moveTypesOk = p.moves.every((m) => p.types.includes(MOVES[m.id].type) || MOVES[m.id].cat === 'status');
   return {
@@ -137,5 +137,7 @@ export function summarize(session: RunSession, p: Player, cleared: boolean, extr
     defeatedChansey: extra.defeatedChansey,
     died: extra.died,
     elite: !!(session.world as { elite?: boolean }).elite,
+    megas: p.megas,
+    alphas: extra.alphas,
   };
 }
