@@ -66,7 +66,7 @@ export const MAX_ENEMIES = 520;
 export function xpForLevel(level: number): number {
   // Snappy first levels, then a quadratic curve so the build fills out over the whole run.
   const k = level - 1;
-  return Math.round(6 + 4.5 * k + 1.05 * k * k + (k > 24 ? 0.07 * (k - 24) ** 3 : 0));
+  return Math.round(6 + 5 * k + 1.2 * k * k + (k > 24 ? 0.08 * (k - 24) ** 3 : 0));
 }
 
 export class Sim {
