@@ -408,6 +408,9 @@ describe('minute waves', () => {
     });
     const waves: { minute: number; species: string; text: string; at: number }[] = [];
     const snap: Record<string, { regulars: number; elites: string[]; pos: string }> = {};
+    // The quota is only exact on the tick the spawner checks it (kills in between dip it), so the
+    // behavioural guarantee is "within the first second of the minute the count reaches min".
+    let peak = 0;
     for (let steps = 0; sim.time < 63 && steps < 63 * 60 * 3; steps++) {
       if (sim.phase === 'levelup') {
         for (const p of sim.players) if (sim.offers.has(p.id)) sim.choose(p.id, botChoose(sim, p));
@@ -418,8 +421,8 @@ describe('minute waves', () => {
       sim.update(DT);
       for (const ev of sim.events) if (ev.e === 'wave') waves.push({ minute: ev.minute, species: ev.species, text: ev.text, at: sim.time });
       sim.events.length = 0;
-      // 60.05: just after the minute-1 quota check (kills between checks legitimately dip below it).
-      for (const at of [60.05, 62.5]) {
+      if (sim.time >= 60 && sim.time < 61) peak = Math.max(peak, regulars(sim).length);
+      for (const at of [62.5]) {
         if (sim.time >= at && !snap[at]) {
           snap[at] = {
             regulars: regulars(sim).length,
@@ -429,25 +432,25 @@ describe('minute waves', () => {
         }
       }
     }
-    return { sim, waves, snap };
+    return { sim, waves, snap, peak };
   }
 
   it('announces minute 1, spawns its elite after the banner and holds the quota', () => {
-    const { waves, snap } = playMinuteOne(1);
+    const { waves, snap, peak } = playMinuteOne(1);
     expect(waves.filter((w) => w.minute === 1)).toHaveLength(1);
     expect(waves[0]).toMatchObject({ species: 'pidgey', text: 'Pidgey appear!' });
     expect(waves[0].at).toBeLessThan(61.5);
     const w1 = STAGES[0].waves[1];
     expect(snap[62.5].elites).toContain(w1.elite);
-    expect(snap[60.05].regulars).toBeGreaterThanOrEqual(w1.min);
-    expect(snap[60.05].regulars).toBeLessThanOrEqual(w1.min + w1.species.length);
+    expect(peak).toBeGreaterThanOrEqual(w1.min);
+    expect(peak).toBeLessThanOrEqual(w1.min + w1.species.length);
   });
 
   it('scales the quota for co-op', () => {
-    const { snap } = playMinuteOne(2);
+    const { peak } = playMinuteOne(2);
     const min = Math.round(STAGES[0].waves[1].min * 1.35);
-    expect(snap[60.05].regulars).toBeGreaterThanOrEqual(min);
-    expect(snap[60.05].regulars).toBeLessThanOrEqual(min + STAGES[0].waves[1].species.length);
+    expect(peak).toBeGreaterThanOrEqual(min);
+    expect(peak).toBeLessThanOrEqual(min + STAGES[0].waves[1].species.length);
   });
 
   /** Starts a run partway in with an unkillable player so set pieces can be watched alone. */
