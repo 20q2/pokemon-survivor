@@ -3,8 +3,28 @@ import type { Player, UpgradeOffer } from './types.ts';
 import { MOVES, MASTERY_OF } from '../data/moves.ts';
 import { HAZARD, hazardEscape } from './hazards.ts';
 
+/** Per bot: where it last was, how long it has barely moved, and an escape heading. */
+const unstick = new WeakMap<Player, { x: number; y: number; still: number; t: number; ex: number; ey: number }>();
+
 /** Simple kiting AI used for headless balance runs and attract-mode demos. */
 export function botSteer(sim: Sim, p: Player): { x: number; y: number } {
+  // Wedged in a pocket of scenery: commit to a fresh heading for a second.
+  let u = unstick.get(p);
+  if (!u) unstick.set(p, (u = { x: p.x, y: p.y, still: 0, t: 0, ex: 0, ey: 0 }));
+  u.still = Math.hypot(p.x - u.x, p.y - u.y) < 0.4 ? u.still + 1 / 60 : 0;
+  u.x = p.x;
+  u.y = p.y;
+  if (u.still > 0.5 && u.t <= 0) {
+    const a = sim.time * 2.3 + p.id;
+    u.ex = Math.cos(a);
+    u.ey = Math.sin(a);
+    u.t = 1;
+    u.still = 0;
+  }
+  if (u.t > 0) {
+    u.t -= 1 / 60;
+    return around(sim, p, u.ex, u.ey);
+  }
   let ax = 0, ay = 0, threat = 0;
   let cx = 0, cy = 0, cn = 0;
   sim.grid.query(p.x, p.y, 240, (e) => {
@@ -72,7 +92,19 @@ export function botSteer(sim: Sim, p: Player): { x: number; y: number } {
   const mx = (ax / tl) * tw + (gx / gl) * (1 - tw * 0.8);
   const my = (ay / tl) * tw + (gy / gl) * (1 - tw * 0.8);
   const l = Math.hypot(mx, my);
-  return l > 1e-6 ? { x: mx / l, y: my / l } : { x: 0, y: 0 };
+  return l > 1e-6 ? around(sim, p, mx / l, my / l) : { x: 0, y: 0 };
+}
+
+/** Feel ahead for scenery and turn toward the nearest clear heading (alternating sides). */
+function around(sim: Sim, p: Player, x: number, y: number): { x: number; y: number } {
+  const look = 26;
+  for (let i = 0; i <= 12; i++) {
+    const a = Math.ceil(i / 2) * (i & 1 ? 1 : -1) * (Math.PI / 12);
+    const c = Math.cos(a), s = Math.sin(a);
+    const rx = x * c - y * s, ry = x * s + y * c;
+    if (sim.obstacles.clearAt(p.x + rx * look, p.y + ry * look, p.radius)) return { x: rx, y: ry };
+  }
+  return { x, y };
 }
 
 /**

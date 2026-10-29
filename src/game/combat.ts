@@ -914,6 +914,9 @@ export function stepProjectileMotion(sim: Sim, pr: Projectile, dt: number, findT
   }
   pr.x += pr.vx * dt;
   pr.y += pr.vy * dt;
+  // Bullet-like shots (either side's) break on scenery. Lobs arc over it; waves, auras and ground
+  // attacks roll through.
+  if ((pr.vx || pr.vy) && (pr.behavior === 'projectile' || pr.behavior === 'boomerang' || pr.behavior === 'enemy') && sim.obstacles.blocks(pr.x, pr.y)) pr.dead = true;
 }
 
 function boundRadius(pr: Projectile): number {

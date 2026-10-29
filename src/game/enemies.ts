@@ -160,8 +160,14 @@ export class Spawner {
   private placePoi(kind: 'cache' | 'mega-stone', dist: number) {
     const sim = this.sim;
     const p = this.anchor();
-    const a = sim.rng.range(0, TAU);
-    const x = p.x + Math.cos(a) * dist, y = p.y + Math.sin(a) * dist;
+    // somewhere with room around it, not inside a grove
+    let a = sim.rng.range(0, TAU);
+    let x = p.x + Math.cos(a) * dist, y = p.y + Math.sin(a) * dist;
+    for (let i = 0; i < 24 && !sim.obstacles.clearAt(x, y, 40); i++) {
+      a += TAU / 24;
+      x = p.x + Math.cos(a) * dist;
+      y = p.y + Math.sin(a) * dist;
+    }
     const pk = sim.spawnPickup(kind === 'cache' ? 'chest' : 'mega-stone', x, y, kind === 'cache' ? (sim.rng.chance(0.3) ? 3 : 2) : 1);
     pk.vx = pk.vy = 0;
     this.pois.push({ kind, id: pk.id, x, y, guarded: false });
@@ -355,6 +361,11 @@ export function updateEnemies(sim: Sim, dt: number) {
       const dx = target.x - e.x, dy = target.y - e.y;
       const d = Math.hypot(dx, dy) || 1;
       mx = dx / d; my = dy / d;
+      if (e.detour && e.detour > 0) {
+        e.detour -= dt;
+        const way = sim.flow[player.id]?.dir(e.x, e.y);
+        if (way) { mx = way.x; my = way.y; }
+      }
       if (helpless) {
         // no AI, no attacks
       } else if (e.boss) {
@@ -442,7 +453,7 @@ export function updateEnemies(sim: Sim, dt: number) {
       }
     }
   }
-  separate(sim);
+  separate(sim, dt);
 }
 
 /** Sky Uppercut: a launched foe crashes down on everything around it. */
@@ -458,7 +469,8 @@ function land(sim: Sim, e: Enemy) {
 }
 
 /** Soft separation so crowds form readable blobs instead of a single stack. */
-function separate(sim: Sim) {
+function separate(sim: Sim, dt: number) {
+  const obs = sim.obstacles;
   sim.rebuildGrid();
   const walls: Projectile[] = [];
   for (const pr of sim.projectiles) if (pr.behavior === 'wall' && !pr.dead && !pr.hostile && pr.t >= pr.delay) walls.push(pr);
@@ -474,6 +486,18 @@ function separate(sim: Sim) {
         e.x = w.x + (dx / d) * rr;
         e.y = w.y + (dy / d) * rr;
       }
+    }
+    // Scenery: bosses crash through and Flying/Ghost types pass over; everyone else is blocked,
+    // slides round the side nearer their heading, and for a moment takes the way round to their
+    // partner (flow field) instead of the straight line, so forest walls never pin them in place.
+    if (!e.boss && !e.types.includes('flying') && !e.types.includes('ghost') && obs.pushOut(e, e.radius)) {
+      e.detour = 0.8;
+      let tx = -obs.ny, ty = obs.nx;
+      const dot = tx * e.dirX + ty * e.dirY;
+      if (dot < 0 || (dot === 0 && e.id & 1)) { tx = -tx; ty = -ty; }
+      const k = e.speed * dt * 0.3;
+      e.x += tx * k;
+      e.y += ty * k;
     }
     // Confused or infatuated foes hurt the foes they bump into.
     const brawler = e.st.confuse > 0 || e.st.charm > 0;

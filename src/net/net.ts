@@ -529,6 +529,7 @@ export class ClientSession implements RunSession {
       if (me.moving) {
         me.x += mx * me.stats.speed * dt;
         me.y += my * me.stats.speed * dt;
+        sim.obstacles.pushOut(me, me.radius);
         me.fx = mx / len; me.fy = my / len;
       }
     } else if (me) me.moving = false;

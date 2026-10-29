@@ -41,7 +41,15 @@ export interface PropSpec {
   clear?: number;
 }
 
-export interface Biome { base: Material; layers: Layer[]; props: PropSpec[]; seed: number }
+export interface Biome {
+  base: Material;
+  layers: Layer[];
+  /** Decorative scatter (walk-through). */
+  props: PropSpec[];
+  /** Art for the solid obstacles; where they stand comes from game/obstacles.ts. */
+  solids: PropSprite[];
+  seed: number;
+}
 
 // ─────────────────────────── ground materials ───────────────────────────
 
@@ -526,8 +534,8 @@ const builders: Record<string, () => Biome> = {
         { mat: dirt(P('#6a4a2a', '#a07a4c', '#c8a46c', '#dcbe88', '#ecd6a8'), 12), field: { scale: 22, kind: 'ridge', thr: 0.035 }, rim: '#8a6a40' },
         { mat: tallGrass(P('#173a1e', '#2a6a2e', '#3c8a3a', '#5cae4c', '#8cd070'), 13), field: { scale: 9, kind: 'blob', thr: 0.6 }, rim: '#1f4c24', shade: true },
       ],
+      solids: [...sprites(3, 1, (r) => tree(r, LEAF)), tree(new PRng(9), LEAF, '#e04040'), pine(LEAF_DARK)],
       props: [
-        { sprites: [...sprites(3, 1, (r) => tree(r, LEAF)), tree(new PRng(9), LEAF, '#e04040'), pine(LEAF_DARK)], cell: 2, density: 0.02, on: [0, 2], grove: { scale: 7, thr: 0.6, density: 0.85 }, clear: 72 },
         { sprites: [bush(LEAF), bush(LEAF, '#4060e0')], cell: 1, density: 0.012, on: [0] },
         { sprites: sprites(3, 2, (r, i) => flowers(r, ([['#7a1a1a', '#c03030', '#e85050', '#ff8080', '#ffd0d0'], ['#7a6a10', '#d0b020', '#f0d840', '#fff080', '#ffffff'], ['#6a6a7a', '#c8c8d8', '#e8e8f0', '#ffffff', '#ffffff']] as Ramp[])[i], '#2a6a2a')), cell: 1, density: 0.03, on: [0] },
         { sprites: [mushroom(['#5a1010', '#a02020', '#d03a30', '#e86a50', '#ffb0a0']), stump()], cell: 1, density: 0.004, on: [0] },
@@ -541,10 +549,12 @@ const builders: Record<string, () => Biome> = {
       { mat: rubble(P('#2a1e22', '#4e3e42', '#64524f', '#7e6a66', '#988480'), 22), field: { scale: 8, kind: 'blob', thr: 0.6 }, rim: '#3a2c30', shade: true },
       { mat: ripples(P('#5a4a38', '#9a8466', '#b49c7a', '#c8b290', '#dccaa8'), 23), field: { scale: 18, kind: 'ridge', thr: 0.03 }, rim: '#7a6650' },
     ],
+    solids: [
+      ...sprites(3, 3, (r, i) => boulder(r, CAVE_STONE, [26, 22, 30][i])), ...sprites(3, 33, (r, i) => boulder(r, CAVE_STONE, [24, 22, 26][i])),
+      ...sprites(2, 4, (r) => stalagmite(r, CAVE_STONE)),
+      ...sprites(2, 5, (r) => crystal(r, ['#2a2a6a', '#5a5ab8', '#8a8ae8', '#bcbcff', '#ffffff'])),
+    ],
     props: [
-      { sprites: sprites(3, 3, (r, i) => boulder(r, CAVE_STONE, [26, 22, 30][i])), cell: 2, density: 0.035, on: [0, 1], grove: { scale: 6, thr: 0.68, density: 0.45 }, clear: 64 },
-      { sprites: sprites(2, 4, (r) => stalagmite(r, CAVE_STONE)), cell: 1, density: 0.006, on: [0, 1], clear: 64 },
-      { sprites: sprites(2, 5, (r) => crystal(r, ['#2a2a6a', '#5a5ab8', '#8a8ae8', '#bcbcff', '#ffffff'])), cell: 2, density: 0.01, on: [0, 1], clear: 64 },
       { sprites: [...sprites(2, 6, (r) => pebbles(r, CAVE_STONE)), bones()], cell: 1, density: 0.02, on: [0, 2] },
     ],
   }),
@@ -555,9 +565,8 @@ const builders: Record<string, () => Biome> = {
       { mat: ripples(P('#6a90b0', '#c0d8ec', '#e2f0fa', '#f4faff', '#ffffff'), 32), field: { scale: 10, kind: 'blob', thr: 0.55 }, rim: '#9ab8d0', shade: true },
       { mat: wetRock(P('#1e3a5a', '#2e5680', '#3e6c9a', '#6a98c0', '#a8d0ec'), 33), field: { scale: 7, kind: 'blob', thr: 0.7 }, rim: '#1e3a5a' },
     ],
+    solids: [...sprites(3, 7, (r) => iceSpike(r)), ...sprites(2, 8, (r) => boulder(r, ['#2a4a68', '#6a8aa8', '#8eaac4', '#b4cce0', '#e0f0ff'], 24))],
     props: [
-      { sprites: sprites(2, 7, (r) => iceSpike(r)), cell: 2, density: 0.025, on: [0, 1], grove: { scale: 6, thr: 0.68, density: 0.4 }, clear: 64 },
-      { sprites: sprites(2, 8, (r) => boulder(r, ['#2a4a68', '#6a8aa8', '#8eaac4', '#b4cce0', '#e0f0ff'], 24)), cell: 2, density: 0.015, on: [0, 1], clear: 64 },
       { sprites: [snowPile(), snowPile(), shell(new PRng(9))], cell: 1, density: 0.01, on: [0, 1] },
       { sprites: [puddle(['#1e3a5a', '#3a6a9a', '#5a8cc0', '#9ac4e8', '#ffffff'])], cell: 2, density: 0.01, on: [0] },
     ],
@@ -571,9 +580,8 @@ const builders: Record<string, () => Biome> = {
         { mat: grate(P('#1e201c', '#2e302a', '#5a5c52', '#7a7c70', '#9a9c8e')), field: { scale: 20, kind: 'ridge', thr: 0.035 }, rim: '#e6c84a' },
         { mat: rockFloor(P('#1e1e1a', '#34342e', '#44443c', '#56564c', '#6a6a5e'), 42), field: { scale: 8, kind: 'blob', thr: 0.66 }, rim: '#24241e', shade: true },
       ],
+      solids: [machine(), machine(), pylon()],
       props: [
-        { sprites: [machine()], cell: 2, density: 0.02, on: [0, 2], grove: { scale: 7, thr: 0.7, density: 0.35 }, clear: 72 },
-        { sprites: [pylon()], cell: 2, density: 0.012, on: [0, 2], clear: 72 },
         { sprites: [barrel(), puddle(['#101010', '#2a2a30', '#3a3a44', '#5a5a70', '#a0a0c0'])], cell: 1, density: 0.012, on: [0, 2] },
       ],
     };
@@ -585,15 +593,18 @@ const builders: Record<string, () => Biome> = {
       { mat: carpet(P('#2a0a18', '#5a1a34', '#7a2648', '#a03a60', '#d06a8a')), field: { scale: 20, kind: 'ridge', thr: 0.035 }, rim: '#c8a048' },
       { mat: grass(P('#1e2a24', '#34443a', '#46584c', '#5a6e60', '#748a7a'), 52), field: { scale: 9, kind: 'blob', thr: 0.6 }, rim: '#26342c', shade: true },
     ],
+    solids: [...sprites(4, 10, (r) => grave(r)), deadTree()],
     props: [
-      { sprites: sprites(4, 10, (r) => grave(r)), cell: 1, density: 0.01, on: [0, 2], grove: { scale: 6, thr: 0.64, density: 0.14 }, clear: 64 },
-      { sprites: [deadTree()], cell: 2, density: 0.008, on: [2], clear: 72 },
       { sprites: [candle()], cell: 1, density: 0.012, on: [0, 1] },
       { sprites: [bones()], cell: 1, density: 0.006, on: [0, 2] },
     ],
   }),
   cinnabar: () => ({
     seed: 61,
+    solids: [
+      ...sprites(3, 11, (r, i) => boulder(r, ['#1a0c0a', '#4a2a22', '#64382c', '#7e4a3a', '#9a6250'], [26, 20, 24][i])),
+      ...sprites(2, 12, (r) => stalagmite(r, ['#1a0c0a', '#4a2a22', '#64382c', '#7e4a3a', '#9a6250'])),
+    ],
     base: rockFloor(P('#1e1010', '#3e2420', '#56322a', '#6c4234', '#845444'), 61, ['#e8641c', '#ffc040']),
     layers: [
       { mat: dirt(P('#1e1a1a', '#3e3836', '#4e4744', '#625a56', '#7a706a'), 62, 2), field: { scale: 9, kind: 'blob', thr: 0.66 }, rim: '#2a2422', shade: true },
@@ -601,8 +612,6 @@ const builders: Record<string, () => Biome> = {
     ],
     props: [
       { sprites: [lavaPool()], cell: 2, density: 0.035, on: [0], clear: 72 },
-      { sprites: sprites(2, 11, (r, i) => boulder(r, ['#1a0c0a', '#4a2a22', '#64382c', '#7e4a3a', '#9a6250'], [26, 20][i])), cell: 2, density: 0.025, on: [0, 1, 2], grove: { scale: 6, thr: 0.7, density: 0.4 }, clear: 64 },
-      { sprites: sprites(2, 12, (r) => stalagmite(r, ['#1a0c0a', '#4a2a22', '#64382c', '#7e4a3a', '#9a6250'])), cell: 1, density: 0.006, on: [0, 2], clear: 64 },
       { sprites: [steamVent(), bones()], cell: 1, density: 0.008, on: [0, 1] },
     ],
   }),
@@ -613,10 +622,12 @@ const builders: Record<string, () => Biome> = {
       { mat: wetRock(P('#0e1422', '#1e2a42', '#283856', '#3c5072', '#6a88b0'), 72), field: { scale: 8, kind: 'blob', thr: 0.6 }, rim: '#0e1422', shade: true },
       { mat: grass(P('#0e2a2a', '#1e4a46', '#2a625a', '#3a7c70', '#58a090'), 73), field: { scale: 7, kind: 'blob', thr: 0.7 }, rim: '#123430' },
     ],
+    solids: [
+      ...sprites(3, 13, (r, i) => crystal(r, ([['#1a2a6a', '#3a5ac0', '#6a8ae8', '#a8c4ff', '#ffffff'], ['#3a1a6a', '#7a4ac0', '#a87ae8', '#d4b4ff', '#ffffff'], ['#0a4a4a', '#20a0a0', '#40d0c8', '#90f0e8', '#ffffff']] as Ramp[])[i])),
+      ...sprites(2, 14, (r, i) => boulder(r, ['#0e1422', '#34405a', '#465674', '#5a6c8c', '#7a8ca8'], [26, 20][i])),
+      ...sprites(1, 15, (r) => stalagmite(r, ['#0e1422', '#34405a', '#465674', '#5a6c8c', '#7a8ca8'])),
+    ],
     props: [
-      { sprites: sprites(3, 13, (r, i) => crystal(r, ([['#1a2a6a', '#3a5ac0', '#6a8ae8', '#a8c4ff', '#ffffff'], ['#3a1a6a', '#7a4ac0', '#a87ae8', '#d4b4ff', '#ffffff'], ['#0a4a4a', '#20a0a0', '#40d0c8', '#90f0e8', '#ffffff']] as Ramp[])[i])), cell: 2, density: 0.025, on: [0, 1, 2], grove: { scale: 6, thr: 0.68, density: 0.35 }, clear: 64 },
-      { sprites: sprites(2, 14, (r, i) => boulder(r, ['#0e1422', '#34405a', '#465674', '#5a6c8c', '#7a8ca8'], [26, 20][i])), cell: 2, density: 0.025, on: [0, 1], clear: 64 },
-      { sprites: sprites(2, 15, (r) => stalagmite(r, ['#0e1422', '#34405a', '#465674', '#5a6c8c', '#7a8ca8'])), cell: 1, density: 0.006, on: [0, 1], clear: 64 },
       { sprites: [puddle(['#0a1420', '#1e3a60', '#2e5488', '#5a88c0', '#c0e0ff']), pebbles(new PRng(3), ['#0e1422', '#34405a', '#465674', '#5a6c8c', '#7a8ca8'])], cell: 1, density: 0.014, on: [0, 1] },
     ],
   }),
@@ -652,12 +663,9 @@ const sheetBuilders: Record<string, (s: Sheet) => Biome> = {
           auto: autotile(s, [0, 6], [[1, 6], [2, 6], [3, 6], [4, 6], [1, 7], [2, 7], [3, 7], [4, 7], [1, 8], [2, 8], [3, 8], [4, 8]], basePal),
         },
       ],
+      solids: [P2([14, 0], 3, 4, 24, 54), P2([3, 34], 3, 4, 24, 58), P2([3, 34], 3, 4, 24, 58), P2([14, 17], 2, 3, 16, 44), P2([14, 17], 2, 3, 16, 44), P2([0, 34], 3, 4, 24, 58)],
       props: [
-        {
-          sprites: [P2([14, 0], 3, 4, 24, 54), P2([3, 34], 3, 4, 24, 58), P2([14, 17], 2, 3, 16, 44)],
-          cell: 2, density: 0.02, on: [0], grove: { scale: 7, thr: 0.6, density: 0.8 }, clear: 72,
-        },
-        { sprites: [P2([0, 34], 3, 4, 24, 58), P2([17, 0], 1, 1, 8, 15)], cell: 2, density: 0.006, on: [0], clear: 72 },
+        { sprites: [P2([17, 0], 1, 1, 8, 15)], cell: 2, density: 0.006, on: [0], clear: 72 },
         { sprites: [P2([7, 12], 1, 1, 8, 14, false), P2([7, 16], 1, 1, 8, 14, false), P2([8, 18], 1, 1, 8, 14, false)], cell: 1, density: 0.012, on: [0] },
         { sprites: [P2([7, 2], 1, 1, 8, 14, false), P2([7, 0], 1, 1, 8, 14, false), P2([2, 33], 1, 1, 8, 14, false)], cell: 1, density: 0.03, on: [0] },
       ],
@@ -676,8 +684,8 @@ const sheetBuilders: Record<string, (s: Sheet) => Biome> = {
       layers: [
         { mat: sheetMaterial(s, [[19, 23]], [1]), field: { scale: 9, kind: 'blob', thr: 0.6 }, rim: '#706858', shade: true },
       ],
+      solids: [onDirt([21, 28], 1, 1, 8, 15), onDirt([22, 28], 1, 1, 8, 15)],
       props: [
-        { sprites: [onDirt([21, 28], 1, 1, 8, 15), onDirt([22, 28], 1, 1, 8, 15)], cell: 2, density: 0.035, on: [0], grove: { scale: 6, thr: 0.68, density: 0.5 }, clear: 64 },
         { sprites: [onLedge([20, 23], 1, 1, 8, 8), onLedge([21, 26], 2, 1, 16, 8)], cell: 2, density: 0.03, on: [1] },
         { sprites: [onDirt([20, 28], 1, 1, 8, 8, false), onDirt([19, 27], 1, 2, 8, 24, false)], cell: 2, density: 0.003, on: [0], clear: 64 },
       ],
@@ -696,8 +704,8 @@ const sheetBuilders: Record<string, (s: Sheet) => Biome> = {
       layers: [
         { mat: sheetMaterial(s, [cobble], [1]), field: { scale: 10, kind: 'blob', thr: 0.6 }, rim: '#808070', shade: true },
       ],
+      solids: [P2([0, 46], 1, 1, 8, 15), P2([0, 46], 1, 1, 8, 15), P2([1, 46], 1, 1, 8, 15)],
       props: [
-        { sprites: [P2([0, 46], 1, 1, 8, 15), P2([1, 46], 1, 1, 8, 15)], cell: 2, density: 0.03, on: [0, 1], grove: { scale: 6, thr: 0.68, density: 0.45 }, clear: 64 },
         { sprites: [P2([3, 43], 2, 3, 16, 46)], cell: 2, density: 0.006, on: [1], clear: 72 },
       ],
     };
@@ -717,8 +725,8 @@ const sheetBuilders: Record<string, (s: Sheet) => Biome> = {
           auto: autotile(s, [24, 35], [[24, 30], [25, 30], [26, 30], [24, 31], [25, 31], [26, 31], [24, 32], [25, 32], [26, 32], [24, 33], [25, 33], [26, 33]], floorPal),
         },
       ],
+      solids: [P2([19, 33], 1, 1, 8, 15), P2([19, 34], 1, 1, 8, 15), P2([20, 34], 1, 1, 8, 15), P2([21, 34], 1, 1, 8, 15)],
       props: [
-        { sprites: [P2([19, 33], 1, 1, 8, 15), P2([19, 34], 1, 1, 8, 15), P2([20, 34], 1, 1, 8, 15), P2([21, 34], 1, 1, 8, 15)], cell: 2, density: 0.035, on: [0], grove: { scale: 6, thr: 0.66, density: 0.5 }, clear: 64 },
         { sprites: [P2([22, 34], 2, 2, 16, 31)], cell: 2, density: 0.008, on: [0], clear: 72 },
       ],
     };

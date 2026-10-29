@@ -4,10 +4,13 @@ import { metaBonuses } from '../src/meta/shop.ts';
 import { MOVE_LIST, MOVES, NON_ATTACKS } from '../src/data/moves.ts';
 import { spawnEnemy } from '../src/game/enemies.ts';
 import type { Enemy, Player } from '../src/game/types.ts';
+import { Obstacles } from '../src/game/obstacles.ts';
 
 /** A partner holding one move (at Lv5) in a ring of tough foes, circling slowly. */
 function arena(moveId: string, extra: string[] = [], seconds = 8, watch?: (sim: Sim, p: Player) => boolean) {
   const sim = new Sim({ stageId: 'viridian', seed: 7, players: [{ name: 'a', lineId: 'charmander', shiny: false, meta: metaBonuses({}), tms: [] }] });
+  // open ground: these check what each move does, not how it meets the scenery
+  Object.assign(sim, { obstacles: new Obstacles('') });
   const p = sim.players[0];
   p.moves = [moveId, ...extra].map((id) => ({ id, level: 5, cd: 0.2, dmgDealt: 0, kills: 0 }));
   const foes: Enemy[] = [];

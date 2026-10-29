@@ -1,4 +1,5 @@
 import type { StageDef } from '../data/stages.ts';
+import { OB_CELL, Obstacles } from '../game/obstacles.ts';
 import { biomeFor, type Biome, type Field, type Material, type PropSprite } from './biomes.ts';
 import { fbm, hash2, T } from './pixelart.ts';
 
@@ -7,7 +8,8 @@ import { fbm, hash2, T } from './pixelart.ts';
  * in 512 px chunks. Each chunk is the base material, with up to two autotiled terrain layers
  * (rounded patch edges, a rim colour and a drop shade where a layer sits on the one below), and
  * the static flat props baked in. Tall and animated props are kept as lists so the renderer can
- * y-sort them with the Pokémon and animate them.
+ * y-sort them with the Pokémon and animate them. Solid obstacles come from the same generated
+ * field the simulation collides against; only their sprites are chosen here.
  */
 
 const CT = 32; // tiles per chunk side
@@ -71,9 +73,11 @@ function decorFrame(s: PropSprite, time: number): DecorSprite {
 export class Background {
   private biome: Biome;
   private chunks = new Map<string, Chunk>();
+  private obstacles: Obstacles;
 
   constructor(stage: StageDef) {
     this.biome = biomeFor(stage.id);
+    this.obstacles = new Obstacles(stage.id);
   }
 
   private chunk(cx: number, cy: number): Chunk {
@@ -197,6 +201,15 @@ export class Background {
       if (p.s.tall || p.s.fps > 0) { if (inside) (p.s.tall ? tall : anim).push(p); }
       else flat.push(p);
     }
+    // solid obstacles whose foot lies in this chunk
+    const solids = biome.solids;
+    if (solids.length) {
+      const per = CPX / OB_CELL;
+      for (let j = cy * per; j < (cy + 1) * per; j++) for (let i = cx * per; i < (cx + 1) * per; i++) {
+        const o = this.obstacles.at(i, j);
+        if (o) tall.push({ s: solids[Math.floor(o.v * solids.length)], x: o.x, y: o.y });
+      }
+    }
     flat.sort((a, b) => a.y - b.y);
     for (const p of flat) g.drawImage(p.s.frames[0], Math.round(p.x - p.s.ax - cx * CPX), Math.round(p.y - p.s.ay - cy * CPX));
     return { c: canvas, tall, anim };
@@ -205,6 +218,8 @@ export class Background {
   /** Deterministic prop choice for one tile (ignoring terrain, which build() checks). */
   private propAt(TX: number, TY: number): (Placed & { spec: Biome['props'][number] }) | null {
     const { biome } = this;
+    // scenery owns its cell
+    if (this.obstacles.at(Math.floor(TX / 2), Math.floor(TY / 2))) return null;
     const u = hash2(TX, TY, biome.seed + 999);
     let acc = 0;
     for (let i = 0; i < biome.props.length; i++) {

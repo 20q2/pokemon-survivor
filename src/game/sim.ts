@@ -13,6 +13,8 @@ import { fireMoves, updateProjectiles, damagePlayer, updatePlayerMoves } from '.
 import { activateMega, updateMega } from './mega.ts';
 import { Spawner, updateEnemies, killEnemy } from './enemies.ts';
 import { heal, newLedger } from './ledger.ts';
+import { Obstacles } from './obstacles.ts';
+import { FlowField } from './flow.ts';
 import type {
   ChestReward, ChestTier, Enemy, GameEvent, Pickup, PickupKind, Player, Projectile, UpgradeOffer,
 } from './types.ts';
@@ -92,6 +94,10 @@ export class Sim {
   readonly elite: boolean;
   readonly rng: Rng;
   readonly grid = new SpatialGrid<Enemy>(48);
+  /** Trees, boulders… that block walking and flying shots (generated from the stage). */
+  readonly obstacles: Obstacles;
+  /** Per partner: the way round the scenery to them (for foes that bump into it). */
+  readonly flow: FlowField[] = [];
   time = 0;
   phase: Phase = 'play';
   cine: Cinematic | null = null;
@@ -139,6 +145,7 @@ export class Sim {
 
   constructor(cfg: SimConfig) {
     this.stage = STAGE[cfg.stageId];
+    this.obstacles = new Obstacles(cfg.stageId);
     this.elite = !!cfg.elite;
     this.rng = new Rng(cfg.seed);
     this.spawner = new Spawner(this);
@@ -214,6 +221,7 @@ export class Sim {
     this.refreshStats();
     this.updatePlayers(dt);
     this.spawner.update(dt);
+    for (const p of this.players) (this.flow[p.id] ??= new FlowField()).update(this.obstacles, p.x, p.y, dt);
     updateEnemies(this, dt);
     this.rebuildGrid();
     fireMoves(this, dt);
@@ -253,6 +261,7 @@ export class Sim {
         if (p.moving) {
           p.x += p.mx * p.stats.speed * dt;
           p.y += p.my * p.stats.speed * dt;
+          this.obstacles.pushOut(p, p.radius);
           p.fx = p.mx / len;
           p.fy = p.my / len;
         }
@@ -286,6 +295,7 @@ export class Sim {
       if (best) { best.value += value; return best; }
     }
     const pk: Pickup = { id: this.id(), kind, x, y, value, vacuum: 0, vx: 0, vy: 0, t: 0, dead: false };
+    this.obstacles.pushOut(pk, 6);
     if (kind !== 'candy') {
       const a = this.rng.range(0, Math.PI * 2);
       pk.vx = Math.cos(a) * 60;
@@ -305,6 +315,8 @@ export class Sim {
         pk.y += pk.vy * dt;
         pk.vx *= 0.9;
         pk.vy *= 0.9;
+        // drops scatter around scenery, never into it (they'd be unreachable)
+        if (this.obstacles.pushOut(pk, 6)) pk.vx = pk.vy = 0;
         if (Math.abs(pk.vx) < 1) pk.vx = pk.vy = 0;
       }
       if (pk.vacuum) {

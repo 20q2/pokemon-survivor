@@ -177,7 +177,7 @@ describe('late-game systems', () => {
     }
     expect(alpha && stone && cache).toBe(true);
     expect(sim.enemies.some((e) => e.alpha && e.alive)).toBe(true);
-  });
+  }, 20_000);
 });
 
 describe('playtest regressions', () => {

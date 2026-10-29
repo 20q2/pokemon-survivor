@@ -188,6 +188,8 @@ export interface Enemy {
   ai: number;               // generic AI timer
   aiState: number;
   aiX: number; aiY: number;
+  /** Seconds left following the way round scenery it bumped into (instead of beelining). */
+  detour?: number;
   patterns: BossPattern[];
   patternIdx: number;
   minions: string[];
