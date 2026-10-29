@@ -9,6 +9,7 @@ import { Background, type DecorSprite } from './background.ts';
 import { DamageNumbers, Particles, Shape } from './fx.ts';
 import { DeathPops, POP_TIME, popSquash } from './pops.ts';
 import { HAZARD, HAZARD_IMPACT } from '../game/hazards.ts';
+import { dangerStrength } from '../game/danger.ts';
 import { PF_FOCUS, PF_RETARGET, PF_STICKY } from '../game/combat.ts';
 import { STATUS_INFO, STATUS_ORDER } from '../data/status.ts';
 import type { WeatherKind } from '../data/moves.ts';
@@ -51,6 +52,10 @@ export class Renderer {
   camX = 0;
   camY = 0;
   private shake = 0;
+  /** Brief zoom-in on elite kills: 1 -> 0 over PUNCH_LIFE seconds. */
+  private punch = 0;
+  /** Multiplier on particle / ground-hazard / trail alpha (the fxOpacity setting). */
+  fxOpacity = 1;
   private flash = 0;
   private flashColor = '#fff';
   private hurtFlash = 0;
@@ -64,6 +69,7 @@ export class Renderer {
   private booms: { x: number; y: number; r: number; color: string; t: number }[] = [];
   private labelCd = 0;
   private vignette: HTMLCanvasElement | null = null;
+  private dangerVignette: HTMLCanvasElement | null = null;
   private lookX = 0;
   private lookY = 0;
   private saved: number[] = [];
@@ -93,13 +99,16 @@ export class Renderer {
     this.baseZoom = Math.max(1, Math.floor((h / 450) * 2) / 2);
     this.applyZoom();
     this.vignette = null;
+    this.dangerVignette = null;
   }
 
   /** The view (and so the sim's spawn ring, which reads viewW/viewH) widens as the partner evolves. */
   private applyZoom() {
-    this.zoom = Math.max(1, this.baseZoom * this.evoZoom);
-    this.viewW = this.canvas.width / this.zoom;
-    this.viewH = this.canvas.height / this.zoom;
+    const view = Math.max(1, this.baseZoom * this.evoZoom);
+    // The punch scales only what is drawn; the sim-facing view size stays put.
+    this.zoom = view * (1 + PUNCH_ZOOM * this.punch);
+    this.viewW = this.canvas.width / view;
+    this.viewH = this.canvas.height / view;
   }
 
   reset() {
@@ -109,6 +118,7 @@ export class Renderer {
     this.chains = [];
     this.booms = [];
     this.shake = 0;
+    this.punch = 0;
     this.flash = 0;
   }
 
@@ -147,6 +157,7 @@ export class Renderer {
         P.ring(ev.x, ev.y - 6, ev.boss ? 48 : 14, '#ffffff', ev.boss ? 0.45 : 0.22);
         P.burst(ev.x, ev.y - 6, ev.boss ? 30 : 4, ev.boss ? 200 : 90, TYPE_COLORS[ev.type], 0.4, ev.boss ? 4 : 3, true, 0, Shape.SPARK);
         if (ev.boss) { this.addShake(8); this.screenFlash('#fff', 0.6); }
+        else if (ev.elite) this.punch = 1;
         if (ev.shiny) P.burst(ev.x, ev.y - 8, 18, 120, '#fff6a8', 0.8, 4, true, 0, Shape.SPARK);
         break;
       }
@@ -231,6 +242,10 @@ export class Renderer {
         this.applyZoom();
       }
     }
+    if (this.punch > 0) {
+      this.punch = Math.max(0, this.punch - dt / PUNCH_LIFE);
+      this.applyZoom();
+    }
     const z = this.zoom;
     if (me) {
       // The camera is locked to the (interpolated) partner; only the look-ahead eases. Snapping the
@@ -266,9 +281,19 @@ export class Renderer {
 
     // ground-level effects
     const fxL = Math.floor(L), fxT = Math.floor(T);
-    this.beginFx(W, H, fxL, fxT);
-    for (const pr of world.projectiles) if (isGroundFx(pr)) this.drawGroundFx(pr, world);
-    this.endFx(fxL, fxT);
+    if (this.fxOpacity >= 1) {
+      this.beginFx(W, H, fxL, fxT);
+      for (const pr of world.projectiles) if (isGroundFx(pr)) this.drawGroundFx(pr, world);
+      this.endFx(fxL, fxT);
+    } else {
+      // Telegraphs, zones, trails and auras fade with the setting; terrain, mines and cages stay solid.
+      this.beginFx(W, H, fxL, fxT);
+      for (const pr of world.projectiles) if (isGroundFx(pr) && !isDimmable(pr)) this.drawGroundFx(pr, world);
+      this.endFx(fxL, fxT);
+      this.beginFx(W, H, fxL, fxT);
+      for (const pr of world.projectiles) if (isGroundFx(pr) && isDimmable(pr)) this.drawGroundFx(pr, world);
+      this.endFx(fxL, fxT, 'source-over', this.fxOpacity);
+    }
     for (const pk of world.pickups) if (inView(pk.x, pk.y, L, T, W, H, 20)) this.drawPickup(pk, world.time);
 
     // shadows + y-sorted sprites
@@ -296,11 +321,11 @@ export class Renderer {
     for (const pr of world.projectiles) if (!isGroundFx(pr) && inView(pr.x, pr.y, L, T, W, H, pr.len + pr.r + 60)) this.drawProjectile(pr, world);
     this.drawChains(dt);
     this.drawBooms(dt);
-    this.particles.draw(this.g, false);
+    this.particles.draw(this.g, false, this.fxOpacity);
     this.endFx(fxL, fxT);
     this.beginFx(W, H, fxL, fxT);
     this.g.globalCompositeOperation = 'lighter';
-    this.particles.draw(this.g, true);
+    this.particles.draw(this.g, true, this.fxOpacity);
     this.g.globalCompositeOperation = 'source-over';
     this.endFx(fxL, fxT, 'lighter');
     this.drawStatusOverlays(world, L, T, W, H);
@@ -310,6 +335,7 @@ export class Renderer {
     // screen space
     g.setTransform(1, 0, 0, 1, 0, 0);
     if (world.stage.darkness && me) this.drawDarkness(world.stage.darkness, (me.x - left) * z, (me.y - 8 - top) * z);
+    if (me && !me.fainted) this.drawDanger(dangerStrength(me.hp / me.stats.maxHp));
     if (world.weather) this.drawWeather(world.weather, world.time);
     this.drawIndicators(world, left, top);
     if (this.hurtFlash > 0) {
@@ -345,12 +371,14 @@ export class Renderer {
     this.g = g;
   }
 
-  private endFx(fxL: number, fxT: number, op: GlobalCompositeOperation = 'source-over') {
+  private endFx(fxL: number, fxT: number, op: GlobalCompositeOperation = 'source-over', alpha = 1) {
     if (!this.mainG) return;
     this.g = this.mainG;
     this.mainG = null;
     this.g.globalCompositeOperation = op;
+    this.g.globalAlpha = alpha;
     this.g.drawImage(this.fx, fxL, fxT);
+    this.g.globalAlpha = 1;
     this.g.globalCompositeOperation = 'source-over';
   }
 
@@ -1376,6 +1404,27 @@ export class Renderer {
     g.globalAlpha = 1;
   }
 
+  /** Soft red vignette for low HP; same radial technique as the stage darkness, centred on the screen. */
+  private drawDanger(strength: number) {
+    if (strength <= 0) return;
+    const g = this.g;
+    const w = this.canvas.width, h = this.canvas.height;
+    if (!this.dangerVignette) {
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const vg = c.getContext('2d')!;
+      const grad = vg.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.3, w / 2, h / 2, Math.max(w, h) * 0.65);
+      grad.addColorStop(0, 'rgba(200,0,0,0)');
+      grad.addColorStop(1, 'rgba(200,0,0,1)');
+      vg.fillStyle = grad;
+      vg.fillRect(0, 0, w, h);
+      this.dangerVignette = c;
+    }
+    g.globalAlpha = strength;
+    g.drawImage(this.dangerVignette, 0, 0);
+    g.globalAlpha = 1;
+  }
+
   private drawIndicators(world: WorldView, left: number, top: number) {
     const g = this.g;
     const z = this.zoom;
@@ -1507,6 +1556,11 @@ export const SLOT_COLORS = ['#ff6b6b', '#4dabf7', '#69db7c', '#ffd43b'];
 
 export const chestTier = (v: number) => Math.max(1, Math.min(4, Math.round(v))) as ChestTier;
 
+/** Ground effects the fx-opacity setting may fade: everything except terrain, mines and cages. */
+function isDimmable(pr: Projectile) {
+  return pr.moveId === HAZARD || !(pr.behavior === 'terrain' || pr.behavior === 'mine' || (pr.behavior === 'zone' && pr.shape === 'ring'));
+}
+
 function isGroundFx(pr: Projectile) {
   return pr.moveId === HAZARD || (!pr.hostile && (pr.behavior === 'zone' || pr.behavior === 'trail' || pr.behavior === 'aura'
     || pr.behavior === 'terrain' || (pr.behavior === 'mine' && pr.fx !== 'bubble')));
@@ -1526,6 +1580,8 @@ function inView(x: number, y: number, L: number, T: number, W: number, H: number
 const DOWN_ROW = dirRow(0, 1);
 /** Camera zoom multiplier per evolution stage of the local partner. */
 const EVO_ZOOM = [1, 0.9, 0.8];
+const PUNCH_ZOOM = 0.04;
+const PUNCH_LIFE = 0.25;
 /** Partners draw larger as they evolve (cosmetic; hitboxes are unchanged). With EVO_ZOOM the
  * partner keeps roughly its on-screen size while the world around it shrinks. */
 const growth = (p: Player) => [1, 1.15, 1.3][Math.min(p.stage, 2)];

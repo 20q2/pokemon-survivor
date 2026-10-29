@@ -71,13 +71,14 @@ export class Particles {
     this.n = w;
   }
 
-  draw(g: CanvasRenderingContext2D, additivePass: boolean) {
+  /** `opacity` is the player's fx-opacity setting. */
+  draw(g: CanvasRenderingContext2D, additivePass: boolean, opacity = 1) {
     for (let i = 0; i < this.n; i++) {
       if ((this.additive[i] === 1) !== additivePass) continue;
       const k = this.life[i] / this.max[i];
       const x = Math.round(this.x[i]), y = Math.round(this.y[i]);
       const size = this.size[i];
-      g.globalAlpha = step(k);
+      g.globalAlpha = step(k) * opacity;
       g.fillStyle = this.color[i];
       switch (this.shape[i]) {
         case Shape.SPARK: {
@@ -89,7 +90,7 @@ export class Particles {
           break;
         }
         case Shape.PUFF: {
-          g.globalAlpha = step(k) * 0.6;
+          g.globalAlpha = step(k) * 0.6 * opacity;
           const r = Math.max(1, Math.round(size * (1.3 - k * 0.7)));
           for (let yy = -r; yy <= r; yy++) {
             const w = Math.floor(Math.sqrt(r * r - yy * yy + r * 0.8));
@@ -203,9 +204,11 @@ export class DamageNumbers {
   private font = new BitmapFont();
   private nums: Num[] = [];
   private labels: Label[] = [];
+  /** Max simultaneous damage numbers (the numberCap setting). */
+  cap = 160;
 
   add(x: number, y: number, value: number, eff: number, crit: boolean) {
-    if (this.nums.length > 160) {
+    if (this.nums.length > this.cap) {
       // under heavy load keep only meaningful numbers
       if (eff <= 1 && !crit && value < 50) return;
       this.nums.shift();

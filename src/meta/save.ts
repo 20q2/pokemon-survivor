@@ -6,6 +6,10 @@ export interface Options {
   shake: boolean;
   damageNumbers: boolean;
   showFps: boolean;
+  /** Opacity of particles, hazard telegraphs and trails (0.25-1). */
+  fxOpacity: number;
+  /** Most damage numbers on screen at once. */
+  numberCap: 40 | 80 | 160;
   autoPick: boolean;
   damageMeter: boolean;
   meterTab: 'dmg' | 'boss' | 'heal';
@@ -63,7 +67,7 @@ export function freshSave(): SaveData {
       runs: 0, kills: 0, bosses: 0, clears: 0, evolutions: 0, masteries: 0, timePlayed: 0,
       moneyEarned: 0, shiniesDefeated: 0, superEffective: 0, coopRuns: 0, maxLevel: 0, revives: 0,
     },
-    options: { music: 0.5, sfx: 0.6, shake: true, damageNumbers: true, showFps: false, autoPick: false, damageMeter: false, meterTab: 'dmg', name: 'Trainer' },
+    options: { music: 0.5, sfx: 0.6, shake: true, damageNumbers: true, showFps: false, fxOpacity: 1, numberCap: 160, autoPick: false, damageMeter: false, meterTab: 'dmg', name: 'Trainer' },
     lastLine: 'charmander', lastStage: 'viridian', flags: {}, bestTimes: {}, movesSeen: {},
   };
 }

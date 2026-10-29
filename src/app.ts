@@ -11,6 +11,7 @@ import type { GameEvent } from './game/types.ts';
 import { applyRun, checkAchievements, type RunRewards } from './meta/progression.ts';
 import type { RunSummary } from './meta/achievements.ts';
 import { loadSave, storeSave, type SaveData } from './meta/save.ts';
+import { heartbeatInterval } from './game/danger.ts';
 import { metaBonuses } from './meta/shop.ts';
 import { assets } from './render/assets.ts';
 import { Renderer } from './render/renderer.ts';
@@ -42,6 +43,7 @@ export class App {
   private endTimer = 0;
   private bossMusic = false;
   private autoT = 0;
+  private heartT = 0;
   private tutorial: { at: number; text: string }[] = [];
   private alphasDown = 0;
   private offersSeen: unknown = null;
@@ -85,6 +87,8 @@ export class App {
     audio.setVolumes(o.music, o.sfx);
     this.renderer.shakeEnabled = o.shake;
     this.renderer.showNumbers = o.damageNumbers;
+    this.renderer.fxOpacity = o.fxOpacity;
+    this.renderer.numbers.cap = o.numberCap;
     this.hud.showFps = o.showFps;
     this.hud.meter.show(o.damageMeter);
     if (this.hud.meter.tab !== o.meterTab) this.hud.meter.setTab(o.meterTab);
@@ -205,6 +209,15 @@ export class App {
       { at: 20, text: 'Super-effective moves deal double damage. Mind the types!' },
       { at: 45, text: 'Max a move, hold its type item, then open a treasure to master it!' },
     ] : [];
+  }
+
+  /** Low-HP heartbeat; UI-side (not the sim) since it is local feedback only. */
+  private updateHeartbeat(s: RunSession, dt: number) {
+    const me = s.world.players[s.localId];
+    const every = me && !me.fainted && s.phase() === 'play' && !s.paused ? heartbeatInterval(me.hp / me.stats.maxHp) : 0;
+    if (!every) { this.heartT = 0; return; }
+    this.heartT -= dt;
+    if (this.heartT <= 0) { audio.sfx('heartbeat'); this.heartT = every; }
   }
 
   endRun() {
@@ -414,6 +427,7 @@ export class App {
       s.step(dt, m.x, m.y, this.renderer.viewW, this.renderer.viewH);
       for (const ev of s.drainEvents()) this.handleEvent(ev, s);
       if (this.tutorial.length && s.world.time >= this.tutorial[0].at && s.phase() === 'play') banner(this.tutorial.shift()!.text, false, 3600);
+      this.updateHeartbeat(s, dt);
       if (this.bossMusic && !s.world.enemies.some((e) => e.boss && e.alive)) {
         this.bossMusic = false;
         audio.playMusic(STAGE[s.stage.id].music);

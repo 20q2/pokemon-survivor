@@ -8,7 +8,7 @@ import { TYPE_COLORS, TYPES, effectiveness, type PType } from '../data/types.ts'
 import { ACHIEVEMENTS, rewardText, stageUnlocked } from '../meta/achievements.ts';
 import { checkAchievements, type RunRewards } from '../meta/progression.ts';
 import type { RunSummary } from '../meta/achievements.ts';
-import { exportSave, freshSave, importSave } from '../meta/save.ts';
+import { exportSave, freshSave, importSave, type Options } from '../meta/save.ts';
 import { FRIENDSHIP_MAX, FRIENDSHIP_PERKS, SHOP, SHOP_CATS, TM_COST, TM_LIST, upgradeCost, type ShopCat } from '../meta/shop.ts';
 import { assets, ASSET_BASE } from '../render/assets.ts';
 import { stageThumbnail } from '../render/background.ts';
@@ -408,8 +408,8 @@ export function dexScreen(app: App, tab: 'mons' | 'moves' | 'items' = 'mons') {
 
 export function optionsScreen(app: App, onBack: () => void) {
   const o = app.save.options;
-  const slider = (label: string, val: number, set: (v: number) => void) =>
-    h('div', { class: 'opt-row' }, h('span', null, label), h('input', { type: 'range', min: 0, max: 1, step: 0.05, value: val, oninput: (e: Event) => { set(+(e.target as HTMLInputElement).value); app.applyOptions(); app.persist(); } }));
+  const slider = (label: string, val: number, set: (v: number) => void, min = 0) =>
+    h('div', { class: 'opt-row' }, h('span', null, label), h('input', { type: 'range', min, max: 1, step: 0.05, value: val, oninput: (e: Event) => { set(+(e.target as HTMLInputElement).value); app.applyOptions(); app.persist(); } }));
   const check = (label: string, val: boolean, set: (v: boolean) => void) =>
     h('div', { class: 'opt-row' }, h('span', null, label), h('input', { type: 'checkbox', class: 'toggle', checked: val, onchange: (e: Event) => { set((e.target as HTMLInputElement).checked); app.applyOptions(); app.persist(); } }));
   const io = h('textarea', { placeholder: 'Paste a save code here to import' });
@@ -421,6 +421,10 @@ export function optionsScreen(app: App, onBack: () => void) {
       slider('Sound effects', o.sfx, (v) => (o.sfx = v)),
       check('Screen shake', o.shake, (v) => (o.shake = v)),
       check('Damage numbers', o.damageNumbers, (v) => (o.damageNumbers = v)),
+      slider('Effect opacity', o.fxOpacity, (v) => (o.fxOpacity = v), 0.25),
+      h('div', { class: 'opt-row' }, h('span', null, 'Max damage numbers'),
+        h('select', { onchange: (e: Event) => { o.numberCap = +(e.target as HTMLSelectElement).value as Options['numberCap']; app.applyOptions(); app.persist(); } },
+          [40, 80, 160].map((n) => h('option', { value: n, selected: o.numberCap === n }, String(n))))),
       check('Auto-pick upgrades', o.autoPick, (v) => (o.autoPick = v)),
       check('Damage tracker (T)', o.damageMeter, (v) => (o.damageMeter = v)),
       check('Show FPS', o.showFps, (v) => (o.showFps = v)),

@@ -99,6 +99,10 @@ export class Sim {
   /** Per partner: the way round the scenery to them (for foes that bump into it). */
   readonly flow: FlowField[] = [];
   time = 0;
+  /** Sim-time freeze left (s): a sim-side time-scale so every co-op peer stops on the same tick. */
+  hitStop = 0;
+  /** `time` before which another crit may not trigger hit-stop. */
+  critStopReady = 0;
   phase: Phase = 'play';
   cine: Cinematic | null = null;
   cineQueue: Cinematic[] = [];
@@ -209,11 +213,15 @@ export class Sim {
     this.eventTap?.(e);
   }
 
+  /** Freeze the sim for `seconds` (never shortens a longer freeze already running). */
+  stop(seconds: number) { if (seconds > this.hitStop) this.hitStop = seconds; }
+
   // ───────────────────────────── main loop ─────────────────────────────
 
   update(dt: number) {
     if (this.phase === 'cine') return this.updateCine(dt);
     if (this.phase !== 'play') return;
+    if (this.hitStop > 1e-9) { this.hitStop -= dt; return; }
     this.time += dt;
     for (const p of this.players) { p.px = p.x; p.py = p.y; }
     for (const e of this.enemies) { e.px = e.x; e.py = e.y; }

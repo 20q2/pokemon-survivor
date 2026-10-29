@@ -268,3 +268,66 @@ describe('damage tracker ledger', () => {
     expect(p.ledger.heal.regen).toBeGreaterThan(0);
   }, 30_000);
 });
+
+describe('hit-stop', () => {
+  const make = (seed = 7) => new Sim({ stageId: 'viridian', seed, players: [{ name: 'a', lineId: 'charmander', shiny: false, meta: metaBonuses({}), tms: [] }] });
+
+  it('freezes sim time for the stop, then resumes', () => {
+    const sim = make();
+    sim.update(DT);
+    const t0 = sim.time;
+    sim.stop(2 * DT);
+    sim.update(DT); sim.update(DT);
+    expect(sim.time).toBe(t0);
+    sim.update(DT);
+    expect(sim.time).toBeCloseTo(t0 + DT);
+  });
+
+  it('a longer stop is not shortened by a shorter one', () => {
+    const sim = make();
+    sim.stop(7 / 60);
+    sim.stop(2 / 60);
+    expect(sim.hitStop).toBeCloseTo(7 / 60);
+  });
+
+  it('an elite kill stops for 7 frames, a boss kill does not', async () => {
+    const { spawnEnemy, killEnemy } = await import('../src/game/enemies.ts');
+    const sim = make();
+    const e = spawnEnemy(sim, 'rattata', 100, 0, { elite: true })!;
+    killEnemy(sim, e, 0);
+    expect(sim.hitStop).toBeCloseTo(7 / 60);
+    expect(sim.events.some((ev) => ev.e === 'kill' && ev.elite)).toBe(true);
+    const sim2 = make();
+    const b = spawnEnemy(sim2, 'scyther', 100, 0, { boss: { species: 'scyther', at: 900, patterns: ['charge'] } })!;
+    killEnemy(sim2, b, 0);
+    expect(sim2.hitStop).toBe(0);
+  });
+
+  it('crits stop for 2 frames at most once per 0.5 s of sim time', async () => {
+    const { spawnEnemy } = await import('../src/game/enemies.ts');
+    const { makeProjectile } = await import('../src/game/combat.ts');
+    const sim = make();
+    const e = spawnEnemy(sim, 'rattata', 100, 0)!;
+    e.hp = e.maxHp = 1e9;
+    const p = sim.players[0];
+    const shoot = () => makeProjectile(sim, { owner: p.id, moveId: 'ember', x: e.x, y: e.y, r: 20, life: 0.3, pierce: -1, dmg: 10, crit: 1 });
+    const stops: number[] = [];
+    shoot();
+    for (let i = 0; i < 120; i++) {
+      const before = sim.hitStop;
+      sim.update(DT);
+      if (sim.hitStop > before) stops.push(sim.time);
+      if (i % 20 === 19) shoot();
+    }
+    expect(stops.length).toBeGreaterThan(1);
+    for (let i = 1; i < stops.length; i++) expect(stops[i] - stops[i - 1]).toBeGreaterThanOrEqual(0.5 - 1e-9);
+  });
+
+  it('stays deterministic: same seed, same time and kills', () => {
+    const a = run('charmander', 'viridian', 60);
+    const b = run('charmander', 'viridian', 60);
+    expect(b.time).toBe(a.time);
+    expect(b.kills).toBe(a.kills);
+    expect(b.xp).toBe(a.xp);
+  });
+});

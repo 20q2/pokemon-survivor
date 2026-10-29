@@ -716,6 +716,9 @@ function dropCandy(sim: Sim, e: Enemy) {
   }
 }
 
+/** Elite / alpha kill hit-stop: 7 frames. Bosses have their own cinematic. */
+const ELITE_KILL_STOP = 7 / 60;
+
 export function killEnemy(sim: Sim, e: Enemy, killerId: number) {
   if (!e.alive) return;
   e.alive = false;
@@ -725,7 +728,8 @@ export function killEnemy(sim: Sim, e: Enemy, killerId: number) {
   if (killer) killer.kills++;
   megaOnKill(sim, killer, e.elite, e.boss);
   sim.defeatedSpecies.set(e.speciesId, (sim.defeatedSpecies.get(e.speciesId) ?? 0) + 1);
-  sim.emit({ e: 'kill', x: e.x, y: e.y, species: e.speciesId, boss: e.boss, shiny: e.shiny, scale: e.scale, anim: e.animOffset, type: e.types[0] });
+  sim.emit({ e: 'kill', x: e.x, y: e.y, species: e.speciesId, boss: e.boss, shiny: e.shiny, scale: e.scale, anim: e.animOffset, type: e.types[0], elite: e.elite || e.alpha });
+  if ((e.elite || e.alpha) && !e.boss) sim.stop(ELITE_KILL_STOP);
   const r = sim.rng;
   dropCandy(sim, e);
   spreadOnDeath(sim, e);

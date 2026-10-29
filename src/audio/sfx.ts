@@ -30,6 +30,8 @@ export const SFX: Record<string, SfxDef> = {
 
   // ── combat ──
   hurt: { bpm: 200, p1: 'o4 l64 @2 E1 v11 a f d < a f', noise: 'v10 s16', tri: 'o2 l32 a', vol: 1.3 },
+  // Lub-dub: two low triangle thumps, quiet; the cadence is set by the caller.
+  heartbeat: { bpm: 200, noise: 'v7 k8 r16 v5 k8', vol: 0.9 },
   // Rising fourth, bright and short: a cheerful minute marker, not an alarm.
   wave: { bpm: 180, p1: 'o5 l16 @0 E1 v10 c f8', p2: 'o5 l16 @0 E1 v5 r16 > c8', vol: 1.5 },
   warn: { bpm: 160, p1: 'o5 l16 @1 E1 v10 e r16 e', p2: 'o4 l16 @2 E1 v6 a r16 a', vol: 1.7 },
