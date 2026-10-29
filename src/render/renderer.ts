@@ -8,6 +8,9 @@ import { assets, type Anim } from './assets.ts';
 import { Background, type DecorSprite } from './background.ts';
 import { DamageNumbers, Particles, Shape } from './fx.ts';
 import { HAZARD, HAZARD_IMPACT } from '../game/hazards.ts';
+import { PF_FOCUS, PF_RETARGET, PF_STICKY } from '../game/combat.ts';
+import { STATUS_INFO, STATUS_ORDER } from '../data/status.ts';
+import type { WeatherKind } from '../data/moves.ts';
 
 /** What the renderer needs from a world — satisfied by Sim (host/solo) and the network replica (client). */
 export interface WorldView {
@@ -21,6 +24,7 @@ export interface WorldView {
   cine: Cinematic | null;
   /** Render interpolation fraction between the previous and current sim step (1 = no interpolation). */
   alpha?: number;
+  weather?: WeatherKind | null;
 }
 
 type Pos = { x: number; y: number; px?: number; py?: number };
@@ -151,6 +155,9 @@ export class Renderer {
         break;
       case 'chain':
         this.chains.push({ pts: ev.pts, color: TYPE_COLORS[ev.type], t: 0 });
+        break;
+      case 'callout':
+        this.numbers.label(ev.x, ev.y, ev.text, ev.color, 1.1, 6);
         break;
       case 'raid':
         this.numbers.label(ev.x, ev.y - (ev.big ? 58 : 34), `${ev.name}!`, ev.big ? '#ffb0a0' : '#ffd0c0', 1.5, ev.big ? 8 : 6);
@@ -296,6 +303,7 @@ export class Renderer {
     // screen space
     g.setTransform(1, 0, 0, 1, 0, 0);
     if (world.stage.darkness && me) this.drawDarkness(world.stage.darkness, (me.x - left) * z, (me.y - 8 - top) * z);
+    if (world.weather) this.drawWeather(world.weather, world.time);
     this.drawIndicators(world, left, top);
     if (this.hurtFlash > 0) {
       g.fillStyle = `rgba(255,0,0,${this.hurtFlash * 0.35})`;
@@ -427,13 +435,31 @@ export class Renderer {
       g.ellipse(e.x, e.y, e.radius + 4, (e.radius + 4) * 0.45, 0, 0, TAU);
       g.stroke();
     }
-    const frozen = e.st.freeze > 0 || e.st.flinch > 0;
-    const t = frozen ? e.animOffset : time * (e.st.slow > 0 || e.st.paralyze > 0 ? 0.5 : 1) + e.animOffset;
-    this.drawAnim(set.walk, e.x, e.y, t, dirRow(e.dirX, e.dirY), e.scale, Math.min(0.65, e.flash * 8));
-    if (e.st.freeze > 0) {
+    const st = e.st;
+    const frozen = st.freeze > 0 || st.sleep > 0 || st.root > 0;
+    const t = frozen ? e.animOffset : time * (st.slow > 0 || st.paralyze > 0 || st.chill > 0 ? 0.5 : 1) + e.animOffset;
+    // Sky Uppercut: launched foes hang in the air.
+    const lift = st.air > 0 ? 22 * Math.sin(Math.min(1, st.air / 0.8) * Math.PI) + 6 : 0;
+    this.drawAnim(set.walk, e.x, e.y - lift, t, dirRow(e.dirX, e.dirY), e.scale, Math.min(0.65, e.flash * 8));
+    if (st.freeze > 0) {
       g.fillStyle = 'rgba(170,225,255,0.45)';
       g.fillRect(e.x - 10 * e.scale, e.y - 24 * e.scale, 20 * e.scale, 24 * e.scale);
+    } else if (st.chill > 0) {
+      g.fillStyle = `rgba(200,240,255,${0.12 * st.chill})`;
+      g.fillRect(e.x - 10 * e.scale, e.y - 24 * e.scale, 20 * e.scale, 24 * e.scale);
     }
+    if (st.root > 0) {
+      g.strokeStyle = '#5fae3c'; g.lineWidth = 1.5;
+      for (let i = -1; i <= 1; i++) { g.beginPath(); g.moveTo(e.x + i * 5, e.y + 2); g.quadraticCurveTo(e.x + i * 9, e.y - 6, e.x + i * 3, e.y - 10); g.stroke(); }
+    }
+    if (st.curse > 0) {
+      g.globalCompositeOperation = 'lighter';
+      g.globalAlpha = 0.35 + 0.2 * Math.sin(time * 5 + e.id);
+      g.drawImage(assets.glow.get('ghost')!, e.x - 16 * e.scale, e.y - 30 * e.scale, 32 * e.scale, 32 * e.scale);
+      g.globalAlpha = 1;
+      g.globalCompositeOperation = 'source-over';
+    }
+    this.drawStatusBadges(e);
     if (e.shiny && Math.random() < 0.08) this.particles.spawn(e.x + (Math.random() - 0.5) * 20, e.y - 10 - Math.random() * 16, 0, -20, 0.5, 3, '#fff6a8', 0, true, Shape.SPARK);
     if (e.elite || e.alpha || (e.boss && e.hp < e.maxHp)) {
       const w = 22 * e.scale;
@@ -479,11 +505,15 @@ export class Renderer {
       g.stroke();
       return;
     }
+    if (p.burrowT > 0) return this.drawBurrow(p, time);
+    this.drawMoveStatesBehind(p, time);
     const anim = p.moving ? set.walk : set.idle;
     const blink = p.hurtT > 0 ? (Math.floor(p.hurtT * 30) % 2) * 0.8 : 0;
     // Forms without a Mega sprite grow and glow instead.
     const scale = grow * (mega && !mega.sprite ? 1.25 : 1);
-    this.drawAnim(anim, p.x, p.y, time * (p.moving ? 1.2 : 1), dirRow(p.fx, p.fy), scale, blink);
+    const jitter = p.digWind > 0 ? (Math.random() - 0.5) * 3 : 0;
+    this.drawAnim(p.sleepT > 0 ? set.idle : anim, p.x + jitter, p.y, p.sleepT > 0 ? 0 : time * (p.moving ? 1.2 : 1), dirRow(p.fx, p.fy), scale, blink, p.vanishT > 0 ? 0.25 : 1);
+    this.drawMoveStatesFront(p, time);
     if (p.shiny && Math.random() < 0.12) this.particles.spawn(p.x + (Math.random() - 0.5) * 22, p.y - 6 - Math.random() * 22, 0, -24, 0.6, 3, '#fff6a8', 0, true, Shape.SPARK);
     for (const b of p.buffs) {
       if (b.kind === 'shield') { g.strokeStyle = 'rgba(160,220,255,0.6)'; g.lineWidth = 1.5; g.beginPath(); g.arc(p.x, p.y - 12 * grow, 18 * grow, 0, TAU); g.stroke(); }
@@ -513,6 +543,293 @@ export class Renderer {
       g.fillRect(Math.round(p.x) - 12, Math.round(p.y) - 34, 24, 2);
       g.globalAlpha = 1;
     }
+  }
+
+  // ─────────────────────────── move states & statuses ───────────────────────────
+
+  /** Up to two status badges (PKMN-style 3-letter tags) over a foe's head. */
+  private drawStatusBadges(e: Enemy) {
+    const st = e.st as unknown as Record<string, number>;
+    const g = this.g;
+    let n = 0;
+    const y = Math.round(e.y - 30 * e.scale - (e.elite || e.alpha || e.boss ? 8 : 2));
+    const shown: string[] = [];
+    for (const k of STATUS_ORDER) {
+      if (n >= 2) break;
+      if ((st[k] ?? 0) > 0 && STATUS_INFO[k]) { shown.push(k); n++; }
+    }
+    if (!shown.length) return;
+    g.font = '5px "Press Start 2P", monospace';
+    g.textAlign = 'center';
+    const w = 17, gap = 1;
+    let x = Math.round(e.x - (shown.length * w + (shown.length - 1) * gap) / 2);
+    for (const k of shown) {
+      const info = STATUS_INFO[k as keyof typeof STATUS_INFO]!;
+      g.fillStyle = '#000';
+      g.fillRect(x - 1, y - 1, w + 2, 9);
+      g.fillStyle = info.color;
+      g.fillRect(x, y, w, 7);
+      g.fillStyle = lightColor(info.color) ? '#1a1a2a' : '#fff';
+      g.fillText(info.abbr, x + w / 2, y + 6);
+      x += w + gap;
+    }
+  }
+
+  private drawBurrow(p: Player, time: number) {
+    const g = this.g;
+    g.fillStyle = '#7a5a3a';
+    g.beginPath(); g.ellipse(p.x, p.y, 12, 5, 0, 0, TAU); g.fill();
+    g.fillStyle = '#a07a50';
+    g.beginPath(); g.ellipse(p.x, p.y - 2, 9, 3.5, 0, 0, TAU); g.fill();
+    if (Math.random() < 0.7) this.particles.spawn(p.x + (Math.random() - 0.5) * 18, p.y, (Math.random() - 0.5) * 40, -40, 0.4, 3, Math.random() < 0.5 ? '#8b6b45' : '#c4a27a', 160, false, Shape.PUFF);
+    void time;
+  }
+
+  /** Effects drawn under the partner sprite: Outrage fury, Iron Defense shell. */
+  private drawMoveStatesBehind(p: Player, time: number) {
+    const g = this.g;
+    if (p.rageT > 0) {
+      g.globalCompositeOperation = 'lighter';
+      g.globalAlpha = 0.5 + 0.3 * Math.sin(time * 18);
+      g.drawImage(assets.glow.get('fire')!, p.x - 28, p.y - 42, 56, 56);
+      g.globalAlpha = 1;
+      g.globalCompositeOperation = 'source-over';
+    }
+    if (p.digWind > 0 && Math.random() < 0.9) {
+      this.particles.spawn(p.x + (Math.random() - 0.5) * 26, p.y + 2, (Math.random() - 0.5) * 60, -50 - Math.random() * 40, 0.5, 4, Math.random() < 0.5 ? '#8b6b45' : '#c4a27a', 140, false, Shape.PUFF);
+    }
+  }
+
+  /** Effects drawn over the partner sprite: Protect, Rest, Spark, Focus Punch, Iron Defense. */
+  private drawMoveStatesFront(p: Player, time: number) {
+    const g = this.g;
+    const grow = growth(p);
+    const has = (id: string) => p.moves.some((m) => m.id === id);
+    if (has('protect') && p.protectCd <= 0) {
+      g.strokeStyle = `rgba(110,255,150,${0.45 + 0.2 * Math.sin(time * 5)})`;
+      g.lineWidth = 1.5;
+      g.beginPath(); g.arc(p.x, p.y - 12 * grow, 17 * grow, 0, TAU); g.stroke();
+    }
+    if (has('iron-defense') && !p.moving) {
+      g.strokeStyle = 'rgba(200,210,225,0.85)';
+      g.lineWidth = 2;
+      g.beginPath(); g.arc(p.x, p.y - 10 * grow, 14 * grow, Math.PI * 0.95, Math.PI * 2.05); g.stroke();
+      g.fillStyle = '#e8eef8';
+      for (let i = 0; i < 3; i++) { const a = Math.PI * (1.2 + i * 0.3); g.fillRect(p.x + Math.cos(a) * 14 * grow - 1, p.y - 10 * grow + Math.sin(a) * 14 * grow - 1, 2, 2); }
+    }
+    if (p.sleepT > 0) {
+      g.font = '6px "Press Start 2P", monospace';
+      g.textAlign = 'left';
+      for (let i = 0; i < 3; i++) {
+        const k = ((time * 0.8 + i / 3) % 1);
+        g.globalAlpha = 1 - k;
+        g.fillStyle = '#cfd8ff';
+        g.fillText('z', p.x + 6 + k * 10 + i * 2, p.y - 24 * grow - k * 14);
+      }
+      g.globalAlpha = 1;
+    }
+    if (has('spark') && p.staticCharge >= 300 && Math.random() < 0.5) {
+      this.particles.spawn(p.x + (Math.random() - 0.5) * 22, p.y - 6 - Math.random() * 18, 0, 0, 0.12, 3, '#fff36b', 0, true, Shape.SPARK);
+    }
+    if (p.focusAt >= 0) {
+      g.globalCompositeOperation = 'lighter';
+      g.globalAlpha = 0.6 + 0.4 * Math.sin(time * 20);
+      g.drawImage(assets.glow.get('fighting')!, p.x + p.fx * 12 - 10, p.y - 16 - 10, 20, 20);
+      g.globalAlpha = 1;
+      g.globalCompositeOperation = 'source-over';
+    }
+  }
+
+  private drawWeather(w: WeatherKind, time: number) {
+    const g = this.g;
+    const W = this.canvas.width, H = this.canvas.height;
+    const tint: Record<WeatherKind, string> = { sun: 'rgba(255,200,90,0.12)', rain: 'rgba(40,70,140,0.16)', sand: 'rgba(200,155,80,0.26)', snow: 'rgba(220,235,255,0.14)' };
+    g.fillStyle = tint[w];
+    g.fillRect(0, 0, W, H);
+    const s = Math.max(1, Math.round(W / 480));
+    if (w === 'sun') {
+      const gr = g.createRadialGradient(W * 0.85, -H * 0.1, 0, W * 0.85, -H * 0.1, H * 0.9);
+      gr.addColorStop(0, 'rgba(255,240,180,0.35)');
+      gr.addColorStop(1, 'rgba(255,240,180,0)');
+      g.fillStyle = gr;
+      g.fillRect(0, 0, W, H);
+      return;
+    }
+    const n = w === 'rain' ? 90 : w === 'snow' ? 70 : 130;
+    for (let i = 0; i < n; i++) {
+      const seed = i * 97.13;
+      const speed = w === 'rain' ? 900 : w === 'snow' ? 60 : 500;
+      const x0 = (seed * 13.7) % W;
+      const y0 = (seed * 7.3) % H;
+      if (w === 'rain') {
+        const y = (y0 + time * speed) % H, x = (x0 - time * 200) % W;
+        g.strokeStyle = 'rgba(180,210,255,0.55)'; g.lineWidth = s;
+        g.beginPath(); g.moveTo((x + W) % W, y); g.lineTo((x + W) % W - 4 * s, y + 12 * s); g.stroke();
+      } else if (w === 'snow') {
+        const y = (y0 + time * speed) % H, x = (x0 + Math.sin(time + i) * 20 + W) % W;
+        g.fillStyle = 'rgba(255,255,255,0.8)';
+        g.fillRect(x, y, 2 * s, 2 * s);
+      } else {
+        const x = (x0 + time * speed) % W, y = (y0 + Math.sin(time * 2 + i) * 6 + H) % H;
+        g.fillStyle = i % 3 ? 'rgba(226,190,128,0.75)' : 'rgba(150,110,60,0.6)';
+        g.fillRect(x, y, (10 + (i % 4) * 4) * s, Math.max(1, s * 1.2));
+      }
+    }
+  }
+
+  private drawTerrain(pr: Projectile, time: number) {
+    const g = this.g;
+    const k = pr.t / pr.life;
+    const fade = k < 0.1 ? k / 0.1 : k > 0.85 ? (1 - k) / 0.15 : 1;
+    const col = pr.moveId === 'aqua-ring' ? '#5fb4ff' : pr.moveId === 'electric-terrain' ? '#ffe14d' : '#ffb3e0';
+    g.globalAlpha = 0.18 * fade;
+    g.fillStyle = col;
+    g.beginPath(); g.ellipse(pr.x, pr.y, pr.r, pr.r * 0.65, 0, 0, TAU); g.fill();
+    g.globalAlpha = 0.7 * fade;
+    g.strokeStyle = col; g.lineWidth = 1.5;
+    g.setLineDash(pr.moveId === 'electric-terrain' ? [4, 3] : []);
+    g.lineDashOffset = -time * 20;
+    g.beginPath(); g.ellipse(pr.x, pr.y, pr.r, pr.r * 0.65, 0, 0, TAU); g.stroke();
+    g.setLineDash([]);
+    g.globalAlpha = 1;
+    if (Math.random() < 0.4 * fade) {
+      const a = Math.random() * TAU, rr = Math.random() * pr.r;
+      const x = pr.x + Math.cos(a) * rr, y = pr.y + Math.sin(a) * rr * 0.65;
+      if (pr.moveId === 'electric-terrain') this.particles.spawn(x, y, 0, 0, 0.12, 3, '#fff36b', 0, true, Shape.SPARK);
+      else if (pr.moveId === 'aqua-ring') this.particles.spawn(x, y, 0, -30, 0.6, 2, '#bfe4ff', 0, true, Shape.RING);
+      else this.particles.spawn(x, y, 0, -10, 0.9, 5, '#ffd6ef', 0, false, Shape.PUFF);
+    }
+  }
+
+  private drawMine(pr: Projectile, time: number) {
+    const g = this.g;
+    const k = pr.t / pr.life;
+    g.globalAlpha = k > 0.85 ? (1 - k) / 0.15 : 1;
+    if (pr.fx === 'spike') {
+      g.fillStyle = '#b06bd9';
+      for (let i = 0; i < 3; i++) { const a = i * 2.1; g.beginPath(); g.moveTo(pr.x + Math.cos(a) * 4 - 2, pr.y + Math.sin(a) * 3); g.lineTo(pr.x + Math.cos(a) * 4, pr.y + Math.sin(a) * 3 - 6); g.lineTo(pr.x + Math.cos(a) * 4 + 2, pr.y + Math.sin(a) * 3); g.fill(); }
+    } else {
+      // Stealth Rock: a bobbing, pointed floating stone.
+      const bob = Math.sin(time * 3 + pr.id) * 2;
+      const r = pr.r;
+      g.fillStyle = 'rgba(0,0,0,0.3)';
+      g.beginPath(); g.ellipse(pr.x, pr.y, r * 0.6, r * 0.25, 0, 0, TAU); g.fill();
+      const cy = pr.y - r - 4 + bob;
+      g.fillStyle = '#6f6455';
+      g.beginPath(); g.moveTo(pr.x, cy - r); g.lineTo(pr.x + r * 0.75, cy - r * 0.1); g.lineTo(pr.x + r * 0.2, cy + r * 0.7); g.lineTo(pr.x - r * 0.7, cy + r * 0.2); g.closePath(); g.fill();
+      g.fillStyle = '#a99a80';
+      g.beginPath(); g.moveTo(pr.x, cy - r); g.lineTo(pr.x + r * 0.75, cy - r * 0.1); g.lineTo(pr.x + r * 0.05, cy); g.closePath(); g.fill();
+      g.fillStyle = '#e6dcc8';
+      g.fillRect(pr.x - 1, cy - r * 0.6, 2, 2);
+    }
+    g.globalAlpha = 1;
+  }
+
+  /** Fire Spin: a ring of flame foes can't walk out of. */
+  private drawCage(pr: Projectile, time: number) {
+    const g = this.g;
+    const k = pr.t / pr.life;
+    const fade = k > 0.85 ? (1 - k) / 0.15 : Math.min(1, k * 8);
+    g.globalAlpha = 0.5 * fade;
+    g.strokeStyle = '#ff7b2b'; g.lineWidth = 3;
+    g.beginPath(); g.ellipse(pr.x, pr.y, pr.r, pr.r * 0.65, 0, 0, TAU); g.stroke();
+    g.globalAlpha = 1;
+    for (let i = 0; i < 2; i++) {
+      const a = Math.random() * TAU;
+      this.particles.spawn(pr.x + Math.cos(a) * pr.r, pr.y + Math.sin(a) * pr.r * 0.65, 0, -50, 0.4, 3, Math.random() < 0.5 ? '#ffb347' : '#ff5e2b', 0, true, Shape.PUFF);
+    }
+    void time;
+  }
+
+  /** Solar Beam / Focus Punch gathering power: a swelling glow on the partner. */
+  private drawCharge(pr: Projectile, time: number) {
+    const g = this.g;
+    const k = Math.min(1, pr.t / Math.max(0.01, pr.delay));
+    const r = 6 + k * 14;
+    g.globalCompositeOperation = 'lighter';
+    g.globalAlpha = 0.5 + 0.5 * k * (0.7 + 0.3 * Math.sin(time * 30));
+    g.drawImage(assets.glow.get(pr.type)!, pr.x - r, pr.y - 10 - r, r * 2, r * 2);
+    g.globalAlpha = 1;
+    g.globalCompositeOperation = 'source-over';
+    if (Math.random() < 0.6) {
+      const a = Math.random() * TAU;
+      this.particles.spawn(pr.x + Math.cos(a) * 24, pr.y - 10 + Math.sin(a) * 24, -Math.cos(a) * 60, -Math.sin(a) * 60, 0.35, 2, TYPE_COLORS[pr.type], 0, true);
+    }
+  }
+
+  /** Future Sight's mark: a slowly closing psychic sigil over the targeted crowd. */
+  private drawForesight(pr: Projectile, time: number) {
+    const g = this.g;
+    const k = pr.t / pr.delay;
+    g.globalAlpha = 0.35 + 0.4 * k;
+    g.strokeStyle = TYPE_COLORS[pr.type]; g.lineWidth = 1.5;
+    g.beginPath(); g.ellipse(pr.x, pr.y, pr.r, pr.r * 0.6, 0, 0, TAU); g.stroke();
+    g.setLineDash([3, 3]); g.lineDashOffset = time * 20;
+    g.beginPath(); g.ellipse(pr.x, pr.y, pr.r * (1 - k * 0.7), pr.r * 0.6 * (1 - k * 0.7), 0, 0, TAU); g.stroke();
+    g.setLineDash([]);
+    g.globalAlpha = 1;
+  }
+
+  /** Rock Tomb pillar. */
+  private drawPillar(pr: Projectile) {
+    const g = this.g;
+    const k = pr.t / pr.life;
+    const rise = Math.min(1, pr.t / 0.15);
+    const h = 26 * rise;
+    g.globalAlpha = k > 0.85 ? (1 - k) / 0.15 : 1;
+    g.fillStyle = 'rgba(0,0,0,0.3)';
+    g.beginPath(); g.ellipse(pr.x, pr.y, pr.r, pr.r * 0.45, 0, 0, TAU); g.fill();
+    g.fillStyle = '#7d6f5c';
+    g.fillRect(pr.x - pr.r * 0.8, pr.y - h, pr.r * 1.6, h);
+    g.fillStyle = '#a8977d';
+    g.fillRect(pr.x - pr.r * 0.8, pr.y - h, pr.r * 0.6, h);
+    g.fillStyle = '#c9b89b';
+    g.beginPath(); g.ellipse(pr.x, pr.y - h, pr.r * 0.8, pr.r * 0.35, 0, 0, TAU); g.fill();
+    g.globalAlpha = 1;
+    if (pr.t < 0.05) this.particles.burst(pr.x, pr.y, 6, 60, '#b8a68a', 0.4, 4, false, -10, Shape.PUFF);
+  }
+
+  /** Substitute doll. */
+  private drawDecoy(pr: Projectile, time: number) {
+    const g = this.g;
+    const k = pr.t / pr.life;
+    const bob = Math.abs(Math.sin(time * 4)) * 2;
+    g.globalAlpha = k > 0.85 ? (1 - k) / 0.15 : 1;
+    g.fillStyle = 'rgba(0,0,0,0.25)';
+    g.beginPath(); g.ellipse(pr.x, pr.y, 7, 3, 0, 0, TAU); g.fill();
+    g.fillStyle = '#f2e3b3';
+    g.beginPath(); g.ellipse(pr.x, pr.y - 7 - bob, 7, 7, 0, 0, TAU); g.fill();
+    g.beginPath(); g.ellipse(pr.x, pr.y - 15 - bob, 5, 5, 0, 0, TAU); g.fill();
+    g.fillStyle = '#5a4a2a';
+    g.fillRect(pr.x - 3, pr.y - 16 - bob, 1, 1); g.fillRect(pr.x + 2, pr.y - 16 - bob, 1, 1);
+    g.strokeStyle = 'rgba(255,240,180,0.4)'; g.lineWidth = 1;
+    g.beginPath(); g.ellipse(pr.x, pr.y, pr.growth * (0.3 + 0.1 * Math.sin(time * 3)), pr.growth * 0.2, 0, 0, TAU); g.stroke();
+    g.globalAlpha = 1;
+  }
+
+  /** Infestation: a buzzing cloud of bugs. */
+  private drawSwarm(pr: Projectile, time: number) {
+    const g = this.g;
+    g.fillStyle = '#3d2f12';
+    for (let i = 0; i < 12; i++) {
+      const a = time * (5 + i) + i * 1.7;
+      const r = pr.r * (0.4 + 0.6 * ((i * 37) % 10) / 10);
+      g.fillRect(Math.round(pr.x + Math.cos(a) * r) - 1, Math.round(pr.y - 8 + Math.sin(a * 1.3) * r * 0.6) - 1, 3, 3);
+    }
+    g.fillStyle = '#a8b820';
+    for (let i = 0; i < 4; i++) {
+      const a = -time * 6 + i * 1.6;
+      g.fillRect(Math.round(pr.x + Math.cos(a) * pr.r * 0.5), Math.round(pr.y - 8 + Math.sin(a) * pr.r * 0.3), 1, 1);
+    }
+  }
+
+  /** Magnet Bomb stuck to a foe, blinking faster as the fuse runs out. */
+  private drawSticky(pr: Projectile, time: number) {
+    const g = this.g;
+    const fast = pr.t > pr.life - 2.2;
+    g.fillStyle = Math.floor(time * (fast ? 16 : 6)) % 2 ? '#ff4040' : '#cfd6e0';
+    g.beginPath(); g.arc(pr.x + 4, pr.y - 10, 4, 0, TAU); g.fill();
+    g.strokeStyle = '#555'; g.lineWidth = 1; g.stroke();
   }
 
   private drawPlayerBars(p: Player, coop: boolean) {
@@ -546,6 +863,12 @@ export class Renderer {
       if (st.poison > 0 && Math.random() < 0.12) P.spawn(e.x + (Math.random() - 0.5) * 12, e.y - 10, 0, -18, 0.6, 3, '#c069ff', 0, false, Shape.RING);
       if (st.paralyze > 0 && Math.random() < 0.12) P.spawn(e.x + (Math.random() - 0.5) * 16, e.y - 14 + (Math.random() - 0.5) * 10, 0, 0, 0.12, 3, '#fff36b', 0, true, Shape.SPARK);
       if (st.confuse > 0 && Math.random() < 0.15) P.spawn(e.x + Math.cos(world.time * 8) * 8, e.y - 26, 0, 0, 0.2, 2, '#ffe14d', 0, true);
+      if (st.wet > 0 && Math.random() < 0.1) P.spawn(e.x + (Math.random() - 0.5) * 12, e.y - 12, 0, 40, 0.35, 2, '#7fc0ff', 0, false);
+      if (st.sleep > 0 && Math.random() < 0.06) P.spawn(e.x + 6, e.y - 22, 8, -18, 0.8, 3, '#cfd8ff', 0, false, Shape.RING);
+      if (st.charm > 0 && Math.random() < 0.1) P.spawn(e.x + (Math.random() - 0.5) * 10, e.y - 22, 0, -20, 0.6, 3, '#ff8ccf', 0, true);
+      if (st.seed > 0 && Math.random() < 0.08) P.spawn(e.x + (Math.random() - 0.5) * 10, e.y - 10, 0, -14, 0.5, 2, '#6fdc5a', 0, true);
+      if (st.vuln > 0 && Math.random() < 0.06) P.spawn(e.x + (Math.random() - 0.5) * 12, e.y - 14, 0, 0, 0.2, 2, '#ff5050', 0, true, Shape.SPARK);
+      if (st.weaken > 0 && Math.random() < 0.06) P.spawn(e.x, e.y - 24, 0, 6, 0.5, 4, '#6b5a40', 0, false, Shape.PUFF);
     }
   }
 
@@ -604,6 +927,9 @@ export class Renderer {
 
   private drawGroundFx(pr: Projectile, world: WorldView) {
     if (pr.moveId === HAZARD) return this.drawHazard(pr, world.time);
+    if (pr.behavior === 'terrain') return this.drawTerrain(pr, world.time);
+    if (pr.behavior === 'mine') return this.drawMine(pr, world.time);
+    if (pr.behavior === 'zone' && pr.shape === 'ring') return this.drawCage(pr, world.time);
     const g = this.g;
     const col = TYPE_COLORS[pr.type];
     const k = pr.t / pr.life;
@@ -739,6 +1065,12 @@ export class Renderer {
       g.fillRect(pr.x - 1, pr.y - 1, 2, 2);
       return;
     }
+    if (pr.t < pr.delay && (pr.flags & (PF_RETARGET | PF_FOCUS))) return this.drawCharge(pr, world.time);
+    if (pr.behavior === 'wall') return this.drawPillar(pr);
+    if (pr.behavior === 'decoy') return this.drawDecoy(pr, world.time);
+    if (pr.behavior === 'minion') return this.drawSwarm(pr, world.time);
+    if ((pr.flags & PF_STICKY) && pr.follow) return this.drawSticky(pr, world.time);
+    if (pr.behavior === 'strike' && pr.follow && pr.t < pr.delay) return this.drawForesight(pr, world.time);
     if (pr.t < pr.delay && pr.behavior !== 'strike') return;
     const k = pr.t / pr.life;
     switch (pr.shape) {
@@ -1154,7 +1486,14 @@ export const SLOT_COLORS = ['#ff6b6b', '#4dabf7', '#69db7c', '#ffd43b'];
 export const chestTier = (v: number) => Math.max(1, Math.min(4, Math.round(v))) as ChestTier;
 
 function isGroundFx(pr: Projectile) {
-  return pr.moveId === HAZARD || (!pr.hostile && (pr.behavior === 'zone' || pr.behavior === 'trail' || pr.behavior === 'aura'));
+  return pr.moveId === HAZARD || (!pr.hostile && (pr.behavior === 'zone' || pr.behavior === 'trail' || pr.behavior === 'aura'
+    || pr.behavior === 'terrain' || (pr.behavior === 'mine' && pr.fx !== 'bubble')));
+}
+
+/** True for pale badge colours that need dark text. */
+function lightColor(hex: string) {
+  const n = parseInt(hex.slice(1), 16);
+  return 0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255) > 170;
 }
 
 function inView(x: number, y: number, L: number, T: number, W: number, H: number, m: number) {

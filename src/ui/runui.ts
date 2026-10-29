@@ -1,13 +1,13 @@
 import { MOVES, MASTERY_OF, MAX_MOVE_LEVEL, moveStatsAt, overLevelMult, type MoveStats } from '../data/moves.ts';
 import { ITEMS, VITAMIN, vitaminDesc } from '../data/items.ts';
-import { TYPE_COLORS, type PType } from '../data/types.ts';
 import { SPECIES } from '../data/pokedex.ts';
 import { assets } from '../render/assets.ts';
 import type { Player, UpgradeOffer } from '../game/types.ts';
 import type { RunSession } from '../game/session.ts';
 import { audio } from '../audio/audio.ts';
-import { btn, catBadge, h, img, typeBadge } from './dom.ts';
-import { BEHAVIOR_TEXT, hideTip } from './tips.ts';
+import { btn, catBadge, h, img, moveDisc, typeBadge } from './dom.ts';
+import { BEHAVIOR_TEXT, hideTip, statusLines } from './tips.ts';
+import { VERB_TEXT } from './verbs.ts';
 
 
 const STAT_LABEL: Partial<Record<keyof MoveStats, string>> = {
@@ -28,9 +28,9 @@ function upgradeDiff(id: string, level: number): string {
   return parts.join(', ') || 'Stronger';
 }
 
-/** A move shown as a TM disc in its type's colour. */
-function tmIcon(type: PType) {
-  return h('div', { class: 'ic tm', style: `--tc:${TYPE_COLORS[type]}` }, img(assets.itemUrl(`tm-${type}`)));
+/** A move shown as a TM disc on its own patterned tile (see movelook.ts). */
+function tmIcon(id: string) {
+  return moveDisc(id, 'ic tm');
 }
 
 export function offerCard(o: UpgradeOffer, p: Player, index: number, onPick: () => void) {
@@ -42,14 +42,14 @@ export function offerCard(o: UpgradeOffer, p: Player, index: number, onPick: () 
     case 'moveUp': {
       const def = MOVES[o.id];
       // Moves come as a TM disc in the move's type colour.
-      icon = tmIcon(def.type);
+      icon = tmIcon(def.id);
       name = def.name;
       const limit = o.kind === 'moveUp' && o.level > MAX_MOVE_LEVEL;
       tag = o.kind === 'newMove' ? 'NEW MOVE' : limit ? `LIMIT ★${o.level - MAX_MOVE_LEVEL}` : `Lv ${o.level}`;
       desc = o.kind === 'newMove' ? def.desc : limit
         ? `Limit break: +${Math.round((overLevelMult(o.level) / overLevelMult(o.level - 1) - 1) * 100)}% power.`
         : upgradeDiff(o.id, o.level);
-      meta = h('div', { class: 'meta' }, typeBadge(def.type), catBadge(def.cat), h('span', { class: 'hint' }, BEHAVIOR_TEXT[def.behavior]));
+      meta = h('div', { class: 'meta' }, typeBadge(def.type), catBadge(def.cat), h('span', { class: 'hint' }, VERB_TEXT[def.verb] ?? BEHAVIOR_TEXT[def.behavior]), ...(o.kind === 'newMove' ? statusLines(def.effect, def.effect2?.kind) : []));
       if (p.types.includes(def.type) && def.cat !== 'status') note = 'STAB ×1.5';
       const mast = MASTERY_OF[o.id];
       if (mast && o.kind === 'moveUp' && o.level === MAX_MOVE_LEVEL) note = `Max! Hold ${ITEMS[mast.mastery!.item].name} to master`;
@@ -70,7 +70,7 @@ export function offerCard(o: UpgradeOffer, p: Player, index: number, onPick: () 
       // "Forget <old move>, learn <new move> at the same level."
       const old = p.moves[o.level];
       const od = MOVES[old.id], nd = MOVES[o.id];
-      icon = tmIcon(od.type);
+      icon = tmIcon(od.id);
       name = od.name;
       tag = 'FORGET';
       desc = `${nd.name} takes its place at Lv ${Math.max(1, Math.min(MAX_MOVE_LEVEL, old.level))}.`;
@@ -172,7 +172,7 @@ export class LevelUpUI {
       const nd = MOVES[offers[0].id];
       heading = h('div', { class: 'learn-head' },
         h('h2', null, `${SPECIES[me.speciesId].name} wants to learn ${nd.name}!`),
-        h('div', { class: 'panel learn-move' }, tmIcon(nd.type),
+        h('div', { class: 'panel learn-move' }, tmIcon(nd.id),
           h('div', null,
             h('div', { class: 'meta' }, typeBadge(nd.type), catBadge(nd.cat), h('span', { class: 'hint' }, BEHAVIOR_TEXT[nd.behavior])),
             h('div', { class: 'ds' }, nd.desc))),

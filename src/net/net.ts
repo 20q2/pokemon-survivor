@@ -1,11 +1,11 @@
 import Peer, { type DataConnection } from 'peerjs';
 import { LINE, SPECIES } from '../data/pokedex.ts';
-import { stepProjectileMotion } from '../game/combat.ts';
+import { freshStatus, stepProjectileMotion } from '../game/combat.ts';
 import { LocalSession, type RunSession } from '../game/session.ts';
 import { Sim, type Phase, type PlayerInit, type SimConfig, type Cinematic } from '../game/sim.ts';
 import type { Enemy, GameEvent, Player, UpgradeOffer } from '../game/types.ts';
 import type { Ledger } from '../game/ledger.ts';
-import { decodeSnapshot, encodeSnapshot, PICKUP_KINDS, projFromWire, projToWire, PROTOCOL, ROOM_PREFIX, SNAP_HZ } from './protocol.ts';
+import { decodeSnapshot, encodeSnapshot, EXTRA_STATUS, MV, PICKUP_KINDS, projFromWire, projToWire, PROTOCOL, ROOM_PREFIX, SNAP_HZ } from './protocol.ts';
 
 export interface LobbyPlayer { slot: number; name: string; lineId: string; shiny: boolean; ready: boolean }
 
@@ -247,7 +247,7 @@ export class NetHost {
         wait: [...sim.offers.keys()].filter((id) => id !== r.slot).map((id) => sim.players[id]?.name ?? '?'),
         ev: ev.map(roundEvent), np, dp, nk, dk, ps,
       });
-      const snap = encodeSnapshot(sim.time, sim.players, sim.enemies, p.x, p.y, R);
+      const snap = encodeSnapshot(sim.time, sim.players, sim.enemies, p.x, p.y, R, sim.weather);
       try {
         if (r.snap?.open) r.snap.send(snap);
         else if (r.ctl.open) r.ctl.send(snap);
@@ -437,7 +437,12 @@ export class ClientSession implements RunSession {
       if (e.e === 'kill') this.defeatedMap.set(e.species, (this.defeatedMap.get(e.species) ?? 0) + 1);
       if (e.e === 'hurt' && e.player === this.localId && this.firstHit === Infinity) this.firstHit = sim.time;
     }
-    for (const a of m.np) sim.projectiles.push(projFromWire(a));
+    for (const a of m.np) {
+      // A projectile re-sent by the host (ricochet, latch…) replaces our copy.
+      const pr = projFromWire(a);
+      const i = sim.projectiles.findIndex((x) => x.id === pr.id);
+      if (i >= 0) sim.projectiles[i] = pr; else sim.projectiles.push(pr);
+    }
     if (m.dp.length) {
       const dead = new Set(m.dp);
       sim.projectiles = sim.projectiles.filter((p) => !dead.has(p.id));
@@ -471,6 +476,7 @@ export class ClientSession implements RunSession {
     const snap = decodeSnapshot(buf);
     if (!snap) return;
     const sim = this.sim;
+    sim.weather = snap.weather;
     snap.players.forEach((sp, i) => {
       const p = sim.players[i];
       if (!p) return;
@@ -478,6 +484,7 @@ export class ClientSession implements RunSession {
       p.fainted = sp.fainted;
       p.connected = sp.connected;
       p.reviveProgress = sp.revive;
+      applyMoveBits(p, sp.mv);
       if (sp.hurt) p.hurtT = Math.max(p.hurtT, 0.1);
       if (i === this.localId) {
         // The host may have moved us (e.g. revive). Snap only on big disagreement.
@@ -502,6 +509,9 @@ export class ClientSession implements RunSession {
       e.radius = 9 * se.scale;
       e.st.freeze = se.freeze ? 1 : 0; e.st.burn = se.burn ? 1 : 0; e.st.poison = se.poison ? 1 : 0;
       e.st.paralyze = se.paralyze ? 1 : 0; e.st.confuse = se.confuse ? 1 : 0; e.st.slow = se.slow ? 1 : 0;
+      const xs = e.st as unknown as Record<string, number>;
+      EXTRA_STATUS.forEach((k, i) => { xs[k] = se.ex & (1 << i) ? 1 : 0; });
+      ['seed', 'curse', 'toxic', 'flinch'].forEach((k, i) => { xs[k] = se.ex & (1 << (8 + i)) ? 1 : 0; });
       if (se.flash) e.flash = 0.1;
     }
     for (const id of this.enemyMap.keys()) if (!seen.has(id)) this.enemyMap.delete(id);
@@ -515,7 +525,7 @@ export class ClientSession implements RunSession {
     // local movement (client-authoritative for own position)
     if (me && !me.fainted && this.hostPhase === 'play') {
       const len = Math.hypot(mx, my);
-      me.moving = len > 0.05;
+      me.moving = len > 0.05 && !(me.sleepT > 0 || me.digWind > 0);
       if (me.moving) {
         me.x += mx * me.stats.speed * dt;
         me.y += my * me.stats.speed * dt;
@@ -599,8 +609,20 @@ function makeReplicaEnemy(id: number, species: string, x: number, y: number): En
   return {
     id, speciesId: species, types: SPECIES[species]?.types ?? ['normal'], role: 'chaser', x, y, tx: x, ty: y, radius: 9, vx: 0, vy: 0, dirX: 0, dirY: 1, hp: 1, maxHp: 1,
     speed: 0, dmg: 0, special: false, xp: 0, elite: false, boss: false, final: false, shiny: false, alpha: false, homeX: x, homeY: y, alive: true, flash: 0,
-    st: { burn: 0, poison: 0, poisonStacks: 0, paralyze: 0, freeze: 0, slow: 0, confuse: 0, flinch: 0, dotTick: 0, burnDmg: 0, poisonDmg: 0, dotOwner: 0, coin: 0 },
+    st: freshStatus(),
     contactCd: 0, ai: 0, aiState: 0, aiX: 0, aiY: 0, patterns: [], patternIdx: 0, minions: [], knockResist: 0, scale: 1, lastHitBy: 0,
     animOffset: (id % 97) / 10,
   };
+}
+
+/** Guests only see move states as bits: keep short timers alive so drawing and movement locks match. */
+function applyMoveBits(p: Player, mv: number) {
+  p.digWind = mv & MV.DIG ? 0.2 : 0;
+  p.burrowT = mv & MV.BURROW ? 0.2 : 0;
+  p.sleepT = mv & MV.SLEEP ? 0.2 : 0;
+  p.rageT = mv & MV.RAGE ? 0.2 : 0;
+  p.vanishT = mv & MV.VANISH ? 0.2 : 0;
+  p.protectCd = mv & MV.PROTECT ? 0 : 1;
+  p.staticCharge = mv & MV.STATIC ? 9999 : 0;
+  p.focusAt = mv & MV.FOCUS ? 1 : -1;
 }

@@ -7,7 +7,7 @@ export const statFactor = (base: number) => 0.75 + base / 200;
 
 export const BASE_PICKUP = 56;
 
-export function derivePlayerStats(p: Player, level: number, time: number): DerivedStats {
+export function derivePlayerStats(p: Player, level: number, time: number, weather: string | null = null): DerivedStats {
   const sp = SPECIES[p.speciesId];
   const [hp, atk, def, spa, spd, spe] = sp.base;
   const m = p.meta;
@@ -39,6 +39,7 @@ export function derivePlayerStats(p: Player, level: number, time: number): Deriv
     typeDmg: {},
     physDmg: 0,
     specDmg: 0,
+    projSpeed: 1,
   };
 
   for (const it of p.items) {
@@ -79,13 +80,19 @@ export function derivePlayerStats(p: Player, level: number, time: number): Deriv
   s.speed *= 1 + vit('carbos');
   s.cooldown /= 1 + vit('pp-up');
 
+  // Run-long growth from Metal Claw and Ancient Power.
+  if (p.clawStacks) s.atk *= 1 + 0.01 * p.clawStacks;
+  if (p.ancientStacks) {
+    const k = 1 + 0.01 * p.ancientStacks;
+    s.atk *= k; s.spa *= k; s.speed *= k; s.maxHp *= k;
+  }
+
   // Abilities
   let haste = 0;
   switch (p.ability) {
     case 'rain-dish': s.regen += 0.006; break;
     case 'levitate': s.contactTaken *= 0.6; s.speed *= 1.1; break;
     case 'magic-guard': s.contactTaken *= 0.8; s.projTaken *= 0.8; break;
-    case 'sand-stream': s.contactTaken *= 0.85; s.projTaken *= 0.85; break;
     case 'speed-boost': haste += Math.min(0.45, Math.floor(time / 60) * 0.03); break;
     case 'unburden': if (time - p.lastHit > 4) { s.speed *= 1.25; haste += 0.15; } break;
     default: break;
@@ -93,7 +100,11 @@ export function derivePlayerStats(p: Player, level: number, time: number): Deriv
 
   for (const b of p.buffs) {
     switch (b.kind) {
-      case 'atk': s.atk *= 1 + b.amount; s.speed *= 1.1; break;
+      case 'atk': s.atk *= 1 + b.amount; break;
+      case 'dance': s.atk *= 1 + b.amount; s.speed *= 1 + b.amount; break;
+      case 'drained': s.spa *= 1 - b.amount; break;
+      case 'reflect': s.projTaken *= 1 - b.amount; break;
+      case 'tailwind': s.speed *= 1 + b.amount; s.projSpeed *= 1 + b.amount; break;
       case 'spa': s.spa *= 1 + b.amount; break;
       case 'speed': s.speed *= 1 + b.amount; break;
       case 'haste': haste += b.amount; break;
@@ -102,6 +113,13 @@ export function derivePlayerStats(p: Player, level: number, time: number): Deriv
       default: break;
     }
   }
+  // Move states: terrains you stand on, Outrage, travelling underground, sandstorm cover.
+  if (p.onTerrain?.haste) s.cooldown /= 1.3;
+  if (p.onTerrain?.misty) { s.contactTaken *= 0.8; s.projTaken *= 0.8; }
+  if (p.rageT > 0) s.speed *= 1.2;
+  if (p.burrowT > 0) s.speed *= 1.3;
+  if (weather === 'sand' && p.types.includes('rock')) { s.contactTaken *= 0.85; s.projTaken *= 0.85; }
+
   // Mega Evolution: everything goes up for a short while.
   if (p.megaT > 0) {
     s.atk *= 1.5; s.spa *= 1.5; s.area *= 1.2; s.speed *= 1.15; s.regen += 0.01;

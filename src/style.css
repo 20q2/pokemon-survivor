@@ -538,3 +538,60 @@ input[type=text], textarea { background: rgba(0, 0, 0, 0.35); color: var(--ink);
 .ss-boosts { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 5px; border-top: 1px solid rgba(143, 183, 255, 0.3); }
 .ss-boost { display: flex; align-items: center; gap: 2px; }
 .ss-boost .logo { width: 14px; height: 14px; }
+
+/* ── Per-move icon looks (see ui/movelook.ts): pattern = shape, logo size = category ── */
+.mvl { position: relative; overflow: hidden; }
+.mvl::before { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0.9; }
+.mvl > * { position: relative; z-index: 1; }
+.mvl.slot > .logo, .mvl.slot > .cd { position: absolute; }
+.pat-projectile::before { background: radial-gradient(rgba(255,255,255,0.32) 1.5px, transparent 2px) 0 0 / 7px 7px; }
+.pat-melee::before { background: repeating-linear-gradient(135deg, rgba(255,255,255,0.28) 0 3px, transparent 3px 9px); }
+.pat-orbit::before { background: radial-gradient(circle at 50% 50%, transparent 38%, rgba(255,255,255,0.35) 40% 46%, transparent 48%); }
+.pat-aura::before { background: radial-gradient(circle at 50% 55%, rgba(255,255,255,0.45), transparent 70%); }
+.pat-nova::before { background: repeating-radial-gradient(circle at 50% 55%, rgba(255,255,255,0.3) 0 2px, transparent 2px 7px); }
+.pat-beam::before { background: linear-gradient(0deg, transparent 38%, rgba(255,255,255,0.45) 44% 56%, transparent 62%); }
+.pat-strike::before { background: repeating-linear-gradient(100deg, rgba(255,255,255,0.3) 0 1.5px, transparent 1.5px 7px); }
+.pat-zone::before { background: conic-gradient(rgba(0,0,0,0.16) 25%, transparent 0 50%, rgba(0,0,0,0.16) 0 75%, transparent 0) 0 0 / 10px 10px; }
+.pat-boomerang::before { background: linear-gradient(135deg, transparent 40%, rgba(255,255,255,0.3) 40% 50%, transparent 50%) 0 0 / 10px 10px, linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.3) 40% 50%, transparent 50%) 0 0 / 10px 10px; }
+.pat-chain::before { background: linear-gradient(135deg, rgba(255,255,255,0.35) 25%, transparent 25%) -5px 0 / 10px 10px, linear-gradient(225deg, rgba(255,255,255,0.35) 25%, transparent 25%) -5px 0 / 10px 10px; }
+.pat-trail::before { background: repeating-linear-gradient(90deg, rgba(0,0,0,0.2) 0 4px, transparent 4px 9px) 0 75% / 100% 4px no-repeat, repeating-linear-gradient(90deg, rgba(255,255,255,0.25) 0 4px, transparent 4px 9px) 0 85% / 100% 3px no-repeat; }
+.pat-cone::before { background: conic-gradient(from 60deg at 0% 50%, rgba(255,255,255,0.4) 0 60deg, transparent 60deg); }
+.pat-wave::before { background: radial-gradient(circle at 50% 0, transparent 5px, rgba(255,255,255,0.3) 5px 7px, transparent 7px) 0 0 / 12px 8px; }
+.pat-buff::before { background: radial-gradient(rgba(255,255,255,0.55) 1px, transparent 1.5px) 2px 3px / 11px 9px, radial-gradient(rgba(255,255,255,0.35) 1px, transparent 1.5px) 7px 7px / 13px 11px; }
+.pat-lob::before { background: radial-gradient(ellipse at 50% 110%, transparent 52%, rgba(255,255,255,0.4) 54% 60%, transparent 62%); }
+.pat-terrain::before { background: linear-gradient(rgba(255,255,255,0.22) 1px, transparent 1px) 0 0 / 7px 7px, linear-gradient(90deg, rgba(255,255,255,0.22) 1px, transparent 1px) 0 0 / 7px 7px; }
+.pat-weather::before { background: linear-gradient(180deg, rgba(255,255,255,0.4), transparent 45%), repeating-linear-gradient(70deg, rgba(255,255,255,0.25) 0 1px, transparent 1px 5px); }
+.pat-wall::before { background: linear-gradient(rgba(0,0,0,0.22) 1px, transparent 1px) 0 0 / 10px 6px, linear-gradient(90deg, rgba(0,0,0,0.22) 1px, transparent 1px) 0 0 / 10px 12px, linear-gradient(90deg, rgba(0,0,0,0.22) 1px, transparent 1px) 5px 6px / 10px 12px; }
+.pat-decoy::before { background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4) 0 18%, transparent 20%), radial-gradient(circle at 70% 70%, rgba(255,255,255,0.4) 0 18%, transparent 20%); }
+.pat-mine::before { background: linear-gradient(45deg, transparent 42%, rgba(255,255,255,0.35) 42% 58%, transparent 58%) 0 0 / 9px 9px, linear-gradient(-45deg, transparent 42%, rgba(0,0,0,0.2) 42% 58%, transparent 58%) 0 0 / 9px 9px; }
+.pat-minion::before { background: radial-gradient(rgba(0,0,0,0.35) 1px, transparent 1.5px) 1px 2px / 5px 6px, radial-gradient(rgba(255,255,255,0.3) 1px, transparent 1.5px) 3px 0 / 7px 5px; }
+.pat-passive::before { background: linear-gradient(135deg, rgba(255,255,255,0.3) 0 50%, rgba(0,0,0,0.18) 50% 100%); }
+.pat-special::before { background: conic-gradient(rgba(255,255,255,0.3) 0 25%, rgba(0,0,0,0.15) 0 50%, rgba(255,255,255,0.3) 0 75%, rgba(0,0,0,0.15) 0); }
+/* category = how big the type symbol sits */
+.mvl.cat-physical > img.logo, .mvl.cat-physical > img:not(.px):first-child { transform-origin: center; }
+.slot.move.mvl.cat-physical .logo { width: 28px; height: 28px; top: 1px; }
+.slot.move.mvl.cat-special .logo { width: 22px; height: 22px; top: 3px; }
+.slot.move.mvl.cat-status .logo { width: 15px; height: 15px; top: 5px; }
+.move-ic.mvl.cat-physical img { width: 86%; height: 86%; }
+.move-ic.mvl.cat-special img { width: 66%; height: 66%; }
+.move-ic.mvl.cat-status img { width: 46%; height: 46%; }
+.m-ic.type.mvl.cat-physical img { width: 16px; height: 16px; }
+.m-ic.type.mvl.cat-special img { width: 12px; height: 12px; }
+.m-ic.type.mvl.cat-status img { width: 8px; height: 8px; }
+.m-ic.type.mvl { border-radius: 4px; }
+/* TM discs on cards/reels: disc size follows category, small type symbol in the corner */
+.ic.tm.mvl img.px, .reel-face.tm.mvl img { transition: none; }
+.ic.tm.mvl.cat-physical img.disc, .reel-face.tm.mvl.cat-physical img.disc { width: 52px; }
+.ic.tm.mvl.cat-special img.disc, .reel-face.tm.mvl.cat-special img.disc { width: 44px; }
+.ic.tm.mvl.cat-status img.disc, .reel-face.tm.mvl.cat-status img.disc { width: 34px; }
+.ic.tm.mvl .corner, .reel-face.tm.mvl .corner { position: absolute; right: 3px; bottom: 3px; width: 16px; height: 16px; filter: brightness(0) invert(1) drop-shadow(0 1px 0 rgba(0,0,0,0.5)); z-index: 2; }
+.mvl.mastered { box-shadow: 0 0 0 2px #ffd94a, 0 0 8px #ffd94a !important; }
+.status-line { display: flex; gap: 4px; align-items: baseline; }
+.st-badge { display: inline-block; padding: 1px 3px; background: var(--sc); color: #fff; font-size: 6px; border: 1px solid #000; text-shadow: 1px 1px 0 #000; flex: none; }
+.upg .ic.tm.shop-tm { width: 44px; height: 44px; grid-row: span 2; display: grid; place-items: center; border-radius: 6px; }
+.upg .ic.tm.shop-tm img.disc { width: 34px !important; }
+.upg .ic.tm.shop-tm.cat-physical img.disc { width: 40px !important; }
+.upg .ic.tm.shop-tm.cat-status img.disc { width: 28px !important; }
+.upg .ic.tm.shop-tm .corner { width: 12px; height: 12px; right: 2px; bottom: 2px; }
+.ic.tm.mvl { background: var(--tc) !important; }
+.reel-face.tm.mvl { background: var(--tc) !important; position: relative; }

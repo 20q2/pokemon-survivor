@@ -1,12 +1,13 @@
 import { SPECIES } from '../data/pokedex.ts';
 import { ENEMY_ROLE, RUN_LENGTH, type BossDef, type EnemyRole, type SpawnEntry } from '../data/stages.ts';
 import { TAU, dist2 } from '../engine/math.ts';
-import { makeProjectile, rawDamageEnemy } from './combat.ts';
+import { freshStatus, makeProjectile, rawDamageEnemy } from './combat.ts';
 import { megaOnKill } from './mega.ts';
 import { RAID_MOVES, alphaNextMove, castRaid, eliteMove, markCharge, spawnHazard, type RaidMove } from './hazards.ts';
 import type { Sim } from './sim.ts';
 import { MAX_ENEMIES } from './sim.ts';
-import type { Enemy, Player } from './types.ts';
+import type { Enemy, Player, Projectile } from './types.ts';
+import { heal } from './ledger.ts';
 
 const ROLE_HP: Record<EnemyRole, number> = { chaser: 1, fast: 0.7, tank: 2.4, ranged: 1, bomber: 0.8, treasure: 6 };
 const ROLE_SPEED: Record<EnemyRole, number> = { chaser: 1, fast: 1.4, tank: 0.7, ranged: 0.95, bomber: 1.15, treasure: 1.25 };
@@ -267,7 +268,7 @@ export function spawnEnemy(sim: Sim, speciesId: string, x: number, y: number, op
     id: sim.id(), speciesId, types: sp.types, role, x, y, radius, vx: 0, vy: 0, dirX: 0, dirY: 1,
     hp, maxHp: hp, speed, dmg, special: bspa > batk, xp, elite: !!opts.elite, boss: !!opts.boss,
     final: !!opts.boss?.final, shiny, alpha: !!opts.alpha, guardian: !!opts.guardian, homeX: x, homeY: y, alive: true, flash: 0,
-    st: { burn: 0, poison: 0, poisonStacks: 0, paralyze: 0, freeze: 0, slow: 0, confuse: 0, flinch: 0, dotTick: 0, burnDmg: 0, poisonDmg: 0, dotOwner: 0, coin: 0 },
+    st: freshStatus(),
     contactCd: 0, ai: sim.rng.range(0, 2), aiState: opts.swarmDir ? 9 : 0, aiX: opts.swarmDir?.x ?? 0, aiY: opts.swarmDir?.y ?? 0,
     patterns: opts.boss?.patterns ?? [], patternIdx: 0, minions: opts.boss?.minions ?? [], knockResist, scale,
     lastHitBy: 0, animOffset: sim.rng.range(0, 10),
@@ -283,6 +284,9 @@ export function spawnEnemy(sim: Sim, speciesId: string, x: number, y: number, op
 
 export function updateEnemies(sim: Sim, dt: number) {
   const players = sim.players;
+  // Substitute dolls on the field draw foes in.
+  const decoys: Projectile[] = [];
+  for (const pr of sim.projectiles) if (pr.behavior === 'decoy' && !pr.dead && !pr.hostile) decoys.push(pr);
   for (const e of sim.enemies) {
     if (!e.alive) continue;
     e.flash = Math.max(0, e.flash - dt);
@@ -294,34 +298,70 @@ export function updateEnemies(sim: Sim, dt: number) {
     st.slow = Math.max(0, st.slow - dt);
     st.confuse = Math.max(0, st.confuse - dt);
     st.flinch = Math.max(0, st.flinch - dt);
-    if (st.burn > 0 || st.poison > 0) {
+    st.wet = Math.max(0, st.wet - dt);
+    st.sleep = Math.max(0, st.sleep - dt);
+    st.charm = Math.max(0, st.charm - dt);
+    st.vuln = Math.max(0, st.vuln - dt);
+    st.weaken = Math.max(0, st.weaken - dt);
+    st.root = Math.max(0, st.root - dt);
+    st.ffCd -= dt;
+    if (st.chill > 0 && (st.chillT -= dt) <= 0) st.chill = 0;
+    if (st.pins > 0 && (st.pinsT -= dt) <= 0) st.pins = 0;
+    if (st.air > 0) {
+      st.air -= dt;
+      if (st.air <= 0) land(sim, e);
+      if (!e.alive) continue;
+    }
+    if (st.burn > 0 || st.poison > 0 || st.seed > 0 || st.curse > 0) {
       st.burn = Math.max(0, st.burn - dt);
       st.poison = Math.max(0, st.poison - dt);
-      if (st.poison === 0) st.poisonStacks = 0;
+      st.seed = Math.max(0, st.seed - dt);
+      if (st.poison === 0) { st.poisonStacks = 0; st.toxic = 0; }
       st.dotTick -= dt;
       if (st.dotTick <= 0) {
         st.dotTick = 0.5;
         if (st.burn > 0) rawDamageEnemy(sim, e, st.burnDmg, 'fire', st.dotOwner, 'burn');
-        if (st.poison > 0 && e.alive) rawDamageEnemy(sim, e, st.poisonDmg * st.poisonStacks, 'poison', st.dotOwner, 'poison');
+        if (st.poison > 0 && e.alive) {
+          // Badly poisoned: each tick hits harder than the last.
+          const ramp = st.toxic ? 1 + 0.35 * st.toxic++ : 1;
+          rawDamageEnemy(sim, e, st.poisonDmg * st.poisonStacks * ramp, 'poison', st.dotOwner, st.toxic ? 'toxic' : 'poison');
+        }
+        if (st.seed > 0 && e.alive) {
+          rawDamageEnemy(sim, e, st.seedDmg, 'grass', st.seedOwner, 'leech-seed');
+          const o = sim.players[st.seedOwner];
+          if (o) heal(o, st.seedDmg * 0.6, 'leech-seed');
+        }
+        if (st.curse > 0 && e.alive) rawDamageEnemy(sim, e, e.maxHp * st.curse * 0.5, 'ghost', st.curseOwner, 'curse');
         if (!e.alive) continue;
       }
     }
 
-    const target = sim.nearestPlayer(e.x, e.y);
+    const player = sim.nearestPlayer(e.x, e.y);
+    let target: { x: number; y: number } | undefined = player;
+    // Decoys: a doll within its lure radius wins the foe's attention.
+    for (const d of decoys) {
+      if (!e.boss && dist2(e.x, e.y, d.x, d.y) < d.growth * d.growth) { target = d; break; }
+    }
     let mult = 1;
+    // Paralysis locks a foe up in random stutters (~35% of the time).
+    const stutter = st.paralyze > 0 && ((sim.time * 3.1 + e.id * 0.618) % 1) < 0.35;
+    // Can it do anything at all? (frozen, asleep, airborne or stuttering)
+    const helpless = st.freeze > 0 || st.sleep > 0 || st.air > 0 || stutter;
     if (st.slow > 0) mult *= 0.55;
-    if (st.paralyze > 0) mult *= 0.5;
-    if (st.freeze > 0 || st.flinch > 0) mult = 0;
+    if (st.chill > 0) mult *= 1 - 0.15 * st.chill;
+    if (helpless || st.root > 0) mult = 0;
     let mx = 0, my = 0;
-    if (target) {
+    if (target && player) {
       const dx = target.x - e.x, dy = target.y - e.y;
       const d = Math.hypot(dx, dy) || 1;
       mx = dx / d; my = dy / d;
-      if (e.boss) {
-        const r = bossAI(sim, e, target, d, dt);
+      if (helpless) {
+        // no AI, no attacks
+      } else if (e.boss) {
+        const r = bossAI(sim, e, player, Math.hypot(player.x - e.x, player.y - e.y) || 1, dt);
         mx = r.x; my = r.y; mult *= r.speed;
       } else if (e.alpha) {
-        const r = alphaAI(sim, e, target, d, dx, dy, dt);
+        const r = alphaAI(sim, e, player, d, dx, dy, dt);
         if (!e.alive) continue;
         mx = r.x; my = r.y; mult *= r.speed;
       } else if (e.aiState === 9) {
@@ -329,14 +369,14 @@ export function updateEnemies(sim: Sim, dt: number) {
         mx = e.aiX; my = e.aiY;
         e.ai -= dt;
         if (e.ai <= 0) { e.alive = false; continue; }
-      } else if (e.elite && eliteRaid(sim, e, target, d, dt)) {
+      } else if (e.elite && st.charm <= 0 && eliteRaid(sim, e, player, d, dt)) {
         mult = 0;
-      } else {
+      } else if (st.charm <= 0) {
         switch (e.role) {
           case 'ranged': {
             if (d < 140) { mx = -mx; my = -my; } else if (d < 200) { [mx, my] = [-my * 0.6, mx * 0.6]; }
             e.ai -= dt;
-            if (e.ai <= 0 && d < 320 && mult > 0) {
+            if (e.ai <= 0 && d < 320) {
               e.ai = sim.rng.range(2.4, 3.6);
               enemyShot(sim, e, Math.atan2(dy, dx), 120, e.dmg * 0.9);
             }
@@ -362,18 +402,22 @@ export function updateEnemies(sim: Sim, dt: number) {
             break;
         }
       }
-      if (st.confuse > 0) {
+      if (!e.alive) continue;
+      if (st.charm > 0) {
+        // Infatuated: wander away from the partners.
+        mx = -mx; my = -my;
+      } else if (st.confuse > 0) {
         const a = Math.sin(sim.time * 3 + e.id) * Math.PI;
         mx = Math.cos(a); my = Math.sin(a);
       }
       // ─ contact damage
-      if (e.contactCd <= 0 && mult > 0) {
+      if (e.contactCd <= 0 && !helpless && st.charm <= 0) {
         for (const p of players) {
           if (p.fainted) continue;
           const rr = e.radius + p.radius;
           if (dist2(e.x, e.y, p.x, p.y) < rr * rr) {
             e.contactCd = 0.8;
-            sim.hurtPlayer(p, e.dmg, e.types[0], false);
+            sim.hurtPlayer(p, e.dmg * (st.weaken > 0 ? 0.7 : 1), e.types[0], false);
             onPlayerContact(sim, p, e);
             break;
           }
@@ -387,31 +431,62 @@ export function updateEnemies(sim: Sim, dt: number) {
     const damp = Math.pow(0.0008, dt);
     e.vx *= damp;
     e.vy *= damp;
-    if (mx || my) { e.dirX = mx; e.dirY = my; }
+    if ((mx || my) && mult > 0) { e.dirX = mx; e.dirY = my; }
     // ─ recycle enemies left far behind
-    if (!e.boss && !e.alpha && e.aiState !== 9 && target) {
-      const lim = Math.max(target.viewW, target.viewH) * 0.9 + 150;
-      if (Math.abs(e.x - target.x) > lim || Math.abs(e.y - target.y) > lim) {
+    if (!e.boss && !e.alpha && e.aiState !== 9 && player) {
+      const lim = Math.max(player.viewW, player.viewH) * 0.9 + 150;
+      if (Math.abs(e.x - player.x) > lim || Math.abs(e.y - player.y) > lim) {
         if (e.role === 'treasure') { e.alive = false; continue; }
-        e.x = target.x + (target.x - e.x) * 0.8;
-        e.y = target.y + (target.y - e.y) * 0.8;
+        e.x = player.x + (player.x - e.x) * 0.8;
+        e.y = player.y + (player.y - e.y) * 0.8;
       }
     }
   }
   separate(sim);
 }
 
+/** Sky Uppercut: a launched foe crashes down on everything around it. */
+function land(sim: Sim, e: Enemy) {
+  const st = e.st;
+  sim.emit({ e: 'boom', x: e.x, y: e.y, r: 46, type: 'fighting' });
+  const dmg = st.airDmg;
+  st.airDmg = 0;
+  sim.grid.query(e.x, e.y, 46, (o) => {
+    if (o.alive && o !== e && dist2(o.x, o.y, e.x, e.y) < 46 * 46) rawDamageEnemy(sim, o, dmg * 0.6, 'fighting', st.airOwner, 'sky-uppercut');
+  });
+  rawDamageEnemy(sim, e, dmg, 'fighting', st.airOwner, 'sky-uppercut');
+}
+
 /** Soft separation so crowds form readable blobs instead of a single stack. */
 function separate(sim: Sim) {
   sim.rebuildGrid();
+  const walls: Projectile[] = [];
+  for (const pr of sim.projectiles) if (pr.behavior === 'wall' && !pr.dead && !pr.hostile && pr.t >= pr.delay) walls.push(pr);
   for (const e of sim.enemies) {
     if (!e.alive) continue;
+    // Rock Tomb pillars: foes can't walk through.
+    for (const w of walls) {
+      const dx = e.x - w.x, dy = e.y - w.y;
+      const rr = w.r + e.radius;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < rr * rr && !e.boss) {
+        const d = Math.sqrt(d2) || 1;
+        e.x = w.x + (dx / d) * rr;
+        e.y = w.y + (dy / d) * rr;
+      }
+    }
+    // Confused or infatuated foes hurt the foes they bump into.
+    const brawler = e.st.confuse > 0 || e.st.charm > 0;
     sim.grid.query(e.x, e.y, e.radius * 2, (o) => {
       if (o === e || !o.alive) return;
       const dx = e.x - o.x, dy = e.y - o.y;
       const rr = e.radius + o.radius;
       const d2 = dx * dx + dy * dy;
       if (d2 >= rr * rr || d2 === 0) return;
+      if (brawler && e.st.ffCd <= 0 && !o.boss) {
+        e.st.ffCd = 0.6;
+        rawDamageEnemy(sim, o, Math.max(4, o.maxHp * 0.08), e.types[0], e.lastHitBy, e.st.charm > 0 ? 'disarming-voice' : 'confusion');
+      }
       const d = Math.sqrt(d2);
       const push = (rr - d) * 0.25;
       const wE = e.boss ? 0.05 : o.boss ? 1.6 : 1;
@@ -434,6 +509,7 @@ function onPlayerContact(sim: Sim, p: Player, e: Enemy) {
 }
 
 function enemyShot(sim: Sim, e: Enemy, a: number, speed: number, dmg: number) {
+  if (e.st.weaken > 0) dmg *= 0.7;
   makeProjectile(sim, {
     owner: -1, hostile: true, behavior: 'enemy', moveId: 'enemy', fx: 'orb', type: e.types[0], shape: 'circle',
     x: e.x, y: e.y - 6, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, angle: a, speed, r: 5, life: 4,
@@ -448,7 +524,7 @@ function explode(sim: Sim, e: Enemy) {
   }
   // Self-Destruct also hurts nearby wild Pokémon.
   sim.grid.query(e.x, e.y, 56, (o) => {
-    if (o !== e && o.alive && !o.boss && dist2(o.x, o.y, e.x, e.y) < 56 * 56) rawDamageEnemy(sim, o, e.maxHp * 3, 'normal', e.lastHitBy, 'explosion');
+    if (o !== e && o.alive && !o.boss && dist2(o.x, o.y, e.x, e.y) < 56 * 56) rawDamageEnemy(sim, o, e.maxHp * 3, 'normal', e.lastHitBy, 'chain-explosion');
   });
   e.alive = false;
 }
@@ -628,6 +704,7 @@ export function killEnemy(sim: Sim, e: Enemy, killerId: number) {
   sim.emit({ e: 'kill', x: e.x, y: e.y, species: e.speciesId, boss: e.boss, shiny: e.shiny, type: e.types[0] });
   const r = sim.rng;
   dropCandy(sim, e);
+  spreadOnDeath(sim, e);
   if (e.st.coin || r.chance(0.01)) sim.spawnPickup('coin', e.x, e.y, 1 + (e.st.coin ? r.int(1, 2) : 0));
   if (r.chance(0.006)) sim.spawnPickup('oran', e.x, e.y);
   if (r.chance(0.0015)) sim.spawnPickup('magnet', e.x, e.y);
@@ -662,5 +739,22 @@ export function killEnemy(sim: Sim, e: Enemy, killerId: number) {
     if (e.final) sim.finalDefeated = true;
     sim.emit({ e: 'bossDown', species: e.speciesId, final: e.final });
     sim.queueCine({ kind: 'bossDown', t: 0, dur: e.final ? 3 : 1.2, player: killerId, species: e.speciesId });
+  }
+}
+
+/** Burns spread to nearby foes when the host faints; Leech Seed hops to a neighbour. */
+function spreadOnDeath(sim: Sim, e: Enemy) {
+  const st = e.st;
+  if (st.burn > 0) {
+    let n = 0;
+    sim.grid.query(e.x, e.y, 70, (o) => {
+      if (n >= 2 || o === e || !o.alive || dist2(o.x, o.y, e.x, e.y) > 70 * 70 || o.st.burn > 0) return;
+      n++;
+      o.st.burn = 3; o.st.burnDmg = Math.max(o.st.burnDmg, st.burnDmg); o.st.dotOwner = st.dotOwner;
+    });
+  }
+  if (st.seed > 0) {
+    const next = sim.grid.nearest(e.x, e.y, 150, (o) => o !== e && o.alive && o.st.seed <= 0);
+    if (next) { next.st.seed = 5; next.st.seedDmg = st.seedDmg; next.st.seedOwner = st.seedOwner; }
   }
 }

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { MOVES, MOVE_LIST, MASTERY_OF, TM_MOVES, moveStatsAt } from '../src/data/moves.ts';
+import { MOVES, MOVE_LIST, MASTERY_OF, TM_MOVES, BASIC_MOVES, NON_ATTACKS, moveStatsAt } from '../src/data/moves.ts';
+import { STATUS_INFO } from '../src/data/status.ts';
+import { lookKey } from '../src/ui/movelook.ts';
+import { VERB_TEXT } from '../src/ui/verbs.ts';
 import { ITEMS, TYPE_BOOSTER } from '../src/data/items.ts';
 import { LINES, SPECIES } from '../src/data/pokedex.ts';
 import { STAGES, ENEMY_ROLE } from '../src/data/stages.ts';
@@ -44,7 +47,32 @@ describe('data integrity', () => {
       if (m.behavior === 'buff') expect(m.buff, m.id).toBeTruthy();
       const s5 = moveStatsAt(m, 5);
       expect(s5.cd).toBeGreaterThan(0.1);
-      if (m.cat !== 'status' || m.behavior !== 'buff') expect(s5.power).toBeGreaterThan(0);
+      if (!NON_ATTACKS.has(m.id)) expect(s5.power, m.id).toBeGreaterThan(0);
+    }
+  });
+
+  it('every move has its own verb (only basic starter moves may share one)', () => {
+    const seen = new Map<string, string>();
+    for (const m of MOVE_LIST) {
+      if (BASIC_MOVES.has(m.id)) continue;
+      expect(seen.get(m.verb), `${m.id} shares verb "${m.verb}"`).toBeUndefined();
+      seen.set(m.verb, m.id);
+    }
+    // Icons: type colour x shape pattern x category size x tint x mastery frame — every move differs.
+    const icons = new Set(MOVE_LIST.map((m) => lookKey(m.id)));
+    expect(icons.size).toBe(MOVE_LIST.length);
+  });
+
+  it('every verb has a short label for cards and tooltips', () => {
+    for (const m of MOVE_LIST) expect(VERB_TEXT[m.verb], `${m.id}: ${m.verb}`).toBeTruthy();
+  });
+
+  it('every status a move applies is explained in the glossary', () => {
+    for (const m of MOVE_LIST) {
+      for (const k of [m.effect, m.effect2?.kind]) {
+        if (!k || k === 'drain' || k === 'coin') continue;
+        expect(STATUS_INFO[k], `${m.id}: ${k}`).toBeTruthy();
+      }
     }
   });
 

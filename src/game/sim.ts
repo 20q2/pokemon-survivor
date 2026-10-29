@@ -1,14 +1,15 @@
 import { LINE, SPECIES } from '../data/pokedex.ts';
 import { MOVES, MAX_MOVE_LEVEL } from '../data/moves.ts';
 import { ITEM_LIST } from '../data/items.ts';
-import type { PType } from '../data/types.ts';
+import { TYPES, type PType } from '../data/types.ts';
+import type { StatusKind, WeatherKind } from '../data/moves.ts';
 import { STAGE, type StageDef } from '../data/stages.ts';
 import { Rng, dist2 } from '../engine/math.ts';
 import { SpatialGrid } from '../engine/spatial.ts';
 import type { MetaBonuses } from '../meta/shop.ts';
 import { derivePlayerStats } from './stats.ts';
 import { applyOffer, generateOffers, masteryCandidates, randomFiller, evolutionMove, learnOffers, ownedUpgrades } from './levelup.ts';
-import { fireMoves, updateProjectiles, damagePlayer } from './combat.ts';
+import { fireMoves, updateProjectiles, damagePlayer, updatePlayerMoves } from './combat.ts';
 import { activateMega, updateMega } from './mega.ts';
 import { Spawner, updateEnemies, killEnemy } from './enemies.ts';
 import { heal, newLedger } from './ledger.ts';
@@ -64,6 +65,22 @@ export function chestTiming(n: number) {
 
 export const MAX_ENEMIES = 520;
 
+/** Hidden Power's status for each rolled type. */
+const HIDDEN_EFFECT: Partial<Record<PType, StatusKind>> = {
+  fire: 'burn', water: 'wet', electric: 'paralyze', grass: 'seed', ice: 'chill', fighting: 'vuln', poison: 'poison',
+  ground: 'weaken', flying: 'flinch', psychic: 'confuse', bug: 'root', rock: 'flinch', ghost: 'curse', dragon: 'paralyze',
+  dark: 'flinch', steel: 'vuln', fairy: 'charm',
+};
+
+/** Per-run state the move mechanics keep on a player. */
+export function newMoveState(hiddenType: PType) {
+  return {
+    hurtLog: [] as [number, number][], digWind: 0, burrowT: 0, sleepT: 0, rageT: 0, exhaustT: 0, vanishT: 0, protectCd: 0,
+    staticCharge: 0, combo: 0, clawStacks: 0, ancientStacks: 0, hiddenType, hiddenEffect: HIDDEN_EFFECT[hiddenType] ?? 'burn',
+    focusAt: -1, onTerrain: { haste: false, misty: false },
+  };
+}
+
 export function xpForLevel(level: number): number {
   // Snappy first levels, then a quadratic curve so the build fills out over the whole run.
   const k = level - 1;
@@ -89,6 +106,12 @@ export class Sim {
   xpNext = xpForLevel(1);
   money = 0;
   kills = 0;
+  /** Weather (one at a time, shared by the team): kind, seconds left, who cast it and how hard it hits. */
+  weather: WeatherKind | null = null;
+  weatherT = 0;
+  weatherTick = 0;
+  weatherOwner = 0;
+  weatherPower = 0;
   bossesDefeated = 0;
   finalDefeated = false;
   /** The team found the Mega Stone: fully evolved partners charge Mega Evolution. */
@@ -159,6 +182,7 @@ export class Sim {
       revives: pi.meta.revives, fainted: false, reviveProgress: 0, hurtT: 0, lastHit: -99,
       pendingLevels: 0, kills: 0, dmgDealt: 0, dmgTaken: 0, bossKills: 0, superEff: 0, shinyKills: 0,
       vitamins: {}, ledger: newLedger(), evolutions: 0, masteries: 0, connected: true, viewW: 960, viewH: 540, mega: 0, megaT: 0, megas: 0,
+      ...newMoveState(this.rng.pick(TYPES.filter((t) => t !== 'normal'))),
     };
     this.tms.set(p.id, pi.tms);
     this.players.push(p);
@@ -167,7 +191,7 @@ export class Sim {
   refreshStats() {
     for (const p of this.players) {
       const prevMax = p.stats?.maxHp;
-      p.stats = derivePlayerStats(p, this.level, this.time);
+      p.stats = derivePlayerStats(p, this.level, this.time, this.weather);
       if (prevMax && p.stats.maxHp > prevMax) p.hp += p.stats.maxHp - prevMax;
       p.hp = Math.min(p.hp, p.stats.maxHp);
     }
@@ -220,9 +244,12 @@ export class Sim {
         }
         continue;
       }
+      updatePlayerMoves(this, p, dt);
       if (!this.remoteControlled.has(p.id)) {
         const len = Math.hypot(p.mx, p.my);
-        p.moving = len > 0.05;
+        // Asleep (Rest) or digging in (Dig wind-up): rooted to the spot.
+        const locked = p.sleepT > 0 || p.digWind > 0;
+        p.moving = len > 0.05 && !locked;
         if (p.moving) {
           p.x += p.mx * p.stats.speed * dt;
           p.y += p.my * p.stats.speed * dt;

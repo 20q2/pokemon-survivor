@@ -32,7 +32,7 @@ interface Effect {
 }
 
 const BUFF_INFO: Record<BuffKind, { item: string; name: string; desc: (a: number) => string }> = {
-  atk: { item: 'x-attack', name: 'Attack up', desc: (a) => `+${pct(a)} Attack and +10% move speed.` },
+  atk: { item: 'x-attack', name: 'Attack up', desc: (a) => `+${pct(a)} Attack.` },
   spa: { item: 'x-sp-atk', name: 'Sp. Atk up', desc: (a) => `+${pct(a)} Sp. Atk.` },
   speed: { item: 'x-speed', name: 'Speed up', desc: (a) => `+${pct(a)} move speed.` },
   haste: { item: 'x-speed', name: 'Haste', desc: (a) => `+${pct(a)} move speed and attack rate.` },
@@ -40,6 +40,10 @@ const BUFF_INFO: Record<BuffKind, { item: string; name: string; desc: (a: number
   shield: { item: 'x-defense', name: 'Barrier', desc: (a) => `Takes ${pct(a)} less damage.` },
   dodge: { item: 'bright-powder', name: 'Evasion up', desc: (a) => `${pct(a)} chance to dodge hits.` },
   heal: { item: 'leftovers', name: 'Recovering', desc: (a) => `Restores ${pct(a)} of max HP per second.` },
+  dance: { item: 'x-attack', name: 'Dragon Dance', desc: (a) => `+${pct(a)} Attack and move speed. Lose a stack when hit.` },
+  drained: { item: 'x-sp-atk', name: 'Drained', desc: (a) => `-${pct(a)} Sp. Atk.` },
+  reflect: { item: 'x-sp-def', name: 'Reflect', desc: (a) => `Takes ${pct(a)} less projectile damage.` },
+  tailwind: { item: 'x-speed', name: 'Tailwind', desc: (a) => `+${pct(a)} move speed, projectile speed and reach.` },
 };
 
 const PINCH: Partial<Record<string, PType>> = { overgrow: 'grass', blaze: 'fire', torrent: 'water' };

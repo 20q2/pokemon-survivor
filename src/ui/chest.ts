@@ -1,11 +1,10 @@
 import { MAX_MOVE_LEVEL, MOVES, MOVE_LIST } from '../data/moves.ts';
 import { ITEMS, ITEM_LIST, VITAMIN, VITAMINS } from '../data/items.ts';
-import { TYPE_COLORS } from '../data/types.ts';
 import { assets } from '../render/assets.ts';
 import { audio } from '../audio/audio.ts';
 import { chestTiming } from '../game/sim.ts';
 import { CHEST_BALL, CHEST_COLOR, CHEST_NAME, type ChestReward, type ChestTier } from '../game/types.ts';
-import { h, img, uiIcon } from './dom.ts';
+import { h, img, moveDisc, uiIcon } from './dom.ts';
 
 type Face = { kind: ChestReward['kind']; id: string };
 
@@ -14,8 +13,7 @@ const pic = (src: string) => h('img', { src, draggable: 'false' });
 
 function face(f: Face): HTMLElement {
   if (f.kind === 'move' || f.kind === 'mastery') {
-    const t = MOVES[f.id].type;
-    return h('div', { class: 'reel-face tm', style: `--tc:${TYPE_COLORS[t]}` }, pic(assets.itemUrl(`tm-${t}`)));
+    return moveDisc(f.id, 'reel-face tm', true);
   }
   return h('div', { class: 'reel-face item' }, pic(assets.itemUrl(f.id)));
 }

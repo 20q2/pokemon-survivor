@@ -1,25 +1,36 @@
 import { SPECIES_LIST } from '../data/pokedex.ts';
 import type { PickupKind, Player, Projectile, Enemy } from '../game/types.ts';
+import type { WeatherKind } from '../data/moves.ts';
 
-export const PROTOCOL = 4;
-export const ROOM_PREFIX = 'pkmnsurv-v4-';
+const WEATHERS: (WeatherKind | null)[] = [null, 'sun', 'rain', 'sand', 'snow'];
+
+export const PROTOCOL = 5;
+export const ROOM_PREFIX = 'pkmnsurv-v5-';
 export const SNAP_HZ = 20;
 
 const SPECIES_INDEX = new Map(SPECIES_LIST.map((s, i) => [s.id, i]));
 export const PICKUP_KINDS: PickupKind[] = ['candy', 'coin', 'oran', 'sitrus', 'magnet', 'repel', 'chest', 'rare-candy', 'mega-stone'];
 
-export interface SnapPlayer { x: number; y: number; hp: number; fx: number; fy: number; moving: boolean; fainted: boolean; connected: boolean; hurt: boolean; revive: number }
+export interface SnapPlayer { x: number; y: number; hp: number; fx: number; fy: number; moving: boolean; fainted: boolean; connected: boolean; hurt: boolean; revive: number; mv: number }
+
+/** Move-state bits sent per player (for drawing Dig, Rest, Protect…). */
+export const MV = { DIG: 1, BURROW: 2, SLEEP: 4, PROTECT: 8, RAGE: 16, STATIC: 32, FOCUS: 64, VANISH: 128 } as const;
 export interface SnapEnemy {
   id: number; species: string; x: number; y: number; dirX: number; dirY: number; hpFrac: number;
   elite: boolean; boss: boolean; shiny: boolean; final: boolean; freeze: boolean; burn: boolean; poison: boolean;
   paralyze: boolean; confuse: boolean; slow: boolean; flash: boolean; alpha: boolean; scale: number;
+  /** Extra statuses: bits of EXTRA_STATUS. */
+  ex: number;
 }
-export interface Snapshot { time: number; players: SnapPlayer[]; enemies: SnapEnemy[] }
+
+export const EXTRA_STATUS = ['wet', 'chill', 'sleep', 'charm', 'vuln', 'weaken', 'root', 'air'] as const;
+const EX2 = ['seed', 'curse', 'toxic', 'flinch'] as const;
+export interface Snapshot { time: number; weather: WeatherKind | null; players: SnapPlayer[]; enemies: SnapEnemy[] }
 
 const q8 = (v: number) => Math.max(-127, Math.min(127, Math.round(v * 100)));
 
 /** Binary snapshot of players + the enemies near one client. */
-export function encodeSnapshot(time: number, players: Player[], enemies: Enemy[], cx: number, cy: number, radius: number): ArrayBuffer {
+export function encodeSnapshot(time: number, players: Player[], enemies: Enemy[], cx: number, cy: number, radius: number, weather: WeatherKind | null = null): ArrayBuffer {
   const visible: Enemy[] = [];
   const r2 = radius * radius;
   for (const e of enemies) {
@@ -27,11 +38,12 @@ export function encodeSnapshot(time: number, players: Player[], enemies: Enemy[]
     const dx = e.x - cx, dy = e.y - cy;
     if (e.boss || e.alpha || dx * dx + dy * dy < r2) visible.push(e);
   }
-  const buf = new ArrayBuffer(1 + 4 + 1 + players.length * 16 + 2 + 8 + visible.length * 16);
+  const buf = new ArrayBuffer(1 + 4 + 1 + 1 + players.length * 17 + 2 + 8 + visible.length * 17);
   const v = new DataView(buf);
   let o = 0;
   v.setUint8(o, 1); o += 1;
   v.setFloat32(o, time); o += 4;
+  v.setUint8(o, Math.max(0, WEATHERS.indexOf(weather))); o += 1;
   v.setUint8(o, players.length); o += 1;
   for (const p of players) {
     v.setFloat32(o, p.x); o += 4;
@@ -41,6 +53,10 @@ export function encodeSnapshot(time: number, players: Player[], enemies: Enemy[]
     v.setInt8(o, q8(p.fy)); o += 1;
     v.setUint8(o, (p.moving ? 1 : 0) | (p.fainted ? 2 : 0) | (p.connected ? 4 : 0) | (p.hurtT > 0 ? 8 : 0)); o += 1;
     v.setUint8(o, Math.round(Math.min(3, p.reviveProgress) * 80)); o += 1;
+    v.setUint8(o, (p.digWind > 0 ? MV.DIG : 0) | (p.burrowT > 0 ? MV.BURROW : 0) | (p.sleepT > 0 ? MV.SLEEP : 0)
+      | (p.protectCd <= 0 && p.moves.some((m) => m.id === 'protect') ? MV.PROTECT : 0) | (p.rageT > 0 ? MV.RAGE : 0)
+      | (p.staticCharge > 0 && p.moves.some((m) => m.id === 'spark') && p.staticCharge >= 300 ? MV.STATIC : 0)
+      | (p.focusAt >= 0 && time - p.focusAt < 2 ? MV.FOCUS : 0) | (p.vanishT > 0 ? MV.VANISH : 0)); o += 1;
   }
   v.setUint16(o, visible.length); o += 2;
   v.setFloat32(o, cx); o += 4;
@@ -57,7 +73,12 @@ export function encodeSnapshot(time: number, players: Player[], enemies: Enemy[]
     v.setUint8(o, (e.elite ? 1 : 0) | (e.boss ? 2 : 0) | (e.shiny ? 4 : 0) | (e.final ? 8 : 0) | (st.freeze > 0 || st.flinch > 0 ? 16 : 0) | (st.burn > 0 ? 32 : 0) | (st.poison > 0 ? 64 : 0) | (st.paralyze > 0 ? 128 : 0)); o += 1;
     v.setUint8(o, (st.confuse > 0 ? 1 : 0) | (st.slow > 0 ? 2 : 0) | (e.flash > 0 ? 4 : 0) | (e.alpha ? 8 : 0)); o += 1;
     v.setUint8(o, Math.round(e.scale * 40)); o += 1;
-    o += 1; // pad
+    let ex = 0;
+    EXTRA_STATUS.forEach((k, i) => { if ((st as unknown as Record<string, number>)[k] > 0) ex |= 1 << i; });
+    v.setUint8(o, ex); o += 1;
+    let ex2 = 0;
+    EX2.forEach((k, i) => { if ((st as unknown as Record<string, number>)[k] > 0) ex2 |= 1 << i; });
+    v.setUint8(o, ex2); o += 1;
   }
   return buf;
 }
@@ -68,6 +89,7 @@ export function decodeSnapshot(buf: ArrayBuffer): Snapshot | null {
   if (v.getUint8(o) !== 1) return null;
   o += 1;
   const time = v.getFloat32(o); o += 4;
+  const weather = WEATHERS[v.getUint8(o)] ?? null; o += 1;
   const np = v.getUint8(o); o += 1;
   const players: SnapPlayer[] = [];
   for (let i = 0; i < np; i++) {
@@ -78,7 +100,8 @@ export function decodeSnapshot(buf: ArrayBuffer): Snapshot | null {
     const fy = v.getInt8(o) / 100; o += 1;
     const f = v.getUint8(o); o += 1;
     const revive = v.getUint8(o) / 80; o += 1;
-    players.push({ x, y, hp, fx, fy, moving: !!(f & 1), fainted: !!(f & 2), connected: !!(f & 4), hurt: !!(f & 8), revive });
+    const mv = v.getUint8(o); o += 1;
+    players.push({ x, y, hp, fx, fy, moving: !!(f & 1), fainted: !!(f & 2), connected: !!(f & 4), hurt: !!(f & 8), revive, mv });
   }
   const ne = v.getUint16(o); o += 2;
   const cx = v.getFloat32(o); o += 4;
@@ -95,13 +118,13 @@ export function decodeSnapshot(buf: ArrayBuffer): Snapshot | null {
     const f = v.getUint8(o); o += 1;
     const f2 = v.getUint8(o); o += 1;
     const scale = v.getUint8(o) / 40; o += 1;
-    o += 1;
+    const ex = v.getUint8(o) | (v.getUint8(o + 1) << 8); o += 2;
     enemies.push({
       id, species, x, y, dirX, dirY, hpFrac, elite: !!(f & 1), boss: !!(f & 2), shiny: !!(f & 4), final: !!(f & 8),
-      freeze: !!(f & 16), burn: !!(f & 32), poison: !!(f & 64), paralyze: !!(f & 128), confuse: !!(f2 & 1), slow: !!(f2 & 2), flash: !!(f2 & 4), alpha: !!(f2 & 8), scale,
+      freeze: !!(f & 16), burn: !!(f & 32), poison: !!(f & 64), paralyze: !!(f & 128), confuse: !!(f2 & 1), slow: !!(f2 & 2), flash: !!(f2 & 4), alpha: !!(f2 & 8), scale, ex,
     });
   }
-  return { time, players, enemies };
+  return { time, weather, players, enemies };
 }
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -109,7 +132,7 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
 const PROJ_KEYS = [
   'id', 'owner', 'hostile', 'moveId', 'behavior', 'fx', 'type', 'cat', 'shape', 'x', 'y', 'vx', 'vy', 'angle', 'r', 'len',
   't', 'life', 'delay', 'attach', 'ox', 'oy', 'orbitR', 'orbitSpd', 'orbitA', 'homing', 'speed', 'boomerang', 'tx', 'ty',
-  'sx', 'sy', 'growth', 'dmg',
+  'sx', 'sy', 'growth', 'dmg', 'angSpd', 'release', 'base', 'follow', 'bounce', 'flags', 'effect', 'fixed',
 ] as const;
 
 export function projToWire(p: Projectile): unknown[] {

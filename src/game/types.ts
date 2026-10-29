@@ -11,6 +11,9 @@ export interface OwnedMove {
   cd: number;      // time until next activation
   dmgDealt: number;
   kills: number;
+  /** Ramp counter (Fury Cutter, Hyper Voice…) and when it last grew. */
+  n?: number;
+  nt?: number;
 }
 
 export interface OwnedItem { id: string; level: number }
@@ -43,6 +46,8 @@ export interface DerivedStats {
   typeDmg: Partial<Record<PType, number>>;
   physDmg: number;
   specDmg: number;
+  /** Projectile speed / reach multiplier (Tailwind). */
+  projSpeed: number;
 }
 
 export interface Player {
@@ -102,12 +107,53 @@ export interface Player {
   /** Seconds of Mega Evolution left (0 = not mega). */
   megaT: number;
   megas: number;
+  /** Recent damage taken (for Dragon Rage): [time, amount] pairs. */
+  hurtLog: [number, number][];
+  /** Dig: wind-up seconds left, then seconds underground. */
+  digWind: number;
+  burrowT: number;
+  /** Rest: seconds asleep. Outrage: seconds of rampage, then exhaustion. Shadow Force: i-frames. */
+  sleepT: number;
+  rageT: number;
+  exhaustT: number;
+  vanishT: number;
+  /** Protect: seconds until the barrier is back (0 = barrier up). */
+  protectCd: number;
+  /** Spark: static gathered (px run). Cross Chop: hits counted. */
+  staticCharge: number;
+  combo: number;
+  /** Run-long growth from Metal Claw / Ancient Power (as stacks of +1%). */
+  clawStacks: number;
+  ancientStacks: number;
+  /** Hidden Power's type and status for this run. */
+  hiddenType: PType;
+  hiddenEffect: StatusKind;
+  /** Focus Punch: sim time the current focus started (-1 = not focusing). */
+  focusAt: number;
+  /** Ally-terrain effects felt this tick. */
+  onTerrain: { haste: boolean; misty: boolean };
 }
 
 export interface StatusState {
   burn: number; poison: number; poisonStacks: number; paralyze: number; freeze: number;
   slow: number; confuse: number; flinch: number; dotTick: number;
   burnDmg: number; poisonDmg: number; dotOwner: number; coin: number;
+  wet: number; chill: number; chillT: number; sleep: number; charm: number; vuln: number;
+  weaken: number; root: number;
+  /** Leech Seed: seconds left, damage per tick, owner. */
+  seed: number; seedDmg: number; seedOwner: number;
+  /** Badly poisoned: ticks so far (0 = plain poison). */
+  toxic: number;
+  /** Curse: % max HP per second (0 = none) and owner. */
+  curse: number; curseOwner: number;
+  /** Pin Missile pins stuck in this foe, and when they fall out. */
+  pins: number; pinsT: number;
+  /** Sky Uppercut: seconds airborne, landing damage, owner. */
+  air: number; airDmg: number; airOwner: number;
+  /** Friendly-fire cooldown for confused/infatuated bumps. */
+  ffCd: number;
+  /** Thief already looted this elite. */
+  robbed: number;
 }
 
 export interface Enemy {
@@ -157,6 +203,8 @@ export interface Enemy {
 
 export type Shape = 'circle' | 'ring' | 'line' | 'box' | 'cone';
 
+export type { WeatherKind } from '../data/moves.ts';
+
 /** Everything that hits things: projectiles, auras, beams, zones, swipes, enemy bullets. */
 export interface Projectile {
   id: number;
@@ -196,6 +244,19 @@ export interface Projectile {
   hit: Map<number, number>; // enemy id -> time it may be hit again
   dead: boolean;
   growth: number;           // ring max radius for nova
+  effect2?: StatusKind;
+  chance2: number;
+  angSpd: number;           // sweeping beams: rotation speed (rad/s)
+  release: number;          // orbits that fling outward after this age (0 = never)
+  base: number;             // breathing orbits: base radius (swings out to `growth`)
+  follow: number;           // enemy id this is stuck to (0 = none)
+  bounce: number;           // screen-edge bounces left
+  ramp: number;             // per-hit damage growth (Rollout); current multiplier in `mult`
+  mult: number;
+  rampT: number;            // sim time of the last hit
+  fixed: number;            // fixed damage per hit (ignores types and defences)
+  timer: number;            // generic countdown (pulse trail, sticky fuse)
+  flags: number;            // per-move bit flags (see combat PF_*)
 }
 
 export type PickupKind = 'candy' | 'coin' | 'oran' | 'sitrus' | 'magnet' | 'repel' | 'chest' | 'rare-candy' | 'mega-stone';
@@ -238,7 +299,9 @@ export type GameEvent =
   | { e: 'learn'; player: number; move: string }
   | { e: 'enemyShot'; x: number; y: number }
   /** A boss, alpha or elite starts a telegraphed ground attack (named move callout). */
-  | { e: 'raid'; x: number; y: number; name: string; big: boolean };
+  | { e: 'raid'; x: number; y: number; name: string; big: boolean }
+  /** A short floating callout (Magnitude roll, fizzles, steals…). */
+  | { e: 'callout'; x: number; y: number; text: string; color: string };
 
 /** Treasure rarity, shown by the Poké Ball it comes in. Stored as a chest pickup's `value`. */
 export type ChestTier = 1 | 2 | 3 | 4;

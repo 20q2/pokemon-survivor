@@ -15,7 +15,7 @@ import { stageThumbnail } from '../render/background.ts';
 import { dirRow } from '../engine/math.ts';
 import type { RunSession } from '../game/session.ts';
 import type { Player } from '../game/types.ts';
-import { btn, cap, catBadge, fmtTime, h, img, moveIcon, toast, typeBadge, uiIcon } from './dom.ts';
+import { btn, cap, catBadge, fmtTime, h, img, moveDisc, moveIcon, toast, typeBadge, uiIcon } from './dom.ts';
 import { lobbyMenu } from './lobby.ts';
 
 const nn = (...a: (Node | string | null)[]) => a.filter((x): x is Node | string => x !== null);
@@ -271,7 +271,7 @@ export function shopScreen(app: App) {
         const owned = s.tms.includes(m.id);
         const off = s.tmsOff.includes(m.id);
         grid.append(h('div', { class: `panel upg${owned && off ? ' off' : ''}` },
-          img(assets.itemUrl(`tm-${m.type}`)),
+          moveDisc(m.id, 'ic tm shop-tm'),
           h('div', { class: 'nm' }, `TM ${m.name}`),
           h('div', null, typeBadge(m.type), ' ', catBadge(m.cat)),
           h('div', { class: 'ds' }, m.desc),
@@ -387,7 +387,7 @@ export function dexScreen(app: App, tab: 'mons' | 'moves' | 'items' = 'mons') {
       const learners = LINES.filter((l) => l.starter === m.id || l.learnset.some((e) => e.move === m.id) || Object.values(l.branchMoves ?? {}).some((ms) => ms.includes(m.id)));
       const tm = (TM_LIST as { id: string }[]).some((t) => t.id === m.id);
       body.append(h('div', { class: `panel ach${m.mastery ? ' done' : ''}` },
-        moveIcon(m.type, '', 'move-ic dex-ic'),
+        moveIcon(m.id, '', 'move-ic dex-ic'),
         h('div', { class: 'nm' }, m.mastery ? img(uiIcon('mastery'), 'mastery-mark') : null, m.name, ' ', typeBadge(m.type), ' ', catBadge(m.cat)),
         h('div', { class: 'ds' }, m.desc),
         h('div', { class: 'rw' }, m.mastery

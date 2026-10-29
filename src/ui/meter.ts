@@ -3,7 +3,7 @@ import { TYPE_COLORS, type PType } from '../data/types.ts';
 import { assets } from '../render/assets.ts';
 import type { Ledger } from '../game/ledger.ts';
 import type { Player } from '../game/types.ts';
-import { h, img, uiIcon } from './dom.ts';
+import { h, img, moveBadge, uiIcon } from './dom.ts';
 
 export type MeterTab = keyof Ledger;
 
@@ -20,7 +20,8 @@ const SPECIAL: Record<string, { name: string; item?: string; type?: PType; ui?: 
   thorns: { name: 'Rocky Helmet', item: 'rocky-helmet' },
   static: { name: 'Static', type: 'electric' },
   synchronize: { name: 'Synchronize', type: 'psychic' },
-  explosion: { name: 'Chain explosions', type: 'normal' },
+  'chain-explosion': { name: 'Chain explosions', type: 'normal' },
+  steam: { name: 'Steam bursts', type: 'water' },
   'mega-burst': { name: 'Mega burst', ui: 'mega' },
   'sand-stream': { name: 'Sand Stream', type: 'rock' },
   regen: { name: 'Regeneration', item: 'leftovers' },
@@ -38,7 +39,7 @@ const SPECIAL: Record<string, { name: string; item?: string; type?: PType; ui?: 
 
 function source(src: string): { name: string; icon: HTMLElement } {
   const mv = MOVES[src];
-  if (mv) return { name: mv.name, icon: typeIcon(mv.type) };
+  if (mv) return { name: mv.name, icon: moveBadge(mv.id) };
   const s = SPECIAL[src];
   if (!s) return { name: src, icon: typeIcon('normal') };
   if (s.item) return { name: s.name, icon: img(assets.itemUrl(s.item), 'm-ic item') };

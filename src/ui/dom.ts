@@ -1,7 +1,9 @@
-import { TYPE_COLORS, type PType } from '../data/types.ts';
+import type { PType } from '../data/types.ts';
 import { audio } from '../audio/audio.ts';
 import { ASSET_BASE } from '../render/assets.ts';
 import type { Category } from '../data/moves.ts';
+import { MOVES } from '../data/moves.ts';
+import { moveLook } from './movelook.ts';
 
 type Child = Node | string | number | null | undefined | false | Child[];
 type Attrs = Record<string, unknown> & { class?: string; style?: string; onclick?: (e: MouseEvent) => void };
@@ -46,11 +48,29 @@ export function catBadge(c: Category) {
   return h('img', { class: 'cat-icon', src: `${ASSET_BASE}ui/cat/${c}.png`, alt: c, title: cap(c), draggable: 'false' });
 }
 
-/** A move's icon: its type symbol on a tile tinted with the type colour. */
-export function moveIcon(type: PType, label: string, cls = 'move-ic') {
-  return h('div', { class: cls, style: `--tc:${TYPE_COLORS[type]}` },
+/** A move's icon: its type symbol on a tile in the move's own look (see movelook.ts). */
+export function moveIcon(id: string, label: string, cls = 'move-ic') {
+  const type = MOVES[id].type;
+  const look = moveLook(id);
+  return h('div', { class: `${cls} ${look.cls}`, style: look.style },
     h('img', { src: `${ASSET_BASE}ui/logo/${type}.png`, alt: type, draggable: 'false' }),
     label ? h('span', { class: 'ab' }, label) : null);
+}
+
+/** A move as a TM disc (sized by category) on its own patterned tile, with its type symbol in the corner. */
+export function moveDisc(id: string, cls: string, eager = false) {
+  const type = MOVES[id].type;
+  const look = moveLook(id);
+  const pic = (src: string, c: string) => h('img', { src, class: c, draggable: 'false', ...(eager ? {} : { loading: 'lazy' }) });
+  return h('div', { class: `${cls} ${look.cls}`, style: look.style },
+    pic(`${ASSET_BASE}items/tm-${type}.png`, 'px disc'), pic(`${ASSET_BASE}ui/logo/${type}.png`, 'corner'));
+}
+
+/** A small round-cornered move badge (damage meter). */
+export function moveBadge(id: string) {
+  const type = MOVES[id].type;
+  const look = moveLook(id);
+  return h('span', { class: `m-ic type ${look.cls}`, style: look.style }, h('img', { src: `${ASSET_BASE}ui/logo/${type}.png`, draggable: 'false' }));
 }
 
 export const moveAbbr = (name: string) => name.split(/[\s-]/).map((w) => w.slice(0, 4)).join(' ').toUpperCase();
