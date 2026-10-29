@@ -275,7 +275,7 @@ export class Sim {
     for (const pr of this.projectiles) { pr.px = pr.x; pr.py = pr.y; }
     this.refreshStats();
     this.updatePlayers(dt);
-    this.spawner.update(dt);
+    this.spawner.update();
     for (const p of this.players) (this.flow[p.id] ??= new FlowField()).update(this.obstacles, p.x, p.y, dt);
     updateEnemies(this, dt);
     this.rebuildGrid();

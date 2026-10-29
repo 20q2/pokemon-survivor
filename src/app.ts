@@ -174,7 +174,7 @@ export class App {
       for (const s of lineSpecies(line)) ids.add(s);
     }
     const st = session.stage;
-    for (const pool of [st.pools.early, st.pools.mid, st.pools.late]) for (const e of pool) ids.add(e.species);
+    for (const w of st.waves) for (const e of w.species) ids.add(e.species);
     for (const s of [...st.elites, st.swarm, ...st.bosses.map((b) => b.species), ...st.bosses.flatMap((b) => b.minions ?? []), 'chansey', 'meowth']) ids.add(s);
     const shiny = new Set(w.players.filter((p) => p.shiny).flatMap((p) => lineSpecies(LINE[p.lineId])));
     await Promise.all([...ids].map((id) => assets.load(id, false).then(() => (shiny.has(id) ? assets.load(id, true) : null))));

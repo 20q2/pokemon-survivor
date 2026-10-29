@@ -9,6 +9,21 @@ export type EnemyRole = 'chaser' | 'fast' | 'tank' | 'ranged' | 'bomber' | 'trea
 export type BossPattern = 'charge' | 'radial' | 'aimed' | 'summon' | 'slam' | 'spiral' | 'quake' | 'donut' | 'meteor' | 'beam' | 'cone' | 'cross';
 
 export interface SpawnEntry { species: string; w: number }
+/** One minute of a stage: what spawns, how many regulars to keep alive, and how sturdy they are. */
+export interface WaveDef {
+  species: SpawnEntry[];
+  /** Quota of live regular enemies; the spawner backfills to this instantly. */
+  min: number;
+  /** Seconds between quota checks. */
+  interval: number;
+  /** Enemy HP multiplier for this minute (stepwise, replaces a smooth curve). */
+  hpTier: number;
+  /** Wave boss: spawns 2s into the minute. */
+  elite?: string;
+  /** Species shown on the minute banner (defaults to the first newcomer). */
+  headline?: string;
+  text?: string;
+}
 export interface BossDef { species: string; at: number; patterns: BossPattern[]; final?: boolean; minions?: string[] }
 
 export interface StageDef {
@@ -18,7 +33,8 @@ export interface StageDef {
   types: PType[];
   music: string;
   difficulty: number;
-  pools: { early: SpawnEntry[]; mid: SpawnEntry[]; late: SpawnEntry[] };
+  /** Minutes 0..15; after minute 15 the last entry keeps applying. */
+  waves: WaveDef[];
   elites: string[];
   swarm: string;
   bosses: BossDef[];
@@ -37,17 +53,54 @@ export const ENEMY_ROLE: Record<string, EnemyRole> = {
   chansey: 'treasure', meowth: 'treasure',
 };
 
-const E = (species: string, w = 1): SpawnEntry => ({ species, w });
+/** Quota shape shared by every stage (after Vampire Survivors' Mad Forest); minutes 5 and 9 breathe. */
+export const WAVE_MIN = [12, 25, 45, 35, 25, 10, 60, 90, 30, 10, 200, 40, 150, 120, 220, 260];
+export const WAVE_INTERVAL = [1, 1, 0.5, 0.5, 0.5, 0.25, 0.25, 0.25, 0.25, 0.25, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1];
+/** Roughly 1 + 0.15m + 0.025m^2 + 0.0025m^3 at whole minutes. */
+export const WAVE_HP = [1, 1.18, 1.42, 1.74, 2.16, 2.69, 3.34, 4.13, 5.08, 6.2, 7.5, 9, 10.7, 12.6, 14.7, 17.1];
+/** Minutes that end with a wave boss (about one chest per minute); a second comes from minute 10. */
+const ELITE_MINUTES = new Set([1, 2, 3, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15]);
+
+/**
+ * Builds the 16 waves from one line of species per minute (`name` or `name:weight`, first
+ * listed is the most common) plus optional flavour text per minute. Elites rotate through `elites`.
+ */
+function waves(elites: string[], minutes: string[], text: Record<number, string> = {}): WaveDef[] {
+  let ei = 0;
+  return minutes.map((line, m) => ({
+    species: line.split(' ').map((tok, i) => {
+      const [species, w] = tok.split(':');
+      return { species, w: w ? Number(w) : i === 0 ? 3 : i === 1 ? 2 : 1 };
+    }),
+    min: WAVE_MIN[m], interval: WAVE_INTERVAL[m], hpTier: WAVE_HP[m],
+    ...(ELITE_MINUTES.has(m) ? { elite: elites[ei++ % elites.length] } : {}),
+    ...(text[m] ? { text: text[m] } : {}),
+  }));
+}
 
 export const STAGES: StageDef[] = [
   {
     id: 'viridian', name: 'Viridian Forest', subtitle: 'A sun-dappled maze of trees and Bug Pokémon.',
     types: ['bug', 'grass', 'normal', 'flying'], music: 'forest', difficulty: 0.9,
-    pools: {
-      early: [E('caterpie', 4), E('weedle', 4), E('pidgey', 2), E('rattata', 2)],
-      mid: [E('metapod', 2), E('kakuna', 2), E('spearow', 3), E('oddish', 2), E('paras', 2), E('rattata', 2), E('bellsprout', 2)],
-      late: [E('pidgeotto', 2), E('paras', 2), E('bellsprout', 3), E('spearow', 2), E('kakuna', 2), E('parasect', 1)],
-    },
+    waves: waves(['pidgeotto', 'metapod', 'parasect'], [
+      'caterpie weedle',
+      'caterpie weedle pidgey',
+      'weedle pidgey rattata',
+      'pidgey rattata metapod',
+      'rattata metapod kakuna oddish',
+      'metapod kakuna spearow',
+      'spearow paras bellsprout kakuna',
+      'paras bellsprout spearow oddish',
+      'bellsprout spearow pidgeotto kakuna',
+      'spearow kakuna metapod',
+      'paras bellsprout pidgeotto rattata',
+      'bellsprout pidgeotto parasect kakuna',
+      'pidgeotto parasect spearow paras',
+      'parasect spearow kakuna bellsprout oddish',
+      'pidgeotto parasect bellsprout paras metapod',
+      'pidgeotto parasect spearow kakuna bellsprout paras'
+    ],
+      {3: 'Metapod wall closing in!', 6: 'Spearow flock in!', 10: 'The forest wakes up!', 15: 'Everything in the forest is coming!'}),
     elites: ['pidgeotto', 'metapod', 'parasect'], swarm: 'spearow',
     bosses: [
       { species: 'beedrill', at: 180, patterns: ['charge', 'cone', 'aimed'], minions: ['weedle'] },
@@ -60,11 +113,25 @@ export const STAGES: StageDef[] = [
   {
     id: 'mtmoon', name: 'Mt. Moon', subtitle: 'Moonlit caverns echoing with Zubat wings.',
     types: ['rock', 'ground', 'poison', 'fairy'], music: 'cave', difficulty: 1.25, darkness: 0.35,
-    pools: {
-      early: [E('zubat', 4), E('geodude', 1), E('diglett', 2), E('sandshrew', 2), E('paras', 2)],
-      mid: [E('zubat', 3), E('geodude', 2), E('ekans', 3), E('clefairy', 2), E('paras', 2), E('sandshrew', 2)],
-      late: [E('golbat', 3), E('graveler', 2), E('clefairy', 2), E('ekans', 2), E('sandslash', 1)],
-    },
+    waves: waves(['golbat', 'graveler', 'sandslash'], [
+      'zubat diglett',
+      'zubat diglett sandshrew',
+      'diglett sandshrew paras',
+      'sandshrew paras geodude zubat',
+      'paras geodude ekans clefairy',
+      'geodude ekans zubat',
+      'ekans clefairy sandshrew golbat',
+      'golbat geodude clefairy paras',
+      'golbat graveler ekans sandshrew',
+      'graveler zubat paras',
+      'golbat graveler clefairy ekans',
+      'graveler clefairy sandslash geodude',
+      'golbat sandslash ekans paras',
+      'sandslash clefairy zubat graveler',
+      'golbat graveler sandslash ekans sandshrew',
+      'golbat graveler sandslash clefairy ekans zubat'
+    ],
+      {1: 'Diglett pop up everywhere!', 6: 'Golbat swoop in!', 10: 'The cavern shakes!', 15: 'The whole mountain is awake!'}),
     elites: ['golbat', 'graveler', 'sandslash'], swarm: 'zubat',
     bosses: [
       { species: 'onix', at: 180, patterns: ['charge', 'slam', 'quake'], minions: ['geodude'] },
@@ -77,11 +144,25 @@ export const STAGES: StageDef[] = [
   {
     id: 'seafoam', name: 'Seafoam Islands', subtitle: 'Frozen tide caves where the ice never melts.',
     types: ['water', 'ice'], music: 'ice', difficulty: 1.5,
-    pools: {
-      early: [E('seel', 3), E('shellder', 3), E('horsea', 2), E('psyduck', 3)],
-      mid: [E('krabby', 3), E('tentacool', 3), E('slowpoke', 2), E('spheal', 2), E('snorunt', 2), E('horsea', 2)],
-      late: [E('dewgong', 2), E('jynx', 2), E('krabby', 2), E('spheal', 2), E('snorunt', 2), E('tentacool', 2)],
-    },
+    waves: waves(['dewgong', 'jynx', 'slowpoke'], [
+      'seel shellder',
+      'seel shellder krabby',
+      'shellder krabby tentacool',
+      'krabby tentacool spheal',
+      'tentacool spheal horsea psyduck',
+      'spheal slowpoke seel',
+      'slowpoke krabby psyduck snorunt',
+      'krabby snorunt horsea tentacool',
+      'snorunt spheal dewgong shellder',
+      'dewgong seel slowpoke',
+      'krabby tentacool dewgong jynx',
+      'tentacool jynx spheal snorunt',
+      'jynx dewgong krabby psyduck',
+      'spheal snorunt tentacool horsea jynx',
+      'dewgong jynx krabby slowpoke snorunt',
+      'dewgong jynx krabby spheal snorunt tentacool'
+    ],
+      {2: 'Krabby claw their way in!', 6: 'Slowpoke drift into the cave!', 10: 'The tide rolls in!', 15: 'A frozen wave crashes down!'}),
     elites: ['dewgong', 'jynx', 'slowpoke'], swarm: 'tentacool',
     bosses: [
       { species: 'cloyster', at: 180, patterns: ['radial', 'beam', 'spiral'], minions: ['shellder'] },
@@ -94,11 +175,25 @@ export const STAGES: StageDef[] = [
   {
     id: 'powerplant', name: 'Power Plant', subtitle: 'Humming generators crackle with stray voltage.',
     types: ['electric', 'steel', 'poison'], music: 'factory', difficulty: 1.8,
-    pools: {
-      early: [E('magnemite', 3), E('voltorb', 2), E('electrike', 3), E('grimer', 2)],
-      mid: [E('magnemite', 2), E('koffing', 2), E('mareep', 3), E('electrike', 2), E('elekid', 2), E('grimer', 2), E('voltorb', 1)],
-      late: [E('electrode', 2), E('magneton', 2), E('elekid', 3), E('koffing', 2), E('mareep', 2)],
-    },
+    waves: waves(['magneton', 'electrode', 'grimer'], [
+      'electrike grimer',
+      'electrike grimer mareep',
+      'grimer mareep elekid',
+      'mareep elekid electrike',
+      'elekid electrike magnemite koffing',
+      'magnemite mareep grimer',
+      'mareep voltorb koffing electrike',
+      'koffing voltorb elekid grimer',
+      'electrike magnemite electrode mareep',
+      'electrode grimer elekid',
+      'magneton elekid koffing mareep',
+      'electrode magneton electrike grimer',
+      'elekid koffing mareep voltorb',
+      'magneton electrode grimer electrike magnemite',
+      'elekid koffing mareep magneton voltorb',
+      'electrode magneton elekid koffing mareep electrike'
+    ],
+      {4: 'Magnemite hum into range!', 8: 'Electrode charge up!', 10: 'The generators overload!', 15: 'Total blackout incoming!'}),
     elites: ['magneton', 'electrode', 'grimer'], swarm: 'voltorb',
     bosses: [
       { species: 'electabuzz', at: 180, patterns: ['charge', 'quake', 'radial'], minions: ['elekid'] },
@@ -111,11 +206,25 @@ export const STAGES: StageDef[] = [
   {
     id: 'tower', name: 'Pokémon Tower', subtitle: 'Restless spirits drift between the graves.',
     types: ['ghost', 'poison', 'psychic', 'dark'], music: 'tower', difficulty: 2.2, darkness: 0.5,
-    pools: {
-      early: [E('shuppet', 3), E('duskull', 2), E('zubat', 3), E('drowzee', 2)],
-      mid: [E('misdreavus', 3), E('cubone', 2), E('murkrow', 3), E('sableye', 2), E('shuppet', 2), E('drowzee', 2)],
-      late: [E('banette', 2), E('dusclops', 2), E('houndour', 3), E('sableye', 2), E('murkrow', 2), E('misdreavus', 2)],
-    },
+    waves: waves(['banette', 'dusclops', 'hypno'], [
+      'shuppet zubat',
+      'shuppet zubat duskull',
+      'zubat duskull cubone',
+      'duskull cubone murkrow',
+      'cubone murkrow drowzee misdreavus',
+      'murkrow sableye shuppet',
+      'sableye shuppet drowzee houndour',
+      'houndour misdreavus cubone zubat',
+      'misdreavus murkrow banette duskull',
+      'banette sableye zubat',
+      'houndour dusclops murkrow shuppet',
+      'dusclops misdreavus sableye cubone',
+      'banette houndour drowzee murkrow',
+      'dusclops banette misdreavus sableye zubat',
+      'houndour murkrow hypno drowzee shuppet',
+      'banette dusclops houndour sableye murkrow misdreavus'
+    ],
+      {1: 'Duskull drift through the walls!', 6: 'Houndour howl in the dark!', 10: 'The graves open!', 15: 'Every spirit is rising!'}),
     elites: ['banette', 'dusclops', 'hypno'], swarm: 'murkrow',
     bosses: [
       { species: 'hypno', at: 180, patterns: ['spiral', 'donut', 'summon'], minions: ['drowzee'] },
@@ -128,11 +237,25 @@ export const STAGES: StageDef[] = [
   {
     id: 'cinnabar', name: 'Cinnabar Volcano', subtitle: 'Magma flows and fierce fighters.',
     types: ['fire', 'fighting', 'dragon', 'rock'], music: 'volcano', difficulty: 2.7,
-    pools: {
-      early: [E('vulpix', 3), E('growlithe', 3), E('slugma', 2), E('mankey', 3)],
-      mid: [E('ponyta', 3), E('numel', 2), E('bagon', 3), E('growlithe', 2), E('mankey', 2), E('rhyhorn', 2)],
-      late: [E('magmar', 2), E('shelgon', 2), E('hitmonlee', 2), E('primeape', 3), E('ponyta', 2), E('rhyhorn', 2)],
-    },
+    waves: waves(['magmar', 'hitmonlee', 'shelgon'], [
+      'growlithe mankey',
+      'growlithe mankey ponyta',
+      'mankey ponyta numel',
+      'ponyta numel bagon',
+      'numel bagon vulpix slugma',
+      'bagon rhyhorn growlithe',
+      'rhyhorn mankey slugma primeape',
+      'primeape ponyta vulpix numel',
+      'ponyta bagon hitmonlee growlithe',
+      'hitmonlee rhyhorn mankey',
+      'primeape magmar rhyhorn ponyta',
+      'magmar shelgon slugma growlithe',
+      'shelgon hitmonlee primeape numel',
+      'magmar ponyta vulpix bagon rhyhorn',
+      'hitmonlee shelgon primeape mankey slugma',
+      'magmar shelgon hitmonlee primeape ponyta rhyhorn'
+    ],
+      {2: 'Ponyta stampede!', 6: 'Rhyhorn charge in!', 10: 'The volcano erupts!', 15: 'The mountain is on fire!'}),
     elites: ['magmar', 'hitmonlee', 'shelgon'], swarm: 'ponyta',
     bosses: [
       { species: 'hitmonlee', at: 180, patterns: ['charge', 'cross', 'aimed'], minions: ['mankey'] },
@@ -145,11 +268,25 @@ export const STAGES: StageDef[] = [
   {
     id: 'cerulean', name: 'Cerulean Cave', subtitle: 'Where the strongest wild Pokémon gather.',
     types: ['psychic', 'normal', 'dragon'], music: 'finale', difficulty: 3.3, darkness: 0.4,
-    pools: {
-      early: [E('golbat', 3), E('graveler', 2), E('raticate', 2), E('parasect', 2), E('ditto', 1)],
-      mid: [E('sandslash', 2), E('primeape', 2), E('electrode', 2), E('dewgong', 2), E('wobbuffet', 1), E('ditto', 2)],
-      late: [E('magmar', 2), E('electabuzz', 2), E('jynx', 2), E('hypno', 2), E('shelgon', 2), E('banette', 2)],
-    },
+    waves: waves(['kangaskhan', 'wobbuffet', 'arcanine'], [
+      'golbat raticate',
+      'golbat raticate graveler',
+      'raticate graveler parasect',
+      'graveler parasect ditto',
+      'parasect ditto sandslash electrode',
+      'sandslash primeape golbat',
+      'primeape dewgong wobbuffet raticate',
+      'dewgong ditto jynx graveler',
+      'wobbuffet electrode magmar parasect',
+      'magmar sandslash ditto',
+      'electabuzz hypno primeape dewgong',
+      'hypno shelgon wobbuffet golbat',
+      'banette electabuzz jynx sandslash',
+      'shelgon banette magmar electrode ditto',
+      'jynx hypno electabuzz primeape graveler',
+      'magmar electabuzz jynx hypno shelgon banette'
+    ],
+      {3: 'Ditto are everywhere!', 7: 'The cave grows restless!', 10: 'The strongest have arrived!', 15: 'Nothing holds back now!'}),
     elites: ['kangaskhan', 'wobbuffet', 'arcanine'], swarm: 'golbat',
     bosses: [
       { species: 'kangaskhan', at: 180, patterns: ['charge', 'slam', 'quake'], minions: ['raticate'] },

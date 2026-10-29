@@ -1,5 +1,5 @@
 import { SPECIES } from '../data/pokedex.ts';
-import { ENEMY_ROLE, RUN_LENGTH, type BossDef, type EnemyRole, type SpawnEntry } from '../data/stages.ts';
+import { ENEMY_ROLE, RUN_LENGTH, type BossDef, type EnemyRole, type SpawnEntry, type WaveDef } from '../data/stages.ts';
 import { TAU, dist2 } from '../engine/math.ts';
 import { freshStatus, makeProjectile, rawDamageEnemy } from './combat.ts';
 import { megaOnKill } from './mega.ts';
@@ -23,8 +23,10 @@ export interface SpawnOpts {
 }
 
 export class Spawner {
-  private acc = 0;
-  private nextElite = 75;
+  private waveIdx = -1;
+  private nextQuota = 0;
+  /** Wave bosses waiting for their minute banner to show first. */
+  private pendingElites: { at: number; species: string }[] = [];
   private nextTreasure = 100;
   private nextItemBall = 40;
   private events: { at: number; kind: 'swarm' | 'ring' }[] = [
@@ -47,19 +49,22 @@ export class Spawner {
     return this.sim.time / 60;
   }
 
-  /** Enemy hp multiplier at the current time. */
+  /** The current minute's wave; after the last minute it keeps applying (overtime). */
+  get wave(): WaveDef {
+    const waves = this.sim.stage.waves;
+    return waves[Math.min(waves.length - 1, Math.floor(this.sim.time / 60))];
+  }
+
   /** Stage difficulty eases in over the first minutes so every route starts fair. */
   stageFactor() {
     const ramp = Math.min(1, 0.25 + this.minute / 6);
     return 1 + (this.sim.stage.difficulty - 1) * ramp;
   }
 
+  /** Enemy hp multiplier: a per-minute step, not a smooth curve, so each minute reads as a new tier. */
   hpMult() {
-    const m = this.minute;
     const n = this.sim.players.length;
-    // Gentle early, brutal late; strong teams (high level) also face sturdier foes.
-    const lvl = 1 + 0.006 * (this.sim.level - 1);
-    return (1 + 0.15 * m + 0.025 * m * m + 0.0025 * m * m * m) * lvl * this.stageFactor() * (1 + 0.65 * (n - 1)) * (this.sim.elite ? 1.6 : 1);
+    return this.wave.hpTier * this.stageFactor() * (1 + 0.65 * (n - 1)) * (this.sim.elite ? 1.6 : 1);
   }
 
   dmgMult() {
@@ -68,36 +73,16 @@ export class Spawner {
     return grace * (1 + 0.06 * m + 0.004 * m * m) * (0.75 + 0.25 * this.stageFactor()) * (this.sim.elite ? 1.3 : 1);
   }
 
-  update(dt: number) {
+  update() {
     const sim = this.sim;
     const t = sim.time;
-    const m = this.minute;
     const n = sim.players.length;
-    const finalUp = t >= RUN_LENGTH;
-    const target = Math.min(MAX_ENEMIES - 40, (24 + m * 26) * (1 + 0.35 * (n - 1)) * (sim.elite ? 1.25 : 1)) * (finalUp ? 0.5 : 1);
-    const rate = (3 + m * 1.4) * (1 + 0.3 * (n - 1)) * (sim.elite ? 1.25 : 1);
-    const alive = sim.enemies.length;
-    if (alive < target) {
-      this.acc += rate * dt * (alive < target * 0.5 ? 1.4 : 1);
-      while (this.acc >= 1) {
-        this.acc -= 1;
-        const pool = m < 4.5 ? sim.stage.pools.early : m < 9.5 ? sim.stage.pools.mid : sim.stage.pools.late;
-        const entry = sim.rng.weighted(pool, (e: SpawnEntry) => e.w)!;
-        // Late game: sprinkle in earlier species too for variety.
-        const sp = m > 10 && sim.rng.chance(0.15) ? sim.rng.pick(sim.stage.pools.mid).species : entry.species;
-        this.spawnOffscreen(sp);
-      }
-    }
-    if (t >= this.nextElite) {
-      this.nextElite += Math.max(48, 80 - m * 2.5);
-      const count = 1 + Math.floor(m / 7);
-      for (let i = 0; i < count; i++) this.spawnOffscreen(sim.rng.pick(sim.stage.elites), { elite: true });
-    }
+    this.updateWave(t, n);
     if (t >= this.nextTreasure) {
       this.nextTreasure += sim.rng.range(80, 130);
       if (sim.rng.chance(0.65)) {
         this.spawnOffscreen(sim.rng.chance(0.35) ? 'chansey' : 'meowth');
-        sim.emit({ e: 'warn', text: 'A wild Pokémon is carrying treasure!' });
+        sim.emit({ e: 'toast', text: 'A wild Pokémon is carrying treasure!' });
       }
     }
     if (t >= this.nextItemBall) {
@@ -124,6 +109,44 @@ export class Spawner {
       const b = bosses[this.bossIdx++];
       this.spawnOffscreen(b.species, { boss: b });
       sim.emit({ e: 'boss', species: b.species, final: !!b.final });
+    }
+  }
+
+  /** Minute changes, wave bosses and the quota backfill. */
+  private updateWave(t: number, n: number) {
+    const sim = this.sim;
+    const idx = Math.min(sim.stage.waves.length - 1, Math.floor(t / 60));
+    if (idx !== this.waveIdx) {
+      const prev = sim.stage.waves[this.waveIdx];
+      this.waveIdx = idx;
+      const w = sim.stage.waves[idx];
+      if (idx > 0) {
+        const species = w.headline ?? (w.species.find((e) => !prev?.species.some((p) => p.species === e.species)) ?? w.species[0]).species;
+        sim.emit({ e: 'wave', minute: idx, species, text: w.text ?? `${SPECIES[species].name} appear!` });
+      }
+      if (w.elite) {
+        const pool = sim.stage.elites;
+        this.pendingElites.push({ at: t + 2, species: w.elite });
+        if (idx >= 10) this.pendingElites.push({ at: t + 2, species: pool[(pool.indexOf(w.elite) + 1) % pool.length] });
+      }
+    }
+    while (this.pendingElites.length && t >= this.pendingElites[0].at) {
+      this.spawnOffscreen(this.pendingElites.shift()!.species, { elite: true });
+    }
+    const w = sim.stage.waves[idx];
+    if (t < this.nextQuota) return;
+    this.nextQuota = t + w.interval;
+    // Only filler counts toward the quota; set pieces and carriers have their own pacing.
+    let alive = 0;
+    for (const e of sim.enemies) if (e.alive && !e.boss && !e.elite && !e.alpha && e.role !== 'treasure' && e.aiState !== 9) alive++;
+    const min = Math.round(w.min * (1 + 0.35 * (n - 1)) * (sim.elite ? 1.25 : 1));
+    if (alive < min) {
+      // Instant backfill; spawnEnemy stops at MAX_ENEMIES.
+      for (; alive < min; alive++) {
+        if (!this.spawnOffscreen(sim.rng.weighted(w.species, (e: SpawnEntry) => e.w)!.species)) break;
+      }
+    } else {
+      for (const e of w.species) this.spawnOffscreen(e.species);
     }
   }
 
@@ -180,8 +203,8 @@ export class Spawner {
     const a = sim.rng.range(0, TAU);
     const dist = sim.rng.range(750, 1050);
     const x = p.x + Math.cos(a) * dist, y = p.y + Math.sin(a) * dist;
-    const pool = this.minute < 6 ? [...sim.stage.pools.early, ...sim.stage.pools.mid] : [...sim.stage.pools.mid, ...sim.stage.pools.late];
-    const choices = [...new Set([...pool.map((e) => e.species), ...sim.stage.elites])].filter((s) => ENEMY_ROLE[s] !== 'treasure' && ENEMY_ROLE[s] !== 'bomber');
+    const waves = this.minute < 6 ? sim.stage.waves.slice(0, 6) : sim.stage.waves.slice(6);
+    const choices = [...new Set([...waves.flatMap((w) => w.species.map((e) => e.species)), ...sim.stage.elites])].filter((s) => ENEMY_ROLE[s] !== 'treasure' && ENEMY_ROLE[s] !== 'bomber');
     const species = sim.rng.pick(choices);
     const e = spawnEnemy(sim, species, x, y, { alpha: true });
     if (e) sim.emit({ e: 'poi', kind: 'alpha', x, y, species });
@@ -229,8 +252,7 @@ export class Spawner {
     const sim = this.sim;
     const p = this.anchor();
     const count = 26 + Math.floor(this.minute * 2);
-    const pool = sim.stage.pools.mid;
-    const species = sim.rng.pick(pool).species;
+    const species = sim.rng.pick(this.wave.species).species;
     sim.emit({ e: 'warn', text: 'You’re surrounded!' });
     const r = Math.max(p.viewW, p.viewH) * 0.42;
     for (let i = 0; i < count; i++) {
@@ -249,8 +271,8 @@ export function spawnEnemy(sim: Sim, speciesId: string, x: number, y: number, op
   const shiny = opts.shiny ?? (!opts.boss && !opts.alpha && sim.rng.chance((1 / 3000) * shinyOdds));
   const [bhp, batk, , bspa, , bspe] = sp.base;
   let hp = (4 + bhp * 0.12) * ROLE_HP[role] * sim.spawner.hpMult();
-  // Wild Pokémon get a little quicker as the run goes on, so kiting stays honest.
-  let speed = Math.min(132, (48 + bspe * 0.42) * ROLE_SPEED[role]) * (1 + Math.min(0.3, Math.max(0, m - 5) * 0.03));
+  // Regulars never outrun the slowest starter (~130 px/s) by much, so kiting stays honest all run.
+  let speed = Math.min(110, (48 + bspe * 0.42) * ROLE_SPEED[role]);
   let dmg = (3 + Math.max(batk, bspa) * 0.055) * sim.spawner.dmgMult();
   let xp = role === 'tank' ? 2 : 1;
   let scale = role === 'tank' ? 1.15 : 1;

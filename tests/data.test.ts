@@ -85,7 +85,7 @@ describe('data integrity', () => {
   it('stages reference real species with sprites', () => {
     const sp = (manifest as { species: Record<string, { normal: unknown }> }).species;
     for (const st of STAGES) {
-      const all = [...st.pools.early, ...st.pools.mid, ...st.pools.late].map((e) => e.species);
+      const all = st.waves.flatMap((w) => w.species.map((e) => e.species));
       all.push(...st.elites, st.swarm, ...st.bosses.map((b) => b.species), ...st.bosses.flatMap((b) => b.minions ?? []));
       for (const s of all) {
         expect(SPECIES[s], `${st.id}:${s}`).toBeTruthy();
@@ -93,6 +93,30 @@ describe('data integrity', () => {
       }
     }
     for (const s of Object.keys(ENEMY_ROLE)) expect(SPECIES[s], s).toBeTruthy();
+  });
+
+  it('every stage has 16 minute waves that each change the species line-up', () => {
+    for (const st of STAGES) {
+      expect(st.waves.length, st.id).toBe(16);
+      const set = (i: number) => st.waves[i].species.map((e) => e.species).sort().join();
+      for (let i = 1; i < 16; i++) expect(set(i), `${st.id} minute ${i}`).not.toBe(set(i - 1));
+    }
+  });
+
+  it('the first four minutes are pure chasers (no ranged or bomber species)', () => {
+    for (const st of STAGES) {
+      for (let i = 0; i < 4; i++) {
+        for (const e of st.waves[i].species) expect(['ranged', 'bomber'], `${st.id} m${i} ${e.species}`).not.toContain(ENEMY_ROLE[e.species]);
+      }
+    }
+  });
+
+  it('wave quotas follow the shared non-monotonic table', () => {
+    const table = [12, 25, 45, 35, 25, 10, 60, 90, 30, 10, 200, 40, 150, 120, 220, 260];
+    for (const st of STAGES) {
+      expect(st.waves.map((w) => w.min), st.id).toEqual(table);
+      for (const w of st.waves) if (w.elite) expect(st.elites, st.id).toContain(w.elite);
+    }
   });
 });
 
