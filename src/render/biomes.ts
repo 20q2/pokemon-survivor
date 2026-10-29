@@ -1,4 +1,5 @@
 import { Ink, mix, PRng, T, Tex, type Ramp } from './pixelart.ts';
+import { autotile, cellPx, cropProp, palette, tileSheet, type Cell, type Sheet } from './tilesheet.ts';
 
 /**
  * Per-route look: a base ground material, up to two autotiled terrain layers on top (patches or
@@ -16,7 +17,14 @@ export interface Field {
   thr: number;
 }
 
-export interface Layer { mat: Material; field: Field; rim?: string; shade?: boolean }
+export interface Layer {
+  mat: Material;
+  field: Field;
+  rim?: string;
+  shade?: boolean;
+  /** Pre-built edge tiles from a tile sheet, one per corner config (transparent = layer below). */
+  auto?: Uint32Array[];
+}
 
 export interface PropSprite { frames: HTMLCanvasElement[]; ax: number; ay: number; tall: boolean; fps: number }
 
@@ -613,13 +621,59 @@ const builders: Record<string, () => Biome> = {
   }),
 };
 
+// ─────────────────────────── tile-sheet layouts ───────────────────────────
+// Cell coordinates in the player-supplied outdoor sheet (see tilesheet.ts). Routes listed here use
+// the sheet when it is present; the rest keep their painted art.
+
+function sheetMaterial(s: Sheet, cells: readonly Cell[], weights: number[]): Material {
+  return {
+    variants: cells.map((cell) => { const t = new Tex('#000000'); t.px.set(cellPx(s, cell)); return t; }),
+    weights,
+  };
+}
+
+function sheetProp(s: Sheet, cell: Cell, w: number, h: number, key: Set<number>, ax: number, ay: number, tall: boolean): PropSprite {
+  return { frames: [cropProp(s, cell, w, h, key)], ax, ay, tall, fps: 0 };
+}
+
+const sheetBuilders: Record<string, (s: Sheet) => Biome> = {
+  viridian: (s) => {
+    const grassCells: Cell[] = [[6, 2], [6, 0], [6, 1], [7, 1]];
+    const basePal = palette(s, grassCells);
+    const P2 = (cell: Cell, w: number, h: number, ax: number, ay: number, tall = true) => sheetProp(s, cell, w, h, basePal, ax, ay, tall);
+    return {
+      seed: 11,
+      base: sheetMaterial(s, grassCells, [8, 2, 2, 2]),
+      layers: [
+        {
+          mat: sheetMaterial(s, [[0, 6]], [1]),
+          field: { scale: 22, kind: 'ridge', thr: 0.035 },
+          auto: autotile(s, [0, 6], [[1, 6], [2, 6], [3, 6], [4, 6], [1, 7], [2, 7], [3, 7], [4, 7], [1, 8], [2, 8], [3, 8], [4, 8]], basePal),
+        },
+      ],
+      props: [
+        {
+          sprites: [P2([14, 0], 3, 4, 24, 54), P2([3, 34], 3, 4, 24, 58), P2([14, 17], 2, 3, 16, 44)],
+          cell: 2, density: 0.02, on: [0], grove: { scale: 7, thr: 0.6, density: 0.8 }, clear: 72,
+        },
+        { sprites: [P2([0, 34], 3, 4, 24, 58), P2([17, 0], 1, 1, 8, 15)], cell: 2, density: 0.006, on: [0], clear: 72 },
+        { sprites: [P2([7, 12], 1, 1, 8, 14, false), P2([7, 16], 1, 1, 8, 14, false), P2([8, 18], 1, 1, 8, 14, false)], cell: 1, density: 0.012, on: [0] },
+        { sprites: [P2([7, 2], 1, 1, 8, 14, false), P2([7, 0], 1, 1, 8, 14, false), P2([2, 33], 1, 1, 8, 14, false)], cell: 1, density: 0.03, on: [0] },
+      ],
+    };
+  },
+};
+
 const cache = new Map<string, Biome>();
 
 export function biomeFor(stageId: string): Biome {
-  let b = cache.get(stageId);
+  const s = tileSheet();
+  const useSheet = !!s && stageId in sheetBuilders;
+  const key = useSheet ? `${stageId}/sheet` : stageId;
+  let b = cache.get(key);
   if (!b) {
-    b = (builders[stageId] ?? builders.viridian)();
-    cache.set(stageId, b);
+    b = useSheet ? sheetBuilders[stageId](s!) : (builders[stageId] ?? builders.viridian)();
+    cache.set(key, b);
   }
   return b;
 }

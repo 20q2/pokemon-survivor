@@ -4,3 +4,5 @@ scripts/.cache
 *.log
 test-results
 playwright-report
+# player-supplied tile sheet (see src/render/tilesheet.ts)
+public/assets/tileset.png

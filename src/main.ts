@@ -1,5 +1,6 @@
 import './style.css';
 import { App } from './app.ts';
+import { loadTileSheet } from './render/tilesheet.ts';
 import { assets } from './render/assets.ts';
 import { AudioEngine } from './audio/audio.ts';
 import { BootScreen, within } from './ui/boot.ts';
@@ -12,7 +13,8 @@ async function boot(screen: BootScreen) {
   await assets.init();
 
   screen.phase('Loading fonts…', 0.15, 0.25);
-  await within(Promise.all(FONTS.map((f) => document.fonts?.load(f))), 3000);
+  // the optional player-supplied tile sheet (absent = painted art); fonts load alongside it
+  await within(Promise.all([...FONTS.map((f) => document.fonts?.load(f)), loadTileSheet()]), 3000);
   screen.fontsReady();
 
   // Starting the app builds the title screen and kicks off its attract-demo sprites; keep the

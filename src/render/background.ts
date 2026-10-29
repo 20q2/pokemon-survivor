@@ -127,16 +127,18 @@ export class Background {
           continue;
         }
         for (let py = y0; py < y1; py++) {
-          const fy = S[mod(oy + py, T)];
+          const sy = mod(oy + py, T), fy = S[sy];
           for (let px = x0; px < x1; px++) {
-            const fx = S[mod(ox + px, T)];
+            const sx = mod(ox + px, T), fx = S[sx];
             let top = 0;
             for (let k = NL - 1; k >= 0; k--) {
               const a = inL[k];
               const c00 = a[vi], c10 = a[vi + 1], c01 = a[vi + nV], c11 = a[vi + nV + 1];
               const sum = c00 + c10 + c01 + c11;
               if (sum === 0) continue;
-              if (sum === 4 || (c00 + (c10 - c00) * fx) * (1 - fy) + (c01 + (c11 - c01) * fx) * fy >= 0.5) { top = k + 1; break; }
+              const auto = layers[k].auto;
+              if (sum === 4 || (auto ? auto[c00 | (c10 << 1) | (c01 << 2) | (c11 << 3)][sy * T + sx] >>> 24 !== 0
+                : (c00 + (c10 - c00) * fx) * (1 - fy) + (c01 + (c11 - c01) * fx) * fy >= 0.5)) { top = k + 1; break; }
             }
             lmap[py * LW + px] = top;
           }
@@ -153,7 +155,15 @@ export class Background {
     const rims = layers.map((l) => (l.rim ? hexAbgr(l.rim) : 0));
     for (let ty = 0; ty < CT; ty++) for (let tx = 0; tx < CT; tx++) {
       const TX = cx * CT + tx, TY = cy * CT + ty;
-      const tex = [pickVariant(biome.base, TX, TY, biome.seed), ...layers.map((l, k) => pickVariant(l.mat, TX, TY, biome.seed + 31 * (k + 1)))];
+      const tex = [pickVariant(biome.base, TX, TY, biome.seed), ...layers.map((l, k) => {
+        // a sheet layer on a partial tile uses its edge tile for that corner config
+        if (l.auto) {
+          const a = inL[k], vi = (ty + MARGIN) * nV + tx + MARGIN;
+          const cfg = a[vi] | (a[vi + 1] << 1) | (a[vi + nV] << 2) | (a[vi + nV + 1] << 3);
+          if (cfg !== 15) return l.auto[cfg];
+        }
+        return pickVariant(l.mat, TX, TY, biome.seed + 31 * (k + 1));
+      })];
       for (let y = 0; y < T; y++) for (let x = 0; x < T; x++) {
         const px = tx * T + x, py = ty * T + y;
         const li = (py + B) * LW + px + B;
