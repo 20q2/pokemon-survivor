@@ -1,5 +1,5 @@
-import { MOVES, MASTERY_OF, moveStatsAt, type MoveStats } from '../data/moves.ts';
-import { ITEMS } from '../data/items.ts';
+import { MOVES, MASTERY_OF, MAX_MOVE_LEVEL, moveStatsAt, overLevelMult, type MoveStats } from '../data/moves.ts';
+import { ITEMS, VITAMIN, vitaminDesc } from '../data/items.ts';
 import { TYPE_COLORS } from '../data/types.ts';
 import { assets } from '../render/assets.ts';
 import type { ChestReward, Player, UpgradeOffer } from '../game/types.ts';
@@ -46,12 +46,15 @@ export function offerCard(o: UpgradeOffer, p: Player, index: number, onPick: () 
       const def = MOVES[o.id];
       icon = moveIcon(o.id);
       name = def.name;
-      tag = o.kind === 'newMove' ? 'NEW MOVE' : `Lv ${o.level}`;
-      desc = o.kind === 'newMove' ? def.desc : upgradeDiff(o.id, o.level);
+      const limit = o.kind === 'moveUp' && o.level > MAX_MOVE_LEVEL;
+      tag = o.kind === 'newMove' ? 'NEW MOVE' : limit ? `LIMIT ★${o.level - MAX_MOVE_LEVEL}` : `Lv ${o.level}`;
+      desc = o.kind === 'newMove' ? def.desc : limit
+        ? `Limit break: +${Math.round((overLevelMult(o.level) / overLevelMult(o.level - 1) - 1) * 100)}% power.`
+        : upgradeDiff(o.id, o.level);
       meta = h('div', { class: 'meta' }, typeBadge(def.type), h('span', { class: `cat ${def.cat}` }, cap(def.cat)), h('span', { class: 'hint' }, BEHAVIOR_TEXT[def.behavior]));
       if (p.types.includes(def.type) && def.cat !== 'status') note = 'STAB ×1.5';
       const mast = MASTERY_OF[o.id];
-      if (mast && o.kind === 'moveUp' && o.level === 5) note = `Max! Hold ${ITEMS[mast.mastery!.item].name} to master`;
+      if (mast && o.kind === 'moveUp' && o.level === MAX_MOVE_LEVEL) note = `Max! Hold ${ITEMS[mast.mastery!.item].name} to master`;
       break;
     }
     case 'newItem':
@@ -70,8 +73,8 @@ export function offerCard(o: UpgradeOffer, p: Player, index: number, onPick: () 
       name = 'Oran Berry'; tag = 'HEAL'; desc = 'Restore 30% of your max HP.';
       break;
     default:
-      icon = h('div', { class: 'ic', style: 'background:#fff' }, img(assets.itemUrl('nugget')));
-      name = 'Nugget'; tag = 'MONEY'; desc = 'Gain ₽25.';
+      icon = h('div', { class: 'ic', style: 'background:#fff' }, img(assets.itemUrl(o.id)));
+      name = VITAMIN[o.id].name; tag = o.level > 1 ? `×${o.level}` : 'VITAMIN'; desc = vitaminDesc(o.id, o.level);
   }
   return h('button', { class: 'panel card', 'data-nav': true, onclick: () => { audio.sfx('select'); onPick(); } },
     h('span', { class: 'key' }, String(index + 1)),
@@ -178,7 +181,7 @@ export function chestPopup(rewards: ChestReward[]): HTMLElement {
     }
     if (r.kind === 'move') return h('div', { class: 'rw', style: delay }, h('span', { class: 'type', style: `background:${TYPE_COLORS[MOVES[r.id].type]}` }, 'move'), `${MOVES[r.id].name} Lv ${r.level}`);
     if (r.kind === 'item') return h('div', { class: 'rw', style: delay }, img(assets.itemUrl(r.id)), `${ITEMS[r.id].name} Lv ${r.level}`);
-    return h('div', { class: 'rw', style: delay }, img(assets.itemUrl('nugget')), `₽${r.level}`);
+    return h('div', { class: 'rw', style: delay }, img(assets.itemUrl(r.id)), `${VITAMIN[r.id].name} ×${r.level}`);
   });
   const mastery = rewards.some((r) => r.kind === 'mastery');
   return h('div', { class: 'chest-pop' }, h('div', { class: 'panel' },

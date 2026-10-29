@@ -5,7 +5,7 @@
 import { mkdir, writeFile, readFile, access } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SPECIES_LIST, LINES } from '../src/data/pokedex.ts';
+import { SPECIES_LIST, LINES, MEGA } from '../src/data/pokedex.ts';
 import { ITEM_LIST } from '../src/data/items.ts';
 import { TYPES } from '../src/data/types.ts';
 
@@ -24,7 +24,9 @@ const EXTRA_ITEMS = [
   'poke-ball', 'great-ball', 'ultra-ball', 'master-ball', 'protein', 'calcium', 'hp-up', 'iron', 'zinc',
   'carbos', 'pp-up', 'pp-max', 'exp-share', 'max-repel', 'revive', 'max-revive', 'lucky-punch', 'nugget',
   'big-nugget', 'shiny-charm', 'soothe-bell', 'moon-stone', 'escape-rope', 'x-attack', 'x-sp-atk', 'x-speed',
-  'choice-band', 'choice-specs', 'zoom-lens', 'magnet',
+  'choice-band', 'choice-specs', 'zoom-lens', 'magnet', 'key-stone', 'venusaurite', 'charizardite-x', 'blastoisinite',
+  'gengarite', 'alakazite', 'sceptilite', 'blazikenite', 'swampertite', 'tyranitarite', 'gardevoirite', 'mega-ring',
+  'itemfinder', 'dowsing-machine', 'star-piece', 'pearl', 'big-pearl', 'stardust', 'comet-shard',
   ...TYPES.map((t) => `tm-${t}`),
 ];
 
@@ -138,6 +140,24 @@ async function main() {
     done++;
     if (done % 20 === 0) console.log(`  species ${done}/${SPECIES_LIST.length}`);
   });
+
+  // Mega Evolutions: sprite sheets where the form has them, portraits for all.
+  for (const m of Object.values(MEGA)) {
+    const dir = join(OUT, 'sprites', m.id);
+    const form = `/${m.form}`;
+    const normal = m.sprite ? await fetchSpriteSet(m.dex, form, join(dir, 'normal'), PLAYER_ANIMS) : null;
+    const shiny = m.sprite ? await fetchSpriteSet(m.dex, `${form}/0001`, join(dir, 'shiny'), PLAYER_ANIMS) : null;
+    const portrait = await download(`${SC}/portrait/${pad(m.dex)}${form}/Normal.png`, join(dir, 'portrait.png'));
+    const shinyPortrait = await download(`${SC}/portrait/${pad(m.dex)}${form}/0001/Normal.png`, join(dir, 'portrait-shiny.png'));
+    if (m.sprite && !normal) console.warn(`!! expected a sprite for ${m.id}`);
+    manifest.species[m.id] = { normal, shiny, portrait, shinyPortrait };
+    const node = tracker[pad(m.dex)]?.subgroups?.[m.form];
+    credits.push({
+      species: m.name, dex: m.dex,
+      sprite: normal ? creditOf(node?.sprite_credit) : [], portrait: creditOf(node?.portrait_credit),
+      shinySprite: shiny ? creditOf(node?.subgroups?.['0001']?.sprite_credit) : [],
+    });
+  }
 
   const itemNames = [...new Set([...ITEM_LIST.map((i) => i.id), ...EXTRA_ITEMS])];
   await pool(itemNames, 10, async (id) => {

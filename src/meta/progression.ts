@@ -1,4 +1,5 @@
 import { LINE } from '../data/pokedex.ts';
+import { STAGES } from '../data/stages.ts';
 import { TM_MOVES } from '../data/moves.ts';
 import { ACHIEVEMENTS, type Achievement, type RunSummary } from './achievements.ts';
 import { FRIENDSHIP_MAX } from './shop.ts';
@@ -18,7 +19,8 @@ export function friendshipGain(r: RunSummary): number {
 
 /** End-of-run bonus on top of collected Poké Dollars. */
 export function runBonus(r: RunSummary): number {
-  return Math.round(r.time / 60 * 6 + r.bosses * 40 + (r.cleared ? 250 : 0));
+  const tier = 1 + 0.25 * Math.max(0, STAGES.findIndex((s) => s.id === r.stageId));
+  return Math.round((r.time / 60 * 6 + r.bosses * 40 + (r.cleared ? 250 : 0)) * tier);
 }
 
 export function applyRun(save: SaveData, r: RunSummary, seen: Iterable<string>, defeated: Map<string, number>): RunRewards {

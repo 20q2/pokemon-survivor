@@ -1,18 +1,18 @@
 import { SPECIES_LIST } from '../data/pokedex.ts';
 import type { PickupKind, Player, Projectile, Enemy } from '../game/types.ts';
 
-export const PROTOCOL = 3;
-export const ROOM_PREFIX = 'pkmnsurv-v3-';
+export const PROTOCOL = 4;
+export const ROOM_PREFIX = 'pkmnsurv-v4-';
 export const SNAP_HZ = 20;
 
 const SPECIES_INDEX = new Map(SPECIES_LIST.map((s, i) => [s.id, i]));
-export const PICKUP_KINDS: PickupKind[] = ['candy', 'coin', 'oran', 'sitrus', 'magnet', 'repel', 'chest', 'rare-candy'];
+export const PICKUP_KINDS: PickupKind[] = ['candy', 'coin', 'oran', 'sitrus', 'magnet', 'repel', 'chest', 'rare-candy', 'mega-stone'];
 
 export interface SnapPlayer { x: number; y: number; hp: number; fx: number; fy: number; moving: boolean; fainted: boolean; connected: boolean; hurt: boolean; revive: number }
 export interface SnapEnemy {
   id: number; species: string; x: number; y: number; dirX: number; dirY: number; hpFrac: number;
   elite: boolean; boss: boolean; shiny: boolean; final: boolean; freeze: boolean; burn: boolean; poison: boolean;
-  paralyze: boolean; confuse: boolean; slow: boolean; flash: boolean; scale: number;
+  paralyze: boolean; confuse: boolean; slow: boolean; flash: boolean; alpha: boolean; scale: number;
 }
 export interface Snapshot { time: number; players: SnapPlayer[]; enemies: SnapEnemy[] }
 
@@ -25,7 +25,7 @@ export function encodeSnapshot(time: number, players: Player[], enemies: Enemy[]
   for (const e of enemies) {
     if (!e.alive) continue;
     const dx = e.x - cx, dy = e.y - cy;
-    if (e.boss || dx * dx + dy * dy < r2) visible.push(e);
+    if (e.boss || e.alpha || dx * dx + dy * dy < r2) visible.push(e);
   }
   const buf = new ArrayBuffer(1 + 4 + 1 + players.length * 16 + 2 + 8 + visible.length * 16);
   const v = new DataView(buf);
@@ -55,7 +55,7 @@ export function encodeSnapshot(time: number, players: Player[], enemies: Enemy[]
     v.setUint8(o, Math.round(Math.max(0, Math.min(1, e.hp / e.maxHp)) * 255)); o += 1;
     const st = e.st;
     v.setUint8(o, (e.elite ? 1 : 0) | (e.boss ? 2 : 0) | (e.shiny ? 4 : 0) | (e.final ? 8 : 0) | (st.freeze > 0 || st.flinch > 0 ? 16 : 0) | (st.burn > 0 ? 32 : 0) | (st.poison > 0 ? 64 : 0) | (st.paralyze > 0 ? 128 : 0)); o += 1;
-    v.setUint8(o, (st.confuse > 0 ? 1 : 0) | (st.slow > 0 ? 2 : 0) | (e.flash > 0 ? 4 : 0)); o += 1;
+    v.setUint8(o, (st.confuse > 0 ? 1 : 0) | (st.slow > 0 ? 2 : 0) | (e.flash > 0 ? 4 : 0) | (e.alpha ? 8 : 0)); o += 1;
     v.setUint8(o, Math.round(e.scale * 40)); o += 1;
     o += 1; // pad
   }
@@ -98,7 +98,7 @@ export function decodeSnapshot(buf: ArrayBuffer): Snapshot | null {
     o += 1;
     enemies.push({
       id, species, x, y, dirX, dirY, hpFrac, elite: !!(f & 1), boss: !!(f & 2), shiny: !!(f & 4), final: !!(f & 8),
-      freeze: !!(f & 16), burn: !!(f & 32), poison: !!(f & 64), paralyze: !!(f & 128), confuse: !!(f2 & 1), slow: !!(f2 & 2), flash: !!(f2 & 4), scale,
+      freeze: !!(f & 16), burn: !!(f & 32), poison: !!(f & 64), paralyze: !!(f & 128), confuse: !!(f2 & 1), slow: !!(f2 & 2), flash: !!(f2 & 4), alpha: !!(f2 & 8), scale,
     });
   }
   return { time, players, enemies };

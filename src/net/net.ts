@@ -17,7 +17,7 @@ type ClientMsg =
 interface PlayerState {
   id: number; sp: string; st: number; ty: Player['types']; mv: [string, number, number, number, number][]; it: [string, number][];
   bf: Player['buffs']; rr: number; sk: number; bn: number; nm: string; con: boolean; k: number; dd: number; se: number;
-  ev: number; ma: number; sh: number; pk: number;
+  ev: number; ma: number; sh: number; pk: number; vt: Record<string, number>; mg: number; mt: number;
 }
 
 type HostMsg =
@@ -283,6 +283,7 @@ function playerState(p: Player): PlayerState {
     id: p.id, sp: p.speciesId, st: p.stage, ty: p.types, mv: p.moves.map((m) => [m.id, m.level, Math.round(m.cd * 100) / 100, Math.round(m.dmgDealt), m.kills]),
     it: p.items.map((i) => [i.id, i.level]), bf: p.buffs, rr: p.rerolls, sk: p.skips, bn: p.banishes, nm: p.name, con: p.connected,
     k: p.kills, dd: Math.round(p.dmgDealt), se: p.superEff, ev: p.evolutions, ma: p.masteries, sh: p.shinyKills, pk: p.pendingLevels,
+    vt: p.vitamins, mg: Math.round(p.mega * 100) / 100, mt: Math.round(p.megaT * 10) / 10,
   };
 }
 
@@ -426,6 +427,7 @@ export class ClientSession implements RunSession {
     this.wait = m.wait;
     for (const e of m.ev) {
       this.events.push(e);
+      if (e.e === 'megaStone') sim.megaStone = true;
       if (e.e === 'kill') this.defeatedMap.set(e.species, (this.defeatedMap.get(e.species) ?? 0) + 1);
       if (e.e === 'hurt' && e.player === this.localId && this.firstHit === Infinity) this.firstHit = sim.time;
     }
@@ -451,6 +453,9 @@ export class ClientSession implements RunSession {
         p.buffs = s.bf; p.rerolls = s.rr; p.skips = s.sk; p.banishes = s.bn; p.name = s.nm; p.connected = s.con;
         p.kills = s.k; p.dmgDealt = s.dd; p.superEff = s.se; p.evolutions = s.ev; p.masteries = s.ma; p.shinyKills = s.sh;
         p.pendingLevels = s.pk;
+        p.vitamins = s.vt; p.mega = s.mg;
+        // Mega time is counted down locally between updates; resync on bigger drift.
+        if (Math.abs(p.megaT - s.mt) > 0.5) p.megaT = s.mt;
       }
       sim.refreshStats();
     }
@@ -487,7 +492,7 @@ export class ClientSession implements RunSession {
         this.enemyMap.set(se.id, e);
       }
       e.tx = se.x; e.ty = se.y; e.dirX = se.dirX; e.dirY = se.dirY;
-      e.hp = se.hpFrac; e.maxHp = 1; e.elite = se.elite; e.boss = se.boss; e.shiny = se.shiny; e.final = se.final; e.scale = se.scale;
+      e.hp = se.hpFrac; e.maxHp = 1; e.elite = se.elite; e.boss = se.boss; e.shiny = se.shiny; e.final = se.final; e.alpha = se.alpha; e.scale = se.scale;
       e.radius = 9 * se.scale;
       e.st.freeze = se.freeze ? 1 : 0; e.st.burn = se.burn ? 1 : 0; e.st.poison = se.poison ? 1 : 0;
       e.st.paralyze = se.paralyze ? 1 : 0; e.st.confuse = se.confuse ? 1 : 0; e.st.slow = se.slow ? 1 : 0;
@@ -513,6 +518,7 @@ export class ClientSession implements RunSession {
     } else if (me) me.moving = false;
     for (const p of sim.players) {
       p.hurtT = Math.max(0, p.hurtT - dt);
+      if (this.hostPhase === 'play') p.megaT = Math.max(0, p.megaT - dt);
       const t = p as Player & { tx?: number; ty?: number };
       if (p.id !== this.localId && t.tx !== undefined) {
         const k = 1 - Math.pow(0.0005, dt);
@@ -586,7 +592,7 @@ export class ClientSession implements RunSession {
 function makeReplicaEnemy(id: number, species: string, x: number, y: number): Enemy & { tx: number; ty: number } {
   return {
     id, speciesId: species, types: SPECIES[species]?.types ?? ['normal'], role: 'chaser', x, y, tx: x, ty: y, radius: 9, vx: 0, vy: 0, dirX: 0, dirY: 1, hp: 1, maxHp: 1,
-    speed: 0, dmg: 0, special: false, xp: 0, elite: false, boss: false, final: false, shiny: false, alive: true, flash: 0,
+    speed: 0, dmg: 0, special: false, xp: 0, elite: false, boss: false, final: false, shiny: false, alpha: false, homeX: x, homeY: y, alive: true, flash: 0,
     st: { burn: 0, poison: 0, poisonStacks: 0, paralyze: 0, freeze: 0, slow: 0, confuse: 0, flinch: 0, dotTick: 0, burnDmg: 0, poisonDmg: 0, dotOwner: 0, coin: 0 },
     contactCd: 0, ai: 0, aiState: 0, aiX: 0, aiY: 0, patterns: [], patternIdx: 0, minions: [], knockResist: 0, scale: 1, lastHitBy: 0,
     animOffset: (id % 97) / 10,

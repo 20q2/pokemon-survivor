@@ -390,6 +390,12 @@ class AudioEngine {
         [72, 79, 84, 88, 91, 96].forEach((m, i) => this.tone(d, t + i * 0.09, midiHz(m), 0.25, 0.12, 'pulse', 0.125));
         this.noiseHit(d, t + 0.5, 0.6, 0.15, 4000);
         break;
+      case 'mega':
+        // rainbow sphere: shimmering rising arpeggio, then the burst
+        for (let i = 0; i < 20; i++) this.tone(d, t + i * 0.075, midiHz(60 + [0, 4, 7, 11][i % 4] + Math.floor(i / 4) * 5), 0.14, 0.07, 'pulse', 0.125);
+        this.noiseHit(d, t + 1.55, 0.9, 0.25, 6000);
+        [48, 60, 67, 72, 76, 79].forEach((m, i) => this.tone(d, t + 1.6 + i * 0.03, midiHz(m), 0.9, 0.09, i < 2 ? 'triangle' : 'pulse', 0.25));
+        break;
       case 'boss':
         for (let i = 0; i < 4; i++) this.tone(d, t + i * 0.35, i % 2 ? 330 : 440, 0.3, 0.14, 'sawtooth', 0.5);
         break;

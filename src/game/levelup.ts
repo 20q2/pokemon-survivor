@@ -1,6 +1,6 @@
 import { LINE } from '../data/pokedex.ts';
 import { MOVES, MASTERY_OF, MAX_MOVE_LEVEL } from '../data/moves.ts';
-import { ITEMS, ITEM_LIST, MAX_ITEM_LEVEL } from '../data/items.ts';
+import { ITEMS, ITEM_LIST, MAX_ITEM_LEVEL, VITAMIN, VITAMINS } from '../data/items.ts';
 import type { Rng } from '../engine/math.ts';
 import { effectiveness, type PType } from '../data/types.ts';
 import type { Player, UpgradeOffer } from './types.ts';
@@ -92,10 +92,50 @@ export function generateOffers(
     out.push(pick.o);
     cands.splice(cands.indexOf(pick), 1);
   }
-  if (out.length === 0) out.push({ kind: 'heal', id: 'oran-berry', level: 0 });
-  if (out.length < count && !out.some((o) => o.kind === 'heal')) out.push({ kind: 'heal', id: 'oran-berry', level: 0 });
-  if (out.length < count) out.push({ kind: 'money', id: 'nugget', level: 0 });
+  // Nothing left to upgrade: keep every level meaningful with limit breaks and vitamins
+  // (both grow logarithmically, so they never run out but never explode either).
+  if (out.length < count && p.hp < p.stats.maxHp * 0.4) out.push({ kind: 'heal', id: 'oran-berry', level: 0 });
+  if (out.length < count) out.push(...pickFillers(p, rng, count - out.length));
   return out;
+}
+
+function pickFillers(p: Player, rng: Rng, n: number): UpgradeOffer[] {
+  const cands: { o: UpgradeOffer; w: number }[] = p.moves
+    .filter((m) => m.level >= MAX_MOVE_LEVEL || MOVES[m.id].mastery)
+    .filter((m) => MOVES[m.id].cat !== 'status' && !p.banished.has(m.id))
+    .map((m) => ({ o: { kind: 'moveUp', id: m.id, level: Math.max(m.level, MAX_MOVE_LEVEL) + 1 }, w: 2.2 }));
+  for (const o of pickVitamins(p, rng, VITAMINS.length)) cands.push({ o, w: 1 });
+  const out: UpgradeOffer[] = [];
+  while (out.length < n && cands.length) {
+    const c = rng.weighted(cands, (x) => x.w)!;
+    cands.splice(cands.indexOf(c), 1);
+    out.push(c.o);
+  }
+  return out;
+}
+
+function pickVitamins(p: Player, rng: Rng, n: number): UpgradeOffer[] {
+  let phys = 0, spec = 0;
+  for (const m of p.moves) {
+    const c = MOVES[m.id].cat;
+    if (c === 'physical') phys++;
+    else if (c === 'special') spec++;
+  }
+  const cands = VITAMINS.map((v) => ({
+    v, w: v.id === 'protein' ? 1 + phys * 1.5 : v.id === 'calcium' ? 1 + spec * 1.5 : v.id === 'hp-up' ? 2 : 1.5,
+  }));
+  const out: UpgradeOffer[] = [];
+  while (out.length < n && cands.length) {
+    const c = rng.weighted(cands, (x) => x.w)!;
+    cands.splice(cands.indexOf(c), 1);
+    out.push({ kind: 'vitamin', id: c.v.id, level: (p.vitamins[c.v.id] ?? 0) + 1 });
+  }
+  return out;
+}
+
+/** A random limit break or vitamin (used by treasure once the build is complete). */
+export function randomFiller(p: Player, rng: Rng): UpgradeOffer {
+  return pickFillers(p, rng, 1)[0];
 }
 
 export function applyOffer(p: Player, o: UpgradeOffer) {
@@ -106,7 +146,7 @@ export function applyOffer(p: Player, o: UpgradeOffer) {
       break;
     case 'moveUp': {
       const m = p.moves.find((x) => x.id === o.id);
-      if (m) m.level = Math.min(MAX_MOVE_LEVEL, m.level + 1);
+      if (m) m.level = Math.max(m.level, Math.min(MAX_MOVE_LEVEL, m.level) + 1);
       break;
     }
     case 'newItem':
@@ -120,8 +160,9 @@ export function applyOffer(p: Player, o: UpgradeOffer) {
     case 'heal':
       p.hp = Math.min(p.stats.maxHp, p.hp + p.stats.maxHp * 0.3);
       break;
-    case 'money':
-      p.money += 25;
+    case 'vitamin':
+      p.vitamins[o.id] = (p.vitamins[o.id] ?? 0) + 1;
+      if (o.id === 'hp-up') p.hp = Math.min(p.stats.maxHp * 1.06, p.hp + p.stats.maxHp * 0.25);
       break;
   }
 }
@@ -150,7 +191,7 @@ export function offerLabel(o: UpgradeOffer): string {
     case 'newMove': case 'moveUp': return MOVES[o.id].name;
     case 'newItem': case 'itemUp': return ITEMS[o.id].name;
     case 'heal': return 'Oran Berry';
-    case 'money': return 'Nugget';
+    case 'vitamin': return VITAMIN[o.id].name;
   }
 }
 

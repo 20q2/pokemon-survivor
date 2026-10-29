@@ -82,3 +82,67 @@ describe('phase handling', () => {
     expect(p.speciesId).toBe('flareon');
   });
 });
+
+describe('late-game systems', () => {
+  const solo = (lineId: string, seed = 9) =>
+    new Sim({ stageId: 'viridian', seed, players: [{ name: 'a', lineId, shiny: false, meta: metaBonuses({}), tms: [] }] });
+
+  it('never runs out of meaningful level-ups: limit breaks and vitamins fill in, with diminishing returns', async () => {
+    const { generateOffers, applyOffer } = await import('../src/game/levelup.ts');
+    const { MAX_MOVE_LEVEL, moveStatsAt, MOVES } = await import('../src/data/moves.ts');
+    const { vitaminBonus } = await import('../src/data/items.ts');
+    const { Rng } = await import('../src/engine/math.ts');
+    const sim = solo('charmander');
+    const p = sim.players[0];
+    p.moves = ['ember', 'flamethrower', 'fire-spin', 'flame-wheel'].map((id) => ({ id, level: MAX_MOVE_LEVEL, cd: 1, dmgDealt: 0, kills: 0 }));
+    p.items = ['charcoal', 'scope-lens', 'wide-lens', 'leftovers'].map((id) => ({ id, level: 5 }));
+    const rng = new Rng(1);
+    for (let i = 0; i < 40; i++) {
+      const offers = generateOffers(p, rng, 3, []);
+      expect(offers.length).toBe(3);
+      for (const o of offers) expect(o.kind === 'vitamin' || (o.kind === 'moveUp' && o.level > MAX_MOVE_LEVEL) || o.kind === 'heal').toBe(true);
+      applyOffer(p, offers[0]);
+    }
+    const ember = p.moves.find((m) => m.id === 'ember')!;
+    if (ember.level > MAX_MOVE_LEVEL + 1) {
+      const a = moveStatsAt(MOVES.ember, ember.level - 1).power, b = moveStatsAt(MOVES.ember, ember.level).power;
+      const c = moveStatsAt(MOVES.ember, MAX_MOVE_LEVEL).power, d = moveStatsAt(MOVES.ember, MAX_MOVE_LEVEL + 1).power;
+      expect(b - a).toBeLessThan(d - c);
+    }
+    expect(vitaminBonus('protein', 2) - vitaminBonus('protein', 1)).toBeLessThan(vitaminBonus('protein', 1));
+  });
+
+  it('Mega Evolves once the stone is found and the meter fills, then reverts', () => {
+    const sim = solo('charmander');
+    const p = sim.players[0];
+    sim.invulnerable = true;
+    p.speciesId = 'charizard'; p.stage = 2; p.types = ['fire', 'flying'];
+    sim.megaStone = true;
+    p.mega = 0.999;
+    let megaSeen = false;
+    for (let i = 0; i < 60 * 30; i++) {
+      if (sim.phase === 'levelup') { sim.choose(0, 0); continue; }
+      sim.update(DT);
+      if (p.megaT > 0) megaSeen = true;
+      if (megaSeen && p.megaT === 0) break;
+    }
+    expect(megaSeen).toBe(true);
+    expect(p.megas).toBe(1);
+    expect(p.megaT).toBe(0);
+    expect(p.types).toEqual(['fire', 'flying']);
+  });
+
+  it('places Alphas, treasure and the Mega Stone on the map over time', () => {
+    const sim = solo('squirtle');
+    sim.invulnerable = true;
+    let alpha = false, stone = false, cache = false;
+    for (let i = 0; i < 60 * 400; i++) {
+      if (sim.phase === 'levelup') { sim.choose(0, 0); continue; }
+      sim.update(DT);
+      for (const e of sim.events) if (e.e === 'poi') { if (e.kind === 'alpha') alpha = true; if (e.kind === 'mega-stone') stone = true; if (e.kind === 'cache') cache = true; }
+      sim.events.length = 0;
+    }
+    expect(alpha && stone && cache).toBe(true);
+    expect(sim.enemies.some((e) => e.alpha && e.alive)).toBe(true);
+  });
+});

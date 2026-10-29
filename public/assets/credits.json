@@ -42,6 +42,15 @@
   ]
  },
  {
+  "species": "Mega Venusaur",
+  "dex": 3,
+  "sprite": [],
+  "portrait": [
+   "Emboarger"
+  ],
+  "shinySprite": []
+ },
+ {
   "species": "Charmander",
   "dex": 4,
   "sprite": [
@@ -90,6 +99,22 @@
   ]
  },
  {
+  "species": "Mega Charizard X",
+  "dex": 6,
+  "sprite": [
+   "Kevin0itachi",
+   "G〜",
+   "Kevin"
+  ],
+  "portrait": [
+   "Emboarger",
+   "Soulja"
+  ],
+  "shinySprite": [
+   "Morei"
+  ]
+ },
+ {
   "species": "Squirtle",
   "dex": 7,
   "sprite": [
@@ -131,6 +156,15 @@
   "shinySprite": [
    "SilverDeoxys563"
   ]
+ },
+ {
+  "species": "Mega Blastoise",
+  "dex": 9,
+  "sprite": [],
+  "portrait": [
+   "baronessfaron"
+  ],
+  "shinySprite": []
  },
  {
   "species": "Caterpie",
@@ -337,6 +371,15 @@
   "shinySprite": [
    "G〜"
   ]
+ },
+ {
+  "species": "Mega Raichu X",
+  "dex": 26,
+  "sprite": [],
+  "portrait": [
+   "Deeshura"
+  ],
+  "shinySprite": []
  },
  {
   "species": "Sandshrew",
@@ -640,6 +683,20 @@
   ]
  },
  {
+  "species": "Mega Alakazam",
+  "dex": 65,
+  "sprite": [
+   "Michael12",
+   "baronessfaron"
+  ],
+  "portrait": [
+   "baronessfaron"
+  ],
+  "shinySprite": [
+   "Emmuffin"
+  ]
+ },
+ {
   "species": "Machop",
   "dex": 66,
   "sprite": [
@@ -928,6 +985,21 @@
   "shinySprite": [
    "Tacocoa",
    "Emboarger"
+  ]
+ },
+ {
+  "species": "Mega Gengar",
+  "dex": 94,
+  "sprite": [
+   "Michael12",
+   "Emboarger",
+   "baronessfaron"
+  ],
+  "portrait": [
+   "G〜"
+  ],
+  "shinySprite": [
+   "Emmuffin"
   ]
  },
  {
@@ -1374,6 +1446,16 @@
   ]
  },
  {
+  "species": "Mega Dragonite",
+  "dex": 149,
+  "sprite": [],
+  "portrait": [
+   "Deeshura",
+   "Crazy_Dragon"
+  ],
+  "shinySprite": []
+ },
+ {
   "species": "Mewtwo",
   "dex": 150,
   "sprite": [
@@ -1594,6 +1676,17 @@
   ]
  },
  {
+  "species": "Mega Tyranitar",
+  "dex": 248,
+  "sprite": [
+   "JFain"
+  ],
+  "portrait": [
+   "Sugi"
+  ],
+  "shinySprite": []
+ },
+ {
   "species": "Treecko",
   "dex": 252,
   "sprite": [
@@ -1642,6 +1735,20 @@
   ]
  },
  {
+  "species": "Mega Sceptile",
+  "dex": 254,
+  "sprite": [
+   "Emmuffin"
+  ],
+  "portrait": [
+   "0palite",
+   "Soulja"
+  ],
+  "shinySprite": [
+   "Emmuffin"
+  ]
+ },
+ {
   "species": "Torchic",
   "dex": 255,
   "sprite": [
@@ -1685,6 +1792,15 @@
   ]
  },
  {
+  "species": "Mega Blaziken",
+  "dex": 257,
+  "sprite": [],
+  "portrait": [
+   "Sugi"
+  ],
+  "shinySprite": []
+ },
+ {
   "species": "Mudkip",
   "dex": 258,
   "sprite": [
@@ -1726,6 +1842,15 @@
    "Anonymous",
    "Emmuffin"
   ]
+ },
+ {
+  "species": "Mega Swampert",
+  "dex": 260,
+  "sprite": [],
+  "portrait": [
+   "Emmuffin"
+  ],
+  "shinySprite": []
  },
  {
   "species": "Ralts",
@@ -1772,6 +1897,19 @@
   ],
   "shinySprite": [
    "Morei"
+  ]
+ },
+ {
+  "species": "Mega Gardevoir",
+  "dex": 282,
+  "sprite": [
+   "baronessfaron"
+  ],
+  "portrait": [
+   "baronessfaron"
+  ],
+  "shinySprite": [
+   "baronessfaron"
   ]
  },
  {

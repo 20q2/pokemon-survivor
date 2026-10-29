@@ -56,6 +56,7 @@ export interface Player {
   ability: AbilityId;
   x: number;
   y: number;
+  px?: number; py?: number;       // position at the start of the last sim step (render interpolation)
   radius: number;
   mx: number; my: number;         // input
   fx: number; fy: number;         // facing (unit)
@@ -84,13 +85,18 @@ export interface Player {
   bossKills: number;
   superEff: number;
   shinyKills: number;
-  money: number;          // collected this run
+  vitamins: Record<string, number>; // vitamin id -> times taken this run
   evolutions: number;
   masteries: number;
   connected: boolean;
   viewW: number;
   viewH: number;
   sandT?: number;
+  /** Mega Evolution: meter 0..1 (fills once fully evolved and the team holds the Mega Stone). */
+  mega: number;
+  /** Seconds of Mega Evolution left (0 = not mega). */
+  megaT: number;
+  megas: number;
 }
 
 export interface StatusState {
@@ -106,6 +112,7 @@ export interface Enemy {
   role: EnemyRole;
   x: number;
   y: number;
+  px?: number; py?: number;
   radius: number;
   vx: number; vy: number;   // knockback velocity
   dirX: number; dirY: number;
@@ -119,6 +126,9 @@ export interface Enemy {
   boss: boolean;
   final: boolean;
   shiny: boolean;
+  /** Alpha Pokémon: huge, territorial, marked on the minimap. */
+  alpha: boolean;
+  homeX: number; homeY: number;
   alive: boolean;
   flash: number;
   st: StatusState;
@@ -149,6 +159,7 @@ export interface Projectile {
   cat: Category;
   shape: Shape;
   x: number; y: number;
+  px?: number; py?: number;
   vx: number; vy: number;
   angle: number;
   r: number;                // radius / half-width
@@ -177,7 +188,7 @@ export interface Projectile {
   growth: number;           // ring max radius for nova
 }
 
-export type PickupKind = 'candy' | 'coin' | 'oran' | 'sitrus' | 'magnet' | 'repel' | 'chest' | 'rare-candy';
+export type PickupKind = 'candy' | 'coin' | 'oran' | 'sitrus' | 'magnet' | 'repel' | 'chest' | 'rare-candy' | 'mega-stone';
 
 export interface Pickup {
   id: number;
@@ -200,6 +211,11 @@ export type GameEvent =
   | { e: 'boss'; species: string; final: boolean }
   | { e: 'bossDown'; species: string; final: boolean }
   | { e: 'chest'; player: number; rewards: ChestReward[] }
+  | { e: 'mega'; player: number; species: string }
+  | { e: 'megaEnd'; player: number }
+  | { e: 'megaStone'; player: number }
+  | { e: 'alphaDown'; species: string }
+  | { e: 'poi'; kind: 'cache' | 'mega-stone' | 'alpha'; x: number; y: number; species?: string }
   | { e: 'fire'; player: number; move: string; type: PType; behavior: Behavior }
   | { e: 'chain'; pts: number[]; type: PType }
   | { e: 'boom'; x: number; y: number; r: number; type: PType }
@@ -212,10 +228,10 @@ export type GameEvent =
   | { e: 'learn'; player: number; move: string }
   | { e: 'enemyShot'; x: number; y: number };
 
-export interface ChestReward { kind: 'mastery' | 'move' | 'item' | 'money'; id: string; level?: number; from?: string }
+export interface ChestReward { kind: 'mastery' | 'move' | 'item' | 'vitamin'; id: string; level?: number; from?: string }
 
 export interface UpgradeOffer {
-  kind: 'newMove' | 'moveUp' | 'newItem' | 'itemUp' | 'heal' | 'money';
+  kind: 'newMove' | 'moveUp' | 'newItem' | 'itemUp' | 'heal' | 'vitamin';
   id: string;
   level: number; // resulting level
 }

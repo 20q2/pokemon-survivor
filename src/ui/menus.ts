@@ -326,7 +326,7 @@ export function dexScreen(app: App, tab: 'mons' | 'moves' | 'items' = 'mons') {
         h('div', { class: 'nm' }, m.mastery ? `★ ${m.name}` : m.name, ' ', h('span', { class: `cat ${m.cat}` }, cap(m.cat))),
         h('div', { class: 'ds' }, m.desc),
         h('div', { class: 'rw' }, m.mastery
-          ? `Master ${MOVES[m.mastery.from].name} (Lv5) + hold ${ITEMS[m.mastery.item].name}, then open a treasure.`
+          ? `Master ${MOVES[m.mastery.from].name} (Lv8) + hold ${ITEMS[m.mastery.item].name}, then open a treasure.`
           : [learners.length ? `Learned by: ${learners.map((l) => l.name).join(', ')}` : '', tm ? (learners.length ? ' · TM' : 'TM') : ''].join('') || '—'),
       ));
     }

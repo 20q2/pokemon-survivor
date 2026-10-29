@@ -49,7 +49,8 @@ export interface MoveDef {
   behavior: Behavior;
   fx: Fx;
   stats: Partial<MoveStats> & { power: number; cd: number };
-  /** Upgrades applied at Lv2..Lv5 (additive; cd/area/duration entries are fractional multipliers e.g. cd:-0.1 = 10% faster). */
+  /** Upgrades applied at Lv2..Lv5 (additive; cd/area/duration entries are fractional multipliers e.g. cd:-0.1 = 10% faster).
+   *  Lv6..Lv8 come from LATE_UP for the move's behaviour. */
   up?: Partial<MoveStats>[];
   effect?: StatusKind;
   buff?: { kind: BuffKind; amount: number };
@@ -58,7 +59,7 @@ export interface MoveDef {
   desc: string;
 }
 
-export const MAX_MOVE_LEVEL = 5;
+export const MAX_MOVE_LEVEL = 8;
 
 export const DEFAULT_STATS: MoveStats = {
   power: 10, cd: 1, count: 1, speed: 300, area: 8, range: 60, duration: 1, pierce: 1,
@@ -84,15 +85,45 @@ const DEFAULT_UP: Record<Behavior, Partial<MoveStats>[]> = {
   lob: [{ power: 8 }, { count: 1 }, { area: 0.2 }, { power: 10, count: 1 }],
 };
 
+/** Lv6..Lv8 upgrades by behaviour. Here `power` is a fractional multiplier too (0.2 = +20%). */
+const LATE_UP: Record<Behavior, Partial<MoveStats>[]> = {
+  projectile: [{ power: 0.2 }, { count: 1 }, { power: 0.3, speed: 0.15 }],
+  melee: [{ power: 0.2 }, { area: 0.15 }, { power: 0.3, cd: -0.1 }],
+  orbit: [{ power: 0.2 }, { count: 1 }, { power: 0.3, duration: 0.2 }],
+  aura: [{ power: 0.2 }, { area: 0.12 }, { power: 0.3 }],
+  nova: [{ power: 0.2 }, { area: 0.12 }, { power: 0.3, cd: -0.1 }],
+  beam: [{ power: 0.2 }, { area: 0.2 }, { power: 0.3, cd: -0.1 }],
+  strike: [{ power: 0.2 }, { count: 1 }, { power: 0.3 }],
+  zone: [{ power: 0.2 }, { duration: 0.2 }, { power: 0.3, area: 0.12 }],
+  boomerang: [{ power: 0.2 }, { count: 1 }, { power: 0.3 }],
+  chain: [{ power: 0.2 }, { count: 2 }, { power: 0.3 }],
+  trail: [{ power: 0.2 }, { area: 0.15 }, { power: 0.3 }],
+  cone: [{ power: 0.2 }, { area: 0.15 }, { power: 0.3, cd: -0.1 }],
+  wave: [{ power: 0.2 }, { area: 0.15 }, { power: 0.3, cd: -0.1 }],
+  buff: [{ cd: -0.1 }, { duration: 0.2 }, { cd: -0.12 }],
+  lob: [{ power: 0.2 }, { count: 1 }, { power: 0.3 }],
+};
+
 /** Stats that combine multiplicatively in upgrade tables. */
 const MULT_KEYS = new Set<keyof MoveStats>(['cd', 'area', 'range', 'duration', 'speed']);
 
+/** Power multiplier for levels past the max ("limit break"): keeps growing, ever more slowly. */
+export function overLevelMult(level: number) {
+  return level > MAX_MOVE_LEVEL ? 1 + 0.35 * Math.log(1 + level - MAX_MOVE_LEVEL) : 1;
+}
+
 export function moveStatsAt(def: MoveDef, level: number): MoveStats {
   const s: MoveStats = { ...DEFAULT_STATS, ...def.stats };
+  s.power *= overLevelMult(level);
+  // Mastered moves are a finished form: only limit-break levels change them.
+  if (def.mastery) return s;
   const ups = def.up ?? DEFAULT_UP[def.behavior];
-  for (let i = 0; i < Math.min(level - 1, ups.length); i++) {
-    for (const [k, v] of Object.entries(ups[i]) as [keyof MoveStats, number][]) {
-      if (MULT_KEYS.has(k)) s[k] *= 1 + v;
+  for (let i = 0; i < Math.min(level, MAX_MOVE_LEVEL) - 1; i++) {
+    const late = i >= ups.length;
+    const up = late ? LATE_UP[def.behavior][i - ups.length] : ups[i];
+    if (!up) break;
+    for (const [k, v] of Object.entries(up) as [keyof MoveStats, number][]) {
+      if (MULT_KEYS.has(k) || (late && k === 'power')) s[k] *= 1 + v;
       else s[k] += v;
     }
   }
@@ -184,7 +215,7 @@ export const MOVE_LIST: MoveDef[] = [
   M({ id: 'aerial-ace', name: 'Aerial Ace', type: 'flying', cat: 'physical', behavior: 'projectile', fx: 'slash', stats: { power: 45, cd: 1.0, speed: 420, area: 10, duration: 1.5, homing: 9 }, desc: 'A swift strike that always finds its mark.' }),
   M({ id: 'hurricane', name: 'Hurricane', type: 'flying', cat: 'special', behavior: 'wave', fx: 'tornado', effect: 'confuse', mastery: { from: 'gust', item: 'sharp-beak' }, stats: { power: 110, cd: 1.6, count: 3, speed: 130, area: 40, duration: 3.5, pierce: -1, chance: 0.3, knock: 60 }, up: [], desc: 'MASTERED Gust. Wandering tornadoes shred the battlefield.' }),
   // ───────────── Psychic ─────────────
-  M({ id: 'confusion', name: 'Confusion', type: 'psychic', cat: 'special', behavior: 'aura', fx: 'ring', effect: 'confuse', stats: { power: 18, cd: 0.8, area: 50, chance: 0.05, knock: 30 }, desc: 'Telekinetic pulses hurt foes close to you. May confuse.' }),
+  M({ id: 'confusion', name: 'Confusion', type: 'psychic', cat: 'special', behavior: 'aura', fx: 'ring', effect: 'confuse', stats: { power: 22, cd: 0.8, area: 64, chance: 0.05, knock: 30 }, desc: 'Telekinetic pulses hurt foes close to you. May confuse.' }),
   M({ id: 'psybeam', name: 'Psybeam', type: 'psychic', cat: 'special', behavior: 'beam', fx: 'beam', effect: 'confuse', stats: { power: 55, cd: 1.9, area: 10, range: 240, duration: 0.35, chance: 0.15 }, desc: 'A peculiar ray that may confuse.' }),
   M({ id: 'psyshock', name: 'Psyshock', type: 'psychic', cat: 'special', behavior: 'projectile', fx: 'orb', stats: { power: 50, cd: 1.2, count: 2, speed: 300, area: 10, duration: 1.4, pierce: 3 }, desc: 'Materializes odd psychic waves that pierce through foes.' }),
   M({ id: 'future-sight', name: 'Future Sight', type: 'psychic', cat: 'special', behavior: 'strike', fx: 'orb', stats: { power: 100, cd: 3.5, count: 3, area: 46, knock: 50 }, desc: 'Foresees attacks that land on foes moments later.' }),

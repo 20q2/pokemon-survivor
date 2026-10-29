@@ -35,6 +35,16 @@ export function botSteer(sim: Sim, p: Player): { x: number; y: number } {
     const d2 = dx * dx + dy * dy;
     if (d2 < best) { best = d2; gx = dx; gy = dy; }
   }
+  if (!gx && !gy && hpFrac > 0.4) {
+    // Head for map treasure and (above all) the Mega Stone when healthy.
+    let bd = Infinity;
+    for (const pk of sim.pickups) {
+      if (pk.kind !== 'chest' && pk.kind !== 'mega-stone') continue;
+      const dx = pk.x - p.x, dy = pk.y - p.y;
+      const d2 = (dx * dx + dy * dy) * (pk.kind === 'mega-stone' ? 0.1 : 1);
+      if (d2 < bd && d2 < 1400 ** 2) { bd = d2; gx = dx; gy = dy; }
+    }
+  }
   if (!gx && !gy) {
     if (cn && hpFrac > 0.45) {
       // circle-strafe around the crowd so moves keep connecting
@@ -57,7 +67,7 @@ export function botSteer(sim: Sim, p: Player): { x: number; y: number } {
 export function botChoose(sim: Sim, p: Player): number {
   const offers = sim.offers.get(p.id);
   if (!offers) return 0;
-  const score = (k: string) => ({ newMove: 4, moveUp: 3, newItem: 2.5, itemUp: 2, heal: 1, money: 0 }[k] ?? 0);
+  const score = (k: string) => ({ newMove: 4, moveUp: 3, newItem: 2.5, itemUp: 2, heal: 1, vitamin: 1.5 }[k] ?? 0);
   let bi = 0;
   offers.forEach((o, i) => { if (score(o.kind) > score(offers[bi].kind)) bi = i; });
   return bi;
@@ -68,7 +78,8 @@ export function autoChoice(s: { offers(): UpgradeOffer[] | null; world: { player
   const offers = s.offers() ?? [];
   const me = s.world.players[s.localId];
   const score = (o: UpgradeOffer) => {
-    let v = { newMove: 40, moveUp: 30, newItem: 22, itemUp: 18, heal: 5, money: 0 }[o.kind];
+    let v = { newMove: 40, moveUp: 30, newItem: 22, itemUp: 18, heal: 5, vitamin: 10 }[o.kind];
+    if (o.kind === 'heal') v = me.hp < me.stats.maxHp * 0.35 ? 60 : 5;
     if (o.kind === 'newMove' && me.types.includes(MOVES[o.id].type)) v += 8;
     if ((o.kind === 'newItem' || o.kind === 'itemUp') && me.moves.some((m) => MASTERY_OF[m.id]?.mastery?.item === o.id)) v += 25;
     return v + Math.random() * 6;

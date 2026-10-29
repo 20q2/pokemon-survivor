@@ -65,4 +65,24 @@ export const ITEM_LIST: ItemDef[] = [
   { id: 'focus-band', name: 'Focus Band', stat: 'focus', perLevel: 0.08, desc: (l) => `${pct(0.08 * l)} chance to survive a fatal hit with 1 HP.` },
 ];
 
+/** Infinite in-run stat boosts offered once the build has nothing left to upgrade ("EV training").
+ *  Each one is worth a little less than the last: total bonus = scale × ln(1 + doses). */
+export interface VitaminDef { id: string; name: string; scale: number; what: string }
+export const VITAMINS: VitaminDef[] = [
+  { id: 'protein', name: 'Protein', scale: 0.14, what: 'Attack' },
+  { id: 'calcium', name: 'Calcium', scale: 0.14, what: 'Sp. Atk' },
+  { id: 'hp-up', name: 'HP Up', scale: 0.16, what: 'max HP' },
+  { id: 'iron', name: 'Iron', scale: 0.12, what: 'contact damage resistance' },
+  { id: 'zinc', name: 'Zinc', scale: 0.12, what: 'projectile damage resistance' },
+  { id: 'carbos', name: 'Carbos', scale: 0.08, what: 'movement speed' },
+  { id: 'pp-up', name: 'PP Up', scale: 0.08, what: 'move recharge speed' },
+];
+export const vitaminBonus = (id: string, doses: number) => (doses > 0 ? VITAMIN[id].scale * Math.log(1 + doses) : 0);
+export function vitaminDesc(id: string, doses: number): string {
+  const v = VITAMIN[id];
+  const now = vitaminBonus(id, doses - 1), next = vitaminBonus(id, doses);
+  return `+${((next - now) * 100).toFixed(1)}% ${v.what} (total +${Math.round(next * 100)}%).${id === 'hp-up' ? ' Heals 25%.' : ''}`;
+}
+export const VITAMIN: Record<string, VitaminDef> = Object.fromEntries(VITAMINS.map((v) => [v.id, v]));
+
 export const ITEMS: Record<string, ItemDef> = Object.fromEntries(ITEM_LIST.map((i) => [i.id, i]));

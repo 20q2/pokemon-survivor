@@ -1,5 +1,5 @@
 import { TYPE_COLORS } from '../data/types.ts';
-import { SPECIES } from '../data/pokedex.ts';
+import { MEGA, SPECIES } from '../data/pokedex.ts';
 import type { StageDef } from '../data/stages.ts';
 import { dirRow, TAU } from '../engine/math.ts';
 import type { Cinematic, Phase } from '../game/sim.ts';
@@ -18,10 +18,14 @@ export interface WorldView {
   pickups: Pickup[];
   phase: Phase;
   cine: Cinematic | null;
+  /** Render interpolation fraction between the previous and current sim step (1 = no interpolation). */
+  alpha?: number;
 }
 
+type Pos = { x: number; y: number; px?: number; py?: number };
+
 const PICKUP_ICON: Record<string, string> = {
-  oran: 'oran-berry', sitrus: 'sitrus-berry', magnet: 'magnet', repel: 'max-repel', chest: 'poke-ball', 'rare-candy': 'rare-candy',
+  oran: 'oran-berry', sitrus: 'sitrus-berry', magnet: 'magnet', repel: 'max-repel', chest: 'poke-ball', 'rare-candy': 'rare-candy', 'mega-stone': 'key-stone',
 };
 
 type Drawable = { y: number; k: 0; e: Enemy } | { y: number; k: 1; p: Player } | { y: number; k: 2; d: DecorSprite; x: number };
@@ -47,6 +51,10 @@ export class Renderer {
   private booms: { x: number; y: number; r: number; color: string; t: number }[] = [];
   private labelCd = 0;
   private vignette: HTMLCanvasElement | null = null;
+  private lookX = 0;
+  private lookY = 0;
+  private saved: number[] = [];
+  private savedObjs: Pos[] = [];
   localId = 0;
   shakeEnabled = true;
   showNumbers = true;
@@ -60,11 +68,14 @@ export class Renderer {
 
   resize() {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w = Math.floor(window.innerWidth * dpr), h = Math.floor(window.innerHeight * dpr);
+    const w = Math.round(window.innerWidth * dpr), h = Math.round(window.innerHeight * dpr);
     this.canvas.width = w;
     this.canvas.height = h;
-    this.canvas.style.width = `${window.innerWidth}px`;
-    this.canvas.style.height = `${window.innerHeight}px`;
+    // Size the element from the backing store so each canvas pixel maps to exactly one device
+    // pixel, even at fractional DPRs (1.25, 1.5); otherwise the browser resamples every frame and
+    // a scrolling world shimmers.
+    this.canvas.style.width = `${w / dpr}px`;
+    this.canvas.style.height = `${h / dpr}px`;
     // Half-step integer zoom keeps pixel art crisp while showing ~450-540 world px vertically.
     this.zoom = Math.max(1, Math.floor((h / 450) * 2) / 2);
     this.viewW = w / this.zoom;
@@ -171,15 +182,17 @@ export class Renderer {
       this.bg = new Background(world.stage);
       this.bgStage = world.stage.id;
     }
+    this.interpolate(world);
     const me = world.players[this.localId] ?? world.players[0];
+    const z = this.zoom;
     if (me) {
-      // Smooth follow with slight look-ahead.
-      const tx = me.x + me.fx * 14 * (me.moving ? 1 : 0);
-      const ty = me.y - 8 + me.fy * 10 * (me.moving ? 1 : 0);
-      const k = 1 - Math.pow(0.0001, dt);
-      this.camX += (tx - this.camX) * k;
-      this.camY += (ty - this.camY) * k;
-      if (Math.abs(tx - this.camX) > 400 || Math.abs(ty - this.camY) > 400) { this.camX = tx; this.camY = ty; }
+      // The camera is locked to the (interpolated) partner; only the look-ahead eases. Snapping the
+      // look-ahead to whole screen pixels keeps the partner perfectly still on screen while walking.
+      const k = 1 - Math.pow(0.02, dt);
+      this.lookX += ((me.moving ? me.fx * 14 : 0) - this.lookX) * k;
+      this.lookY += ((me.moving ? me.fy * 10 : 0) - this.lookY) * k;
+      this.camX = me.x + Math.round(this.lookX * z) / z;
+      this.camY = me.y - 8 + Math.round(this.lookY * z) / z;
     }
     this.particles.update(dt);
     this.numbers.update(dt);
@@ -188,16 +201,16 @@ export class Renderer {
     this.flash = Math.max(0, this.flash - dt * 2.5);
     this.hurtFlash = Math.max(0, this.hurtFlash - dt);
 
-    const z = this.zoom;
-    const sx = this.shake ? (Math.random() - 0.5) * this.shake : 0;
-    const sy = this.shake ? (Math.random() - 0.5) * this.shake : 0;
-    const left = this.camX - this.viewW / 2 + sx;
-    const top = this.camY - this.viewH / 2 + sy;
-    // Snap the camera to the screen-pixel grid to avoid shimmering.
-    const ox = Math.round(-left * z), oy = Math.round(-top * z);
+    const sx = this.shake ? Math.round((Math.random() - 0.5) * this.shake) : 0;
+    const sy = this.shake ? Math.round((Math.random() - 0.5) * this.shake) : 0;
+    // Camera origin in whole screen pixels. Sprites snap to the same grid (see snap()), so a sprite
+    // moving with the camera keeps a constant on-screen position instead of wobbling by a pixel.
+    const ox = -(Math.round(this.camX * z) - Math.round(this.canvas.width / 2)) + sx * z;
+    const oy = -(Math.round(this.camY * z) - Math.round(this.canvas.height / 2)) + sy * z;
+    const left = -ox / z, top = -oy / z;
     g.setTransform(z, 0, 0, z, ox, oy);
     g.imageSmoothingEnabled = false;
-    const L = -ox / z, T = -oy / z, W = this.canvas.width / z, H = this.canvas.height / z;
+    const L = left, T = top, W = this.canvas.width / z, H = this.canvas.height / z;
 
     this.bg!.drawGround(g, L - 2, T - 2, W + 4, H + 4);
     this.drawFlatDecor(L, T, W, H);
@@ -251,6 +264,34 @@ export class Renderer {
       g.globalAlpha = 1;
     }
     if (world.cine?.kind === 'evolve') this.drawEvolution(world.cine, world);
+    if (world.cine?.kind === 'mega') this.drawMegaEvolution(world.cine, world);
+    this.restore();
+  }
+
+  /** Temporarily move entities to their interpolated positions; restore() puts them back. */
+  private interpolate(world: WorldView) {
+    const a = world.alpha ?? 1;
+    this.savedObjs.length = 0;
+    this.saved.length = 0;
+    if (a >= 1) return;
+    const lerpIn = (o: Pos) => {
+      if (o.px === undefined || o.py === undefined) return;
+      const dx = o.x - o.px, dy = o.y - o.py;
+      if (dx * dx + dy * dy > 48 * 48) return; // teleported: don't smear across the map
+      this.savedObjs.push(o);
+      this.saved.push(o.x, o.y);
+      o.x = o.px + dx * a;
+      o.y = o.py + dy * a;
+    };
+    for (const p of world.players) lerpIn(p);
+    for (const e of world.enemies) if (e.alive) lerpIn(e);
+    for (const pr of world.projectiles) lerpIn(pr);
+  }
+
+  private restore() {
+    const o = this.savedObjs, s = this.saved;
+    for (let i = 0; i < o.length; i++) { o[i].x = s[i * 2]; o[i].y = s[i * 2 + 1]; }
+    o.length = 0;
   }
 
   // ─────────────────────────── decor ───────────────────────────
@@ -281,7 +322,8 @@ export class Renderer {
     const f = anim.frameAt(t);
     const r = row % anim.rows;
     const w = anim.fw * scale, h = anim.fh * scale;
-    const dx = Math.round(x - w / 2), dy = Math.round(y - h / 2 - 6 * scale);
+    const z = this.zoom;
+    const dx = (Math.round(x * z) - Math.round((w / 2) * z)) / z, dy = (Math.round(y * z) - Math.round((h / 2 + 6 * scale) * z)) / z;
     if (alpha < 1) g.globalAlpha = alpha;
     g.drawImage(anim.img, f * anim.fw, r * anim.fh, anim.fw, anim.fh, dx, dy, w, h);
     if (flash > 0) {
@@ -300,6 +342,21 @@ export class Renderer {
       return;
     }
     const g = this.g;
+    if (e.alpha) {
+      // Alphas: a smouldering red aura and glowing ground ring.
+      const pulse = 0.5 + 0.5 * Math.sin(time * 4 + e.id);
+      g.globalCompositeOperation = 'lighter';
+      g.globalAlpha = 0.35 + pulse * 0.25;
+      g.drawImage(assets.glow.get('fire')!, e.x - 40 * e.scale / 2, e.y - 34 * e.scale, 40 * e.scale, 40 * e.scale);
+      g.globalAlpha = 1;
+      g.globalCompositeOperation = 'source-over';
+      g.strokeStyle = `rgba(255,40,40,${0.55 + pulse * 0.4})`;
+      g.lineWidth = 2;
+      g.beginPath();
+      g.ellipse(e.x, e.y, e.radius + 6, (e.radius + 6) * 0.45, 0, 0, TAU);
+      g.stroke();
+      if (Math.random() < 0.25) this.particles.spawn(e.x + (Math.random() - 0.5) * 30, e.y - Math.random() * 40, 0, -30, 0.7, 2, '#ff5040', 0, true);
+    }
     if (e.elite || e.boss) {
       const pulse = 0.5 + 0.5 * Math.sin(time * 6);
       g.strokeStyle = e.boss ? `rgba(255,60,60,${0.5 + pulse * 0.4})` : `rgba(255,200,60,${0.4 + pulse * 0.4})`;
@@ -316,21 +373,35 @@ export class Renderer {
       g.fillRect(e.x - 10 * e.scale, e.y - 24 * e.scale, 20 * e.scale, 24 * e.scale);
     }
     if (e.shiny && Math.random() < 0.08) this.particles.spawn(e.x + (Math.random() - 0.5) * 20, e.y - 10 - Math.random() * 16, 0, -20, 0.5, 2, '#fff6a8', 0, true);
-    if (e.elite || (e.boss && e.hp < e.maxHp)) {
+    if (e.elite || e.alpha || (e.boss && e.hp < e.maxHp)) {
       const w = 22 * e.scale;
       g.fillStyle = '#000';
       g.fillRect(e.x - w / 2 - 1, e.y - 34 * e.scale - 1, w + 2, 4);
-      g.fillStyle = e.boss ? '#ff4b4b' : '#ffc53d';
+      g.fillStyle = e.boss || e.alpha ? '#ff4b4b' : '#ffc53d';
       g.fillRect(e.x - w / 2, e.y - 34 * e.scale, w * Math.max(0, e.hp / e.maxHp), 2);
     }
   }
 
   private drawPlayer(p: Player, time: number) {
-    const set = assets.get(p.speciesId, p.shiny);
+    const mega = p.megaT > 0 ? MEGA[p.speciesId] : undefined;
+    let set = assets.get(p.speciesId, p.shiny);
+    if (mega?.sprite) {
+      const ms = assets.get(mega.id, p.shiny);
+      if (ms) set = ms;
+      else void assets.load(mega.id, p.shiny);
+    }
     const g = this.g;
     if (!set) {
       void assets.load(p.speciesId, p.shiny);
       return;
+    }
+    if (p.megaT > 0) this.drawMegaAura(p, time, !mega?.sprite);
+    else if (p.mega >= 0.999) {
+      g.globalCompositeOperation = 'lighter';
+      g.globalAlpha = 0.5 + 0.3 * Math.sin(time * 12);
+      g.drawImage(assets.glow.get(p.types[0])!, p.x - 24, p.y - 36, 48, 48);
+      g.globalAlpha = 1;
+      g.globalCompositeOperation = 'source-over';
     }
     if (p.fainted) {
       this.drawAnim(set.idle, p.x, p.y, 0, 0, 1, 0, 0.45);
@@ -343,11 +414,37 @@ export class Renderer {
     }
     const anim = p.moving ? set.walk : set.idle;
     const blink = p.hurtT > 0 ? (Math.floor(p.hurtT * 30) % 2) * 0.8 : 0;
-    this.drawAnim(anim, p.x, p.y, time * (p.moving ? 1.2 : 1), dirRow(p.fx, p.fy), 1, blink);
+    // Forms without a Mega sprite grow and glow instead.
+    const scale = mega && !mega.sprite ? 1.25 : 1;
+    this.drawAnim(anim, p.x, p.y, time * (p.moving ? 1.2 : 1), dirRow(p.fx, p.fy), scale, blink);
     if (p.shiny && Math.random() < 0.12) this.particles.spawn(p.x + (Math.random() - 0.5) * 22, p.y - 6 - Math.random() * 22, 0, -24, 0.6, 2, '#fff6a8', 0, true);
     for (const b of p.buffs) {
       if (b.kind === 'shield') { g.strokeStyle = 'rgba(160,220,255,0.6)'; g.lineWidth = 1.5; g.beginPath(); g.arc(p.x, p.y - 12, 18, 0, TAU); g.stroke(); }
       if (b.kind === 'dodge' && Math.floor(time * 10) % 2 === 0) this.drawAnim(anim, p.x + 8, p.y, time, dirRow(p.fx, p.fy), 1, 0, 0.3);
+    }
+  }
+
+  /** Rainbow Mega Evolution energy: a pulsing ring, rising sparks and a shimmer. */
+  private drawMegaAura(p: Player, time: number, strong: boolean) {
+    const g = this.g;
+    const hue = (o: number) => `hsl(${Math.floor((time * 140 + o) % 360)},100%,65%)`;
+    g.globalCompositeOperation = 'lighter';
+    g.globalAlpha = strong ? 0.75 : 0.5;
+    g.drawImage(assets.glow.get(p.types[0])!, p.x - 30, p.y - 44, 60, 60);
+    g.globalAlpha = 1;
+    // Pixel ring of six orbiting gems (the Mega Evolution symbol's colours).
+    for (let i = 0; i < 6; i++) {
+      const a = time * 2.4 + (i / 6) * TAU;
+      g.fillStyle = hue(i * 60);
+      g.fillRect(Math.round(p.x + Math.cos(a) * 18) - 1, Math.round(p.y - 12 + Math.sin(a) * 8) - 1, 3, 3);
+    }
+    g.globalCompositeOperation = 'source-over';
+    if (Math.random() < 0.5) this.particles.spawn(p.x + (Math.random() - 0.5) * 26, p.y - Math.random() * 30, 0, -40, 0.6, 2, hue(Math.random() * 360), 0, true);
+    if (p.megaT < 3 && Math.floor(time * 8) % 2 === 0) {
+      g.globalAlpha = 0.4;
+      g.fillStyle = '#fff';
+      g.fillRect(Math.round(p.x) - 12, Math.round(p.y) - 34, 24, 2);
+      g.globalAlpha = 1;
     }
   }
 
@@ -408,6 +505,16 @@ export class Renderer {
     const icon = PICKUP_ICON[pk.kind];
     const img = icon ? assets.itemImage(icon) : undefined;
     const bob = Math.sin(time * 4 + pk.id) * 2;
+    if (pk.kind === 'mega-stone') {
+      g.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 3; i++) {
+        g.globalAlpha = 0.35;
+        g.fillStyle = `hsl(${Math.floor((time * 120 + i * 120) % 360)},100%,60%)`;
+        g.fillRect(pk.x - 6 + i * 4 - 2, pk.y - 120, 4, 114);
+      }
+      g.globalAlpha = 1;
+      g.globalCompositeOperation = 'source-over';
+    }
     if (pk.kind === 'chest') {
       g.globalCompositeOperation = 'lighter';
       g.globalAlpha = 0.35 + 0.15 * Math.sin(time * 5);
@@ -796,7 +903,70 @@ export class Renderer {
     };
     for (const e of world.enemies) if (e.boss && e.alive) mark(e.x, e.y, '#ff4b4b', 14 * Math.min(2, z / 2));
     for (const pk of world.pickups) if (pk.kind === 'chest') mark(pk.x, pk.y, '#ffd94a', 10 * Math.min(2, z / 2));
+    for (const pk of world.pickups) if (pk.kind === 'mega-stone') mark(pk.x, pk.y, `hsl(${Math.floor((world.time * 120) % 360)},100%,65%)`, 12 * Math.min(2, z / 2));
     for (const p of world.players) if (p.id !== this.localId && p.connected) mark(p.x, p.y, SLOT_COLORS[p.slot], 10 * Math.min(2, z / 2));
+  }
+
+  /** Mega Evolution: the partner is wrapped in a rainbow sphere that shatters into the Mega form. */
+  private drawMegaEvolution(c: Cinematic, world: WorldView) {
+    const g = this.g;
+    const W = this.canvas.width, H = this.canvas.height;
+    const p = world.players[c.player];
+    if (!p) return;
+    const k = c.t / c.dur;
+    const mega = MEGA[c.from!];
+    g.fillStyle = `rgba(8,6,24,${Math.min(0.8, c.t * 3)})`;
+    g.fillRect(0, 0, W, H);
+    const scale = Math.max(3, Math.round(Math.min(W, H) / 110));
+    const cx = W / 2, cy = H / 2 - 20;
+    const reveal = k > 0.72;
+    let set = assets.get(c.from!, p.shiny);
+    if (reveal && mega?.sprite) set = assets.get(mega.id, p.shiny) ?? set;
+    if (mega?.sprite && !assets.get(mega.id, p.shiny)) void assets.load(mega.id, p.shiny);
+    // rainbow ribbons converging on the partner
+    g.globalCompositeOperation = 'lighter';
+    const rings = 6;
+    for (let i = 0; i < rings; i++) {
+      const a0 = c.t * 5 + (i / rings) * TAU;
+      const r = (1 - Math.min(1, k / 0.6)) * Math.min(W, H) * 0.45 + 30 * scale * 0.4;
+      g.strokeStyle = `hsl(${(i * 60 + c.t * 200) % 360},100%,60%)`;
+      g.lineWidth = scale * 2;
+      g.beginPath();
+      g.arc(cx, cy, r, a0, a0 + 1.4);
+      g.stroke();
+    }
+    if (k > 0.45 && k < 0.75) {
+      // the sphere
+      const s = (k - 0.45) / 0.3;
+      g.globalAlpha = 0.5 + s * 0.5;
+      g.fillStyle = `hsl(${(c.t * 300) % 360},100%,75%)`;
+      g.beginPath();
+      g.arc(cx, cy, 22 * scale * (0.6 + s * 0.4), 0, TAU);
+      g.fill();
+      g.globalAlpha = 1;
+    }
+    g.globalCompositeOperation = 'source-over';
+    if (set && (k < 0.5 || reveal)) {
+      const anim = set.idle;
+      const f = anim.frameAt(c.t);
+      const sc = scale * (reveal && !mega?.sprite ? 1.25 : 1);
+      g.imageSmoothingEnabled = false;
+      g.drawImage(k > 0.3 && k < 0.5 ? anim.whiteSheet() : anim.img, f * anim.fw, 0, anim.fw, anim.fh, cx - (anim.fw * sc) / 2, cy - (anim.fh * sc) / 2, anim.fw * sc, anim.fh * sc);
+    }
+    if (k > 0.72 && k < 0.76) {
+      this.flash = 0.9;
+      this.flashColor = '#fff';
+      this.particles.burst(p.x, p.y - 10, 80, 260, '#ffffff', 1, 3, true);
+    }
+    g.textAlign = 'center';
+    const fs = Math.max(12, Math.round(H / 40));
+    g.font = `${fs}px "Press Start 2P", monospace`;
+    const name = SPECIES[c.from!]?.name.toUpperCase() ?? '';
+    const text = !reveal ? `${name}'s Mega Stone is reacting!` : mega ? `${name} Mega Evolved into ${mega.name.toUpperCase()}!` : `${name} is overflowing with power!`;
+    g.fillStyle = '#000';
+    g.fillText(text, W / 2 + 2, H * 0.78 + 2);
+    g.fillStyle = '#fff';
+    g.fillText(text, W / 2, H * 0.78);
   }
 
   private drawEvolution(c: Cinematic, world: WorldView) {

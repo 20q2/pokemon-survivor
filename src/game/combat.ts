@@ -4,6 +4,7 @@ import { TAU, wrapAngle } from '../engine/math.ts';
 import { baseDamage, incomingDamage, resolveHit } from './damage.ts';
 import { killEnemy } from './enemies.ts';
 import type { Sim } from './sim.ts';
+import { megaOnHurt } from './mega.ts';
 import type { Enemy, Player, Projectile, Shape } from './types.ts';
 
 const HIGH_CRIT = new Set(['razor-leaf', 'karate-chop', 'leaf-blade', 'night-slash', 'blaze-kick', 'cross-chop', 'air-slash', 'stone-edge', 'crunch']);
@@ -547,6 +548,7 @@ export function damagePlayer(sim: Sim, p: Player, raw: number, type: PType, spec
   p.hurtT = 0.25;
   p.lastHit = sim.time;
   p.dmgTaken += dmg;
+  megaOnHurt(sim, p, dmg);
   sim.emit({ e: 'hurt', player: p.id, dmg });
   if (p.hp > 0) return;
   if (sim.rng.next() < p.stats.focus) { p.hp = 1; return; }

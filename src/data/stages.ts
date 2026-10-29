@@ -40,7 +40,7 @@ const E = (species: string, w = 1): SpawnEntry => ({ species, w });
 export const STAGES: StageDef[] = [
   {
     id: 'viridian', name: 'Viridian Forest', subtitle: 'A sun-dappled maze of trees and Bug Pokémon.',
-    types: ['bug', 'grass', 'normal', 'flying'], music: 'forest', difficulty: 1,
+    types: ['bug', 'grass', 'normal', 'flying'], music: 'forest', difficulty: 0.9,
     ground: ['#3f7a3a', '#357032', '#5c9a48'], decor: ['tree', 'bush', 'flower', 'tuft', 'mushroom'],
     pools: {
       early: [E('caterpie', 4), E('weedle', 4), E('pidgey', 2), E('rattata', 2)],

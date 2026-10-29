@@ -7,8 +7,9 @@ import { Rng, dist2 } from '../engine/math.ts';
 import { SpatialGrid } from '../engine/spatial.ts';
 import type { MetaBonuses } from '../meta/shop.ts';
 import { derivePlayerStats } from './stats.ts';
-import { applyOffer, generateOffers, masteryCandidates, ownedUpgrades } from './levelup.ts';
+import { applyOffer, generateOffers, masteryCandidates, randomFiller, ownedUpgrades } from './levelup.ts';
 import { fireMoves, updateProjectiles, damagePlayer } from './combat.ts';
+import { activateMega, updateMega } from './mega.ts';
 import { Spawner, updateEnemies, killEnemy } from './enemies.ts';
 import type {
   ChestReward, Enemy, GameEvent, Pickup, PickupKind, Player, Projectile, UpgradeOffer,
@@ -33,7 +34,7 @@ export interface SimConfig {
 export type Phase = 'play' | 'levelup' | 'cine' | 'over' | 'victory';
 
 export interface Cinematic {
-  kind: 'evolve' | 'chest' | 'bossDown';
+  kind: 'evolve' | 'chest' | 'bossDown' | 'mega';
   t: number;
   dur: number;
   player: number;
@@ -47,12 +48,9 @@ export const DT = 1 / 60;
 export const MAX_ENEMIES = 520;
 
 export function xpForLevel(level: number): number {
-  // Snappy first levels, then the long curve.
-  if (level < 10) return 4 + (level - 1) * 5;
-  let need = 5 + (level - 1) * 7;
-  if (level > 20) need += (level - 20) * 6;
-  if (level > 40) need += (level - 40) * 10;
-  return need;
+  // Snappy first levels, then a quadratic curve so the build fills out over the whole run.
+  const k = level - 1;
+  return Math.round(5 + 4 * k + 0.9 * k * k + (k > 24 ? 0.06 * (k - 24) ** 3 : 0));
 }
 
 export class Sim {
@@ -76,11 +74,15 @@ export class Sim {
   kills = 0;
   bossesDefeated = 0;
   finalDefeated = false;
+  /** The team found the Mega Stone: fully evolved partners charge Mega Evolution. */
+  megaStone = false;
   offers = new Map<number, UpgradeOffer[]>();
   tms = new Map<number, string[]>();
   spawner: Spawner;
   /** Replication outboxes (filled only when `replicate` is on, drained by the host). */
   replicate = false;
+  /** Fraction of a fixed step elapsed since the last update (render interpolation). */
+  alpha = 1;
   newProj: Projectile[] = [];
   deadProj: number[] = [];
   newPickups: Pickup[] = [];
@@ -139,7 +141,7 @@ export class Sim {
       rerolls: pi.meta.rerolls, skips: pi.meta.skips, banishes: pi.meta.banishes, banished: new Set(),
       revives: pi.meta.revives, fainted: false, reviveProgress: 0, hurtT: 0, lastHit: -99,
       pendingLevels: 0, kills: 0, dmgDealt: 0, dmgTaken: 0, bossKills: 0, superEff: 0, shinyKills: 0,
-      money: 0, evolutions: 0, masteries: 0, connected: true, viewW: 960, viewH: 540,
+      vitamins: {}, evolutions: 0, masteries: 0, connected: true, viewW: 960, viewH: 540, mega: 0, megaT: 0, megas: 0,
     };
     this.tms.set(p.id, pi.tms);
     this.players.push(p);
@@ -165,6 +167,9 @@ export class Sim {
     if (this.phase === 'cine') return this.updateCine(dt);
     if (this.phase !== 'play') return;
     this.time += dt;
+    for (const p of this.players) { p.px = p.x; p.py = p.y; }
+    for (const e of this.enemies) { e.px = e.x; e.py = e.y; }
+    for (const pr of this.projectiles) { pr.px = pr.x; pr.py = pr.y; }
     this.refreshStats();
     this.updatePlayers(dt);
     this.spawner.update(dt);
@@ -214,6 +219,7 @@ export class Sim {
         b.t -= dt;
         if (b.t <= 0) p.buffs.splice(i, 1);
       }
+      updateMega(this, p, dt);
       if (p.stats.regen) p.hp = Math.min(p.stats.maxHp, p.hp + p.stats.maxHp * p.stats.regen * dt);
       if (p.stats.lifeOrb && p.ability !== 'magic-guard')
         p.hp = Math.max(1, p.hp - p.stats.maxHp * 0.004 * dt * (p.stats.lifeOrb / 0.08));
@@ -232,7 +238,7 @@ export class Sim {
         const d = dist2(pk.x, pk.y, x, y);
         if (d < bd) { bd = d; best = pk; }
       }
-      if (best) { best.value += value; return; }
+      if (best) { best.value += value; return best; }
     }
     const pk: Pickup = { id: this.id(), kind, x, y, value, vacuum: 0, vx: 0, vy: 0, t: 0, dead: false };
     if (kind !== 'candy') {
@@ -242,6 +248,7 @@ export class Sim {
     }
     this.pickups.push(pk);
     if (this.replicate) this.newPickups.push(pk);
+    return pk;
   }
 
   private updatePickups(dt: number) {
@@ -309,6 +316,10 @@ export class Sim {
         break;
       case 'chest':
         this.openChest(p);
+        break;
+      case 'mega-stone':
+        this.megaStone = true;
+        this.emit({ e: 'megaStone', player: p.id });
         break;
     }
     this.emit({ e: 'pickup', kind: pk.kind, player: p.id, value: pk.value });
@@ -386,6 +397,7 @@ export class Sim {
     c.t += dt;
     if (c.t < c.dur) return;
     if (c.kind === 'evolve') this.applyEvolution(this.players[c.player], c.to!);
+    if (c.kind === 'mega') activateMega(this, this.players[c.player]);
     this.cine = null;
     if (this.cineQueue.length) return this.startNextCine();
     if (this.finalDefeated) {
@@ -419,7 +431,6 @@ export class Sim {
     if (!offers || !p || !offers[index]) return;
     const o = offers[index];
     applyOffer(p, o);
-    if (o.kind === 'money') this.money += 25;
     if (o.kind === 'newMove') this.emit({ e: 'learn', player: p.id, move: o.id });
     this.afterChoice(p);
   }
@@ -444,7 +455,7 @@ export class Sim {
     const offers = this.offers.get(playerId);
     if (!p || !offers || p.banishes <= 0 || !offers[index]) return;
     const o = offers[index];
-    if (o.kind === 'heal' || o.kind === 'money') return;
+    if (o.kind === 'heal' || o.kind === 'vitamin') return;
     p.banishes--;
     p.banished.add(o.id);
     this.offers.set(playerId, this.makeOffers(p));
@@ -466,21 +477,22 @@ export class Sim {
       const m = ready[0];
       const owned = p.moves.find((x) => x.id === m.from)!;
       owned.id = m.to;
-      owned.level = MAX_MOVE_LEVEL;
+      owned.level = Math.max(owned.level, MAX_MOVE_LEVEL);
       p.masteries++;
       rewards.push({ kind: 'mastery', id: m.to, from: m.from });
     } else {
       const roll = this.rng.next();
-      const n = roll < 0.05 ? 5 : roll < 0.3 ? 3 : 1;
+      const n = roll < 0.03 ? 5 : roll < 0.15 ? 3 : 1;
       for (let i = 0; i < n; i++) {
         let ups = ownedUpgrades(p);
         // Nothing to level? Grant something new instead.
         if (!ups.length) ups = generateOffers(p, this.rng, 3, this.tms.get(p.id) ?? []).filter((o) => o.kind === 'newMove' || o.kind === 'newItem');
-        if (!ups.length) break;
+        // A complete build still gets something: vitamins.
+        if (!ups.length) ups = [randomFiller(p, this.rng)];
         const o = this.rng.pick(ups);
         applyOffer(p, o);
         const lvl = o.kind === 'newMove' || o.kind === 'newItem' ? 1 : o.level;
-        rewards.push({ kind: o.kind === 'moveUp' || o.kind === 'newMove' ? 'move' : 'item', id: o.id, level: lvl });
+        rewards.push({ kind: o.kind === 'moveUp' || o.kind === 'newMove' ? 'move' : o.kind === 'vitamin' ? 'vitamin' : 'item', id: o.id, level: lvl });
         // A chest can complete a mastery chain mid-way: master immediately.
         const ready = masteryCandidates(p);
         if (ready.length) {
@@ -490,11 +502,6 @@ export class Sim {
           p.masteries++;
           rewards.push({ kind: 'mastery', id: m.to, from: m.from });
         }
-      }
-      if (!rewards.length) {
-        const amount = Math.round(80 + this.time / 6);
-        this.money += amount;
-        rewards.push({ kind: 'money', id: 'nugget', level: amount });
       }
     }
     this.refreshStats();

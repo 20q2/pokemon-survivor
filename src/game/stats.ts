@@ -1,5 +1,5 @@
 import { SPECIES } from '../data/pokedex.ts';
-import { ITEMS } from '../data/items.ts';
+import { ITEMS, vitaminBonus } from '../data/items.ts';
 import type { DerivedStats, Player } from './types.ts';
 
 /** Maps a base stat (~20..160) into a gentle multiplier so every Pokémon stays viable. */
@@ -69,6 +69,16 @@ export function derivePlayerStats(p: Player, level: number, time: number): Deriv
     }
   }
 
+  // Vitamins (taken on level-ups once the build is complete)
+  const vit = (id: string) => vitaminBonus(id, p.vitamins[id] ?? 0);
+  s.atk *= 1 + vit('protein');
+  s.spa *= 1 + vit('calcium');
+  s.maxHp *= 1 + vit('hp-up');
+  s.contactTaken /= 1 + vit('iron');
+  s.projTaken /= 1 + vit('zinc');
+  s.speed *= 1 + vit('carbos');
+  s.cooldown /= 1 + vit('pp-up');
+
   // Abilities
   let haste = 0;
   switch (p.ability) {
@@ -90,6 +100,12 @@ export function derivePlayerStats(p: Player, level: number, time: number): Deriv
       case 'shield': s.contactTaken *= 1 - b.amount; s.projTaken *= 1 - b.amount; break;
       default: break;
     }
+  }
+  // Mega Evolution: everything goes up for a short while.
+  if (p.megaT > 0) {
+    s.atk *= 1.5; s.spa *= 1.5; s.area *= 1.2; s.speed *= 1.15; s.regen += 0.01;
+    s.contactTaken *= 0.5; s.projTaken *= 0.5; s.crit += 0.1;
+    haste += 0.35;
   }
   if (haste) {
     s.speed *= 1 + haste;

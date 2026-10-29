@@ -1,5 +1,5 @@
 import { audio } from './audio/audio.ts';
-import { LINE, LINES, SPECIES, STARTER_LINES } from './data/pokedex.ts';
+import { LINE, LINES, MEGA, SPECIES, STARTER_LINES, fullyEvolved } from './data/pokedex.ts';
 import { STAGE } from './data/stages.ts';
 import { TYPES } from './data/types.ts';
 import { MOVES } from './data/moves.ts';
@@ -318,6 +318,33 @@ export class App {
         break;
       case 'boom':
         audio.sfx('boom');
+        break;
+      case 'mega': {
+        audio.sfx('mega');
+        const p = s.world.players[ev.player];
+        const mg = MEGA[ev.species];
+        if (ev.player !== me) toast('Mega Evolution!', `${p?.name}'s ${mg?.name ?? SPECIES[ev.species].name} is unleashed!`, assets.portraitUrl(mg?.id ?? ev.species, p?.shiny));
+        break;
+      }
+      case 'megaEnd':
+        if (ev.player === me) banner('Mega Evolution wore off…', false, 1600);
+        break;
+      case 'megaStone': {
+        audio.sfx('mastery');
+        const p = s.world.players[ev.player];
+        const evolved = s.world.players.some((x) => fullyEvolved(x.lineId, x.speciesId));
+        banner(ev.player === me ? 'You found the MEGA STONE!' : `${p?.name} found the MEGA STONE!`, false, 2600);
+        toast('Mega Stone', evolved ? 'Fight to charge the rainbow meter. When it fills, your partner Mega Evolves!' : 'Fully evolve your partner, then fight to charge Mega Evolution.', assets.itemUrl('key-stone'));
+        break;
+      }
+      case 'poi':
+        if (ev.kind === 'cache') toast('Itemfinder', 'Something is buried nearby. Check the map!', assets.itemUrl('dowsing-machine'));
+        else if (ev.kind === 'mega-stone') { banner('A MEGA STONE is shining somewhere! Check the map!', false, 3200); audio.sfx('shiny'); }
+        else toast('Alpha spotted!', `An Alpha ${SPECIES[ev.species!].name} roams nearby. Defeat it for big rewards!`, assets.portraitUrl(ev.species!));
+        break;
+      case 'alphaDown':
+        banner(`The Alpha ${SPECIES[ev.species].name.toUpperCase()} was defeated!`, false, 2400);
+        audio.sfx('chest');
         break;
       case 'shiny':
         audio.sfx('shiny');

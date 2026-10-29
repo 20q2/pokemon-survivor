@@ -286,6 +286,31 @@ export const LINE: Record<string, Line> = Object.fromEntries(LINES.map((l) => [l
 /** Lines available from the very first run. */
 export const STARTER_LINES = ['bulbasaur', 'charmander', 'squirtle', 'pichu'];
 
+/** Mega Evolutions of fully evolved partners. `form` is the PMD SpriteCollab form folder;
+ *  `sprite` is false where only a portrait exists (the normal sprite is drawn with a Mega aura). */
+export interface MegaDef { id: string; name: string; dex: number; form: string; sprite: boolean; types?: PType[] }
+export const MEGA: Record<string, MegaDef> = {
+  venusaur: { id: 'venusaur-mega', name: 'Mega Venusaur', dex: 3, form: '0001', sprite: false },
+  charizard: { id: 'charizard-mega-x', name: 'Mega Charizard X', dex: 6, form: '0001', sprite: true, types: ['fire', 'dragon'] },
+  blastoise: { id: 'blastoise-mega', name: 'Mega Blastoise', dex: 9, form: '0001', sprite: false },
+  raichu: { id: 'raichu-mega-x', name: 'Mega Raichu X', dex: 26, form: '0002', sprite: false },
+  gengar: { id: 'gengar-mega', name: 'Mega Gengar', dex: 94, form: '0001', sprite: true },
+  alakazam: { id: 'alakazam-mega', name: 'Mega Alakazam', dex: 65, form: '0001', sprite: true },
+  dragonite: { id: 'dragonite-mega', name: 'Mega Dragonite', dex: 149, form: '0001', sprite: false },
+  sceptile: { id: 'sceptile-mega', name: 'Mega Sceptile', dex: 254, form: '0001', sprite: true, types: ['grass', 'dragon'] },
+  blaziken: { id: 'blaziken-mega', name: 'Mega Blaziken', dex: 257, form: '0001', sprite: false },
+  swampert: { id: 'swampert-mega', name: 'Mega Swampert', dex: 260, form: '0001', sprite: false },
+  tyranitar: { id: 'tyranitar-mega', name: 'Mega Tyranitar', dex: 248, form: '0001', sprite: true },
+  gardevoir: { id: 'gardevoir-mega', name: 'Mega Gardevoir', dex: 282, form: '0001', sprite: true },
+};
+
+/** True once a partner has reached the end of its line (Mega Evolution becomes possible). */
+export function fullyEvolved(lineId: string, speciesId: string): boolean {
+  const line = LINE[lineId];
+  if (line.branch) return Object.values(line.branch).includes(speciesId);
+  return line.stages[line.stages.length - 1] === speciesId;
+}
+
 export function lineOfSpecies(speciesId: string): Line | undefined {
   return LINES.find((l) => l.stages.includes(speciesId) || (l.branch && Object.values(l.branch).includes(speciesId)));
 }

@@ -2,6 +2,7 @@ import { SPECIES } from '../data/pokedex.ts';
 import { ENEMY_ROLE, RUN_LENGTH, type BossDef, type EnemyRole, type SpawnEntry } from '../data/stages.ts';
 import { TAU, dist2 } from '../engine/math.ts';
 import { makeProjectile, rawDamageEnemy } from './combat.ts';
+import { megaOnKill } from './mega.ts';
 import type { Sim } from './sim.ts';
 import { MAX_ENEMIES } from './sim.ts';
 import type { Enemy, Player } from './types.ts';
@@ -14,6 +15,7 @@ export interface SpawnOpts {
   boss?: BossDef;
   swarmDir?: { x: number; y: number };
   shiny?: boolean;
+  alpha?: boolean;
 }
 
 export class Spawner {
@@ -26,6 +28,11 @@ export class Spawner {
     { at: 690, kind: 'swarm' }, { at: 780, kind: 'ring' }, { at: 840, kind: 'swarm' },
   ];
   private bossIdx = 0;
+  /** Far-off treasure on the map (shown on the minimap); guardians appear as you get close. */
+  private pois: { kind: 'cache' | 'mega-stone'; id: number; x: number; y: number; guarded: boolean }[] = [];
+  private nextCache = 100;
+  private nextAlpha = 140;
+  private megaStoneAt = 330;
 
   private sim: Sim;
   constructor(sim: Sim) {
@@ -46,12 +53,15 @@ export class Spawner {
   hpMult() {
     const m = this.minute;
     const n = this.sim.players.length;
-    return (1 + 0.14 * m + 0.022 * m * m) * this.stageFactor() * (1 + 0.65 * (n - 1)) * (this.sim.elite ? 1.6 : 1);
+    // Gentle early, brutal late; strong teams (high level) also face sturdier foes.
+    const lvl = 1 + 0.006 * (this.sim.level - 1);
+    return (1 + 0.15 * m + 0.025 * m * m + 0.0025 * m * m * m) * lvl * this.stageFactor() * (1 + 0.65 * (n - 1)) * (this.sim.elite ? 1.6 : 1);
   }
 
   dmgMult() {
     const grace = Math.min(1, 0.55 + this.minute * 0.15);
-    return grace * (1 + 0.075 * this.minute) * (0.75 + 0.25 * this.stageFactor()) * (this.sim.elite ? 1.3 : 1);
+    const m = this.minute;
+    return grace * (1 + 0.06 * m + 0.004 * m * m) * (0.75 + 0.25 * this.stageFactor()) * (this.sim.elite ? 1.3 : 1);
   }
 
   update(dt: number) {
@@ -61,10 +71,10 @@ export class Spawner {
     const n = sim.players.length;
     const finalUp = t >= RUN_LENGTH;
     const target = Math.min(MAX_ENEMIES - 40, (24 + m * 26) * (1 + 0.35 * (n - 1)) * (sim.elite ? 1.25 : 1)) * (finalUp ? 0.5 : 1);
-    const rate = (3 + m * 2.2) * (1 + 0.3 * (n - 1)) * (sim.elite ? 1.25 : 1);
+    const rate = (3 + m * 1.4) * (1 + 0.3 * (n - 1)) * (sim.elite ? 1.25 : 1);
     const alive = sim.enemies.length;
     if (alive < target) {
-      this.acc += rate * dt * (alive < target * 0.5 ? 2 : 1);
+      this.acc += rate * dt * (alive < target * 0.5 ? 1.4 : 1);
       while (this.acc >= 1) {
         this.acc -= 1;
         const pool = m < 4.5 ? sim.stage.pools.early : m < 9.5 ? sim.stage.pools.mid : sim.stage.pools.late;
@@ -95,13 +105,15 @@ export class Spawner {
       const kind = roll < 0.45 ? 'oran' : roll < 0.65 ? 'magnet' : roll < 0.8 ? 'coin' : roll < 0.92 ? 'repel' : 'sitrus';
       sim.spawnPickup(kind, p.x + Math.cos(a) * d, p.y + Math.sin(a) * d, kind === 'coin' ? 10 : 1);
     }
+    this.updatePois(t);
     while (this.events.length && t >= this.events[0].at) {
       const ev = this.events.shift()!;
       if (ev.kind === 'swarm') this.swarm();
       else this.ring();
     }
-    if (t >= RUN_LENGTH + 300 && this.events.length === 0) {
-      this.events.push({ at: t + 45, kind: sim.rng.chance(0.5) ? 'swarm' : 'ring' });
+    // From the midgame on, keep the set-pieces coming (faster still in overtime).
+    if (t >= 600 && this.events.length === 0) {
+      this.events.push({ at: t + (t >= RUN_LENGTH ? 35 : 55), kind: sim.rng.chance(0.5) ? 'swarm' : 'ring' });
     }
     const bosses = sim.stage.bosses;
     if (this.bossIdx < bosses.length && t >= bosses[this.bossIdx].at) {
@@ -109,6 +121,60 @@ export class Spawner {
       this.spawnOffscreen(b.species, { boss: b });
       sim.emit({ e: 'boss', species: b.species, final: !!b.final });
     }
+  }
+
+  private updatePois(t: number) {
+    const sim = this.sim;
+    if (t >= this.megaStoneAt) {
+      this.megaStoneAt = Infinity;
+      this.placePoi('mega-stone', 850);
+    }
+    if (t >= this.nextCache) {
+      this.nextCache += sim.rng.range(100, 140);
+      if (this.pois.filter((p) => p.kind === 'cache').length < 2) this.placePoi('cache', sim.rng.range(700, 1000));
+    }
+    if (t >= this.nextAlpha) {
+      this.nextAlpha += sim.rng.range(130, 170);
+      if (sim.enemies.filter((e) => e.alpha && e.alive).length < 2) this.placeAlpha();
+    }
+    for (const poi of this.pois) {
+      if (poi.guarded) continue;
+      const near = sim.players.some((p) => !p.fainted && dist2(p.x, p.y, poi.x, poi.y) < 330 * 330);
+      if (!near) continue;
+      poi.guarded = true;
+      const n = poi.kind === 'mega-stone' ? 2 + Math.floor(this.minute / 6) : 1;
+      for (let i = 0; i < n; i++) {
+        const a = sim.rng.range(0, TAU);
+        spawnEnemy(sim, sim.rng.pick(sim.stage.elites), poi.x + Math.cos(a) * 60, poi.y + Math.sin(a) * 60, { elite: true });
+      }
+      sim.emit({ e: 'warn', text: poi.kind === 'mega-stone' ? 'Powerful Pokémon guard the Mega Stone!' : 'Something is guarding the treasure!' });
+    }
+    const alive = new Set(sim.pickups.filter((p) => !p.dead).map((p) => p.id));
+    this.pois = this.pois.filter((p) => alive.has(p.id));
+  }
+
+  private placePoi(kind: 'cache' | 'mega-stone', dist: number) {
+    const sim = this.sim;
+    const p = this.anchor();
+    const a = sim.rng.range(0, TAU);
+    const x = p.x + Math.cos(a) * dist, y = p.y + Math.sin(a) * dist;
+    const pk = sim.spawnPickup(kind === 'cache' ? 'chest' : 'mega-stone', x, y);
+    pk.vx = pk.vy = 0;
+    this.pois.push({ kind, id: pk.id, x, y, guarded: false });
+    sim.emit({ e: 'poi', kind, x, y });
+  }
+
+  private placeAlpha() {
+    const sim = this.sim;
+    const p = this.anchor();
+    const a = sim.rng.range(0, TAU);
+    const dist = sim.rng.range(750, 1050);
+    const x = p.x + Math.cos(a) * dist, y = p.y + Math.sin(a) * dist;
+    const pool = this.minute < 6 ? [...sim.stage.pools.early, ...sim.stage.pools.mid] : [...sim.stage.pools.mid, ...sim.stage.pools.late];
+    const choices = [...new Set([...pool.map((e) => e.species), ...sim.stage.elites])].filter((s) => ENEMY_ROLE[s] !== 'treasure' && ENEMY_ROLE[s] !== 'bomber');
+    const species = sim.rng.pick(choices);
+    const e = spawnEnemy(sim, species, x, y, { alpha: true });
+    if (e) sim.emit({ e: 'poi', kind: 'alpha', x, y, species });
   }
 
   private anchor(): Player {
@@ -165,22 +231,23 @@ export class Spawner {
 }
 
 export function spawnEnemy(sim: Sim, speciesId: string, x: number, y: number, opts: SpawnOpts = {}): Enemy | undefined {
-  if (sim.enemies.length >= MAX_ENEMIES && !opts.boss && !opts.elite) return;
+  if (sim.enemies.length >= MAX_ENEMIES && !opts.boss && !opts.elite && !opts.alpha) return;
   const sp = SPECIES[speciesId];
   const role: EnemyRole = opts.boss ? 'chaser' : ENEMY_ROLE[speciesId] ?? 'chaser';
   const m = sim.time / 60;
   const shinyOdds = Math.max(...sim.players.map((p) => p.meta.shinyOdds));
-  const shiny = opts.shiny ?? (!opts.boss && sim.rng.chance((1 / 450) * shinyOdds));
+  const shiny = opts.shiny ?? (!opts.boss && !opts.alpha && sim.rng.chance((1 / 3000) * shinyOdds));
   const [bhp, batk, , bspa, , bspe] = sp.base;
   let hp = (4 + bhp * 0.12) * ROLE_HP[role] * sim.spawner.hpMult();
-  let speed = Math.min(128, (48 + bspe * 0.42) * ROLE_SPEED[role]);
+  // Wild Pokémon get a little quicker as the run goes on, so kiting stays honest.
+  let speed = Math.min(132, (48 + bspe * 0.42) * ROLE_SPEED[role]) * (1 + Math.min(0.3, Math.max(0, m - 5) * 0.03));
   let dmg = (3 + Math.max(batk, bspa) * 0.055) * sim.spawner.dmgMult();
-  let xp = (role === 'tank' ? 2 : 1) * (1 + m * 0.06);
+  let xp = role === 'tank' ? 2 : 1;
   let scale = role === 'tank' ? 1.15 : 1;
   let radius = 9 * scale;
   let knockResist = role === 'tank' ? 0.6 : 0;
   if (opts.elite) {
-    hp *= 12; dmg *= 1.4; xp = 20 * (1 + m * 0.1); scale = 1.5; radius = 14; knockResist = 0.85; speed *= 0.95;
+    hp *= 12; dmg *= 1.4; xp = 25; scale = 1.5; radius = 14; knockResist = 0.85; speed *= 0.95;
   }
   if (opts.boss) {
     const n = sim.players.length;
@@ -188,12 +255,15 @@ export function spawnEnemy(sim: Sim, speciesId: string, x: number, y: number, op
     dmg *= 1.8; xp = 150; scale = opts.boss.final ? 2.4 : 2; radius = opts.boss.final ? 26 : 22; knockResist = 1;
     speed = Math.min(112, 82 + bspe * 0.24);
   }
+  if (opts.alpha) {
+    hp *= 44; dmg *= 1.8; xp = 80; scale = 2.1; radius = 19; knockResist = 0.95; speed = Math.min(118, speed * 1.1);
+  }
   if (role === 'treasure') { speed = Math.max(speed, 80); xp = 5; }
   if (shiny) { hp *= 3; xp *= 5; }
   const e: Enemy = {
     id: sim.id(), speciesId, types: sp.types, role, x, y, radius, vx: 0, vy: 0, dirX: 0, dirY: 1,
     hp, maxHp: hp, speed, dmg, special: bspa > batk, xp, elite: !!opts.elite, boss: !!opts.boss,
-    final: !!opts.boss?.final, shiny, alive: true, flash: 0,
+    final: !!opts.boss?.final, shiny, alpha: !!opts.alpha, homeX: x, homeY: y, alive: true, flash: 0,
     st: { burn: 0, poison: 0, poisonStacks: 0, paralyze: 0, freeze: 0, slow: 0, confuse: 0, flinch: 0, dotTick: 0, burnDmg: 0, poisonDmg: 0, dotOwner: 0, coin: 0 },
     contactCd: 0, ai: sim.rng.range(0, 2), aiState: opts.swarmDir ? 9 : 0, aiX: opts.swarmDir?.x ?? 0, aiY: opts.swarmDir?.y ?? 0,
     patterns: opts.boss?.patterns ?? [], patternIdx: 0, minions: opts.boss?.minions ?? [], knockResist, scale,
@@ -246,6 +316,10 @@ export function updateEnemies(sim: Sim, dt: number) {
       mx = dx / d; my = dy / d;
       if (e.boss) {
         const r = bossAI(sim, e, target, d, dt);
+        mx = r.x; my = r.y; mult *= r.speed;
+      } else if (e.alpha) {
+        const r = alphaAI(sim, e, d, dx, dy, dt);
+        if (!e.alive) continue;
         mx = r.x; my = r.y; mult *= r.speed;
       } else if (e.aiState === 9) {
         // swarm: fly straight across the screen then disappear
@@ -310,7 +384,7 @@ export function updateEnemies(sim: Sim, dt: number) {
     e.vy *= damp;
     if (mx || my) { e.dirX = mx; e.dirY = my; }
     // ─ recycle enemies left far behind
-    if (!e.boss && e.aiState !== 9 && target) {
+    if (!e.boss && !e.alpha && e.aiState !== 9 && target) {
       const lim = Math.max(target.viewW, target.viewH) * 0.9 + 150;
       if (Math.abs(e.x - target.x) > lim || Math.abs(e.y - target.y) > lim) {
         if (e.role === 'treasure') { e.alive = false; continue; }
@@ -446,6 +520,58 @@ function ringShots(sim: Sim, e: Enemy, n: number, offset: number, speed: number)
 
 // ─────────────────────────── death & loot ───────────────────────────
 
+/** Alphas idle around their territory until provoked, then hunt with shockwave stomps; leashed to home. */
+function alphaAI(sim: Sim, e: Enemy, d: number, dx: number, dy: number, dt: number): { x: number; y: number; speed: number } {
+  const hx = e.homeX - e.x, hy = e.homeY - e.y;
+  const hd = Math.hypot(hx, hy) || 1;
+  e.ai -= dt;
+  if (e.aiState === 0) {
+    if (d < 250 || e.hp < e.maxHp) {
+      e.aiState = 1;
+      e.ai = 1.5;
+      sim.emit({ e: 'warn', text: `The Alpha ${SPECIES[e.speciesId].name} is enraged!` });
+    }
+    if (e.ai <= 0) {
+      e.ai = sim.rng.range(1.5, 3.5);
+      const a = sim.rng.range(0, TAU);
+      e.aiX = Math.cos(a); e.aiY = Math.sin(a);
+    }
+    if (hd > 110) return { x: hx / hd, y: hy / hd, speed: 0.4 };
+    return { x: e.aiX, y: e.aiY, speed: 0.25 };
+  }
+  if (hd > 950) {
+    // Lured too far: give up, go home and recover.
+    e.aiState = 0;
+    e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.3);
+    return { x: hx / hd, y: hy / hd, speed: 1 };
+  }
+  if (e.ai <= 0 && d < 320) {
+    e.ai = sim.rng.range(2.6, 3.6);
+    const n = 10;
+    const off = sim.rng.range(0, TAU);
+    for (let i = 0; i < n; i++) enemyShot(sim, e, off + (i / n) * TAU, 110, e.dmg * 0.7);
+  }
+  return { x: dx / d, y: dy / d, speed: 1 };
+}
+
+/** Exp. Candy values: S < 4 <= M < 12 <= L < 40 <= XL. Big foes burst into big candy. */
+function dropCandy(sim: Sim, e: Enemy) {
+  const r = sim.rng;
+  const drops: number[] = [];
+  if (e.boss) drops.push(e.xp * 0.3, e.xp * 0.3, ...Array(4).fill(e.xp * 0.1));
+  else if (e.elite || e.alpha) drops.push(e.xp * 0.5, ...Array(5).fill(e.xp * 0.1));
+  else if (e.role === 'tank' || r.chance(0.04)) drops.push(Math.max(4, e.xp * 4 * (e.role === 'tank' ? 0.5 : 1)));
+  else drops.push(e.xp);
+  for (let i = 0; i < drops.length; i++) {
+    const pk = sim.spawnPickup('candy', e.x, e.y, drops[i]);
+    if (pk && drops.length > 1) {
+      const a = r.range(0, TAU), sp = r.range(70, 170);
+      pk.vx = Math.cos(a) * sp;
+      pk.vy = Math.sin(a) * sp;
+    }
+  }
+}
+
 export function killEnemy(sim: Sim, e: Enemy, killerId: number) {
   if (!e.alive) return;
   e.alive = false;
@@ -453,30 +579,37 @@ export function killEnemy(sim: Sim, e: Enemy, killerId: number) {
   sim.kills++;
   const killer = sim.players[killerId];
   if (killer) killer.kills++;
+  megaOnKill(sim, killer, e.elite, e.boss);
   sim.defeatedSpecies.set(e.speciesId, (sim.defeatedSpecies.get(e.speciesId) ?? 0) + 1);
   sim.emit({ e: 'kill', x: e.x, y: e.y, species: e.speciesId, boss: e.boss, shiny: e.shiny, type: e.types[0] });
-  sim.spawnPickup('candy', e.x, e.y, e.xp);
   const r = sim.rng;
-  if (e.st.coin || r.chance(0.025)) sim.spawnPickup('coin', e.x, e.y, 1 + (e.st.coin ? r.int(1, 3) : 0));
+  dropCandy(sim, e);
+  if (e.st.coin || r.chance(0.01)) sim.spawnPickup('coin', e.x, e.y, 1 + (e.st.coin ? r.int(1, 2) : 0));
   if (r.chance(0.006)) sim.spawnPickup('oran', e.x, e.y);
   if (r.chance(0.0015)) sim.spawnPickup('magnet', e.x, e.y);
   if (r.chance(0.0008)) sim.spawnPickup('repel', e.x, e.y);
   if (r.chance(0.0004)) sim.spawnPickup('rare-candy', e.x, e.y);
   if (e.role === 'treasure') {
-    for (let i = 0; i < 8; i++) sim.spawnPickup('coin', e.x, e.y, e.speciesId === 'chansey' ? 6 : 4);
+    for (let i = 0; i < 6; i++) sim.spawnPickup('coin', e.x, e.y, e.speciesId === 'chansey' ? 4 : 3);
     if (e.speciesId === 'chansey') sim.spawnPickup('chest', e.x, e.y);
   }
   if (e.shiny) {
     if (killer) killer.shinyKills++;
     sim.spawnPickup('chest', e.x, e.y);
-    for (let i = 0; i < 5; i++) sim.spawnPickup('coin', e.x, e.y, 10);
+    for (let i = 0; i < 5; i++) sim.spawnPickup('coin', e.x, e.y, 4);
   }
-  if (e.elite && r.chance(0.6)) sim.spawnPickup('chest', e.x, e.y);
+  if (e.elite && r.chance(0.35)) sim.spawnPickup('chest', e.x, e.y);
+  if (e.alpha) {
+    sim.spawnPickup('chest', e.x, e.y);
+    sim.spawnPickup('rare-candy', e.x, e.y);
+    for (let i = 0; i < 6; i++) sim.spawnPickup('coin', e.x, e.y, 3);
+    sim.emit({ e: 'alphaDown', species: e.speciesId });
+  }
   if (e.boss) {
     sim.bossesDefeated++;
     if (killer) killer.bossKills++;
     sim.spawnPickup('chest', e.x, e.y);
-    for (let i = 0; i < 10; i++) sim.spawnPickup('coin', e.x, e.y, 8);
+    for (let i = 0; i < 10; i++) sim.spawnPickup('coin', e.x, e.y, 5);
     sim.spawnPickup('sitrus', e.x, e.y);
     if (e.final) sim.finalDefeated = true;
     sim.emit({ e: 'bossDown', species: e.speciesId, final: e.final });

@@ -66,15 +66,30 @@ export class Particles {
 
 // ─────────────────────────── damage numbers ───────────────────────────
 
-const DIGITS = '0123456789';
+/** Hand-drawn 5×7 pixel glyphs (digits plus "!"), outlined at build time. */
+const GLYPHS: Record<string, string[]> = {
+  '0': ['.###.', '#...#', '#..##', '#.#.#', '##..#', '#...#', '.###.'],
+  '1': ['..#..', '.##..', '..#..', '..#..', '..#..', '..#..', '.###.'],
+  '2': ['.###.', '#...#', '....#', '...#.', '..#..', '.#...', '#####'],
+  '3': ['####.', '....#', '....#', '.###.', '....#', '....#', '####.'],
+  '4': ['...#.', '..##.', '.#.#.', '#..#.', '#####', '...#.', '...#.'],
+  '5': ['#####', '#....', '####.', '....#', '....#', '#...#', '.###.'],
+  '6': ['.###.', '#....', '#....', '####.', '#...#', '#...#', '.###.'],
+  '7': ['#####', '....#', '...#.', '..#..', '.#...', '.#...', '.#...'],
+  '8': ['.###.', '#...#', '#...#', '.###.', '#...#', '#...#', '.###.'],
+  '9': ['.###.', '#...#', '#...#', '.####', '....#', '....#', '.###.'],
+  '!': ['..#..', '..#..', '..#..', '..#..', '..#..', '.....', '..#..'],
+};
+const CHARS = Object.keys(GLYPHS);
 type FontColor = 'white' | 'super' | 'weak' | 'crit' | 'heal' | 'hurt';
-const FONT_COLORS: Record<FontColor, [string, string]> = {
-  white: ['#ffffff', '#2a2a2a'],
-  super: ['#ffb347', '#5a2400'],
-  weak: ['#a8b0bd', '#26292e'],
-  crit: ['#ffe14d', '#6b3000'],
-  heal: ['#7dff8a', '#0d4016'],
-  hurt: ['#ff5a5a', '#3a0000'],
+/** [top fill, bottom fill, outline] — a two-tone fill gives the numbers a little depth. */
+const FONT_COLORS: Record<FontColor, [string, string, string]> = {
+  white: ['#ffffff', '#d6dbe8', '#1b1b24'],
+  super: ['#ffd27a', '#ff8a1f', '#4a1800'],
+  weak: ['#c3c9d4', '#8c94a3', '#202329'],
+  crit: ['#fff27a', '#ff5a2a', '#3a0600'],
+  heal: ['#a6ffaf', '#3fd457', '#0b3412'],
+  hurt: ['#ff8a8a', '#e02f2f', '#2e0000'],
 };
 
 class BitmapFont {
@@ -82,41 +97,42 @@ class BitmapFont {
   readonly gh = 9;
   sheets = new Map<FontColor, HTMLCanvasElement>();
   constructor() {
-    for (const [k, [fill, outline]] of Object.entries(FONT_COLORS) as [FontColor, [string, string]][]) {
+    for (const [k, [top, bottom, outline]] of Object.entries(FONT_COLORS) as [FontColor, [string, string, string]][]) {
       const c = document.createElement('canvas');
-      c.width = this.gw * DIGITS.length;
+      c.width = this.gw * CHARS.length;
       c.height = this.gh;
       const g = c.getContext('2d')!;
-      g.font = 'bold 9px monospace';
-      g.textBaseline = 'top';
-      g.textAlign = 'center';
-      for (let i = 0; i < DIGITS.length; i++) {
-        const x = i * this.gw + this.gw / 2;
+      CHARS.forEach((ch, i) => {
+        const rows = GLYPHS[ch];
+        const ox = i * this.gw + 1, oy = 1;
         g.fillStyle = outline;
-        for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) g.fillText(DIGITS[i], x + ox, 0 + oy);
-        g.fillStyle = fill;
-        g.fillText(DIGITS[i], x, 0);
-      }
-      // binarize alpha so it stays crisp when scaled
-      const img = g.getImageData(0, 0, c.width, c.height);
-      for (let p = 3; p < img.data.length; p += 4) img.data[p] = img.data[p] > 90 ? 255 : 0;
-      g.putImageData(img, 0, 0);
+        for (let y = 0; y < 7; y++) for (let x = 0; x < 5; x++) {
+          if (rows[y][x] !== '#') continue;
+          g.fillRect(ox + x - 1, oy + y - 1, 3, 3);
+        }
+        for (let y = 0; y < 7; y++) for (let x = 0; x < 5; x++) {
+          if (rows[y][x] !== '#') continue;
+          g.fillStyle = y < 4 ? top : bottom;
+          g.fillRect(ox + x, oy + y, 1, 1);
+        }
+      });
       this.sheets.set(k, c);
     }
   }
   draw(g: CanvasRenderingContext2D, text: string, x: number, y: number, color: FontColor, scale: number) {
     const sheet = this.sheets.get(color)!;
     const w = (this.gw - 1) * scale;
-    let cx = x - (text.length * w) / 2;
+    let cx = Math.round(x - (text.length * w) / 2);
+    const cy = Math.round(y);
     for (const ch of text) {
-      const i = ch.charCodeAt(0) - 48;
-      if (i >= 0 && i < 10) g.drawImage(sheet, i * this.gw, 0, this.gw, this.gh, cx, y, this.gw * scale, this.gh * scale);
+      const i = CHARS.indexOf(ch);
+      if (i >= 0) g.drawImage(sheet, i * this.gw, 0, this.gw, this.gh, cx, cy, this.gw * scale, this.gh * scale);
       cx += w;
     }
   }
 }
 
-interface Num { x: number; y: number; text: string; color: FontColor; t: number; life: number; scale: number }
+interface Num { x: number; y: number; text: string; color: FontColor; t: number; life: number; scale: number; crit: boolean }
 interface Label { x: number; y: number; text: string; color: string; t: number; life: number }
 
 export class DamageNumbers {
@@ -131,11 +147,14 @@ export class DamageNumbers {
       this.nums.shift();
     }
     const color: FontColor = crit ? 'crit' : eff > 1 ? 'super' : eff < 1 ? 'weak' : 'white';
-    this.nums.push({ x: x + (Math.random() - 0.5) * 8, y, text: String(value), color, t: 0, life: 0.65, scale: crit || eff > 1 ? 1.25 : 1 });
+    this.nums.push({
+      x: x + (Math.random() - 0.5) * 10, y, text: crit ? `${value}!` : String(value), color, t: 0,
+      life: crit ? 0.9 : 0.7, scale: crit ? 2 : eff > 1 ? 1.5 : eff < 1 ? 1 : 1.5, crit,
+    });
   }
 
   addPlayer(x: number, y: number, value: number, heal: boolean) {
-    this.nums.push({ x, y, text: String(Math.round(value)), color: heal ? 'heal' : 'hurt', t: 0, life: 0.8, scale: 1.2 });
+    this.nums.push({ x, y, text: String(Math.round(value)), color: heal ? 'heal' : 'hurt', t: 0, life: 0.8, scale: 1.5, crit: false });
   }
 
   label(x: number, y: number, text: string, color: string) {
@@ -153,12 +172,27 @@ export class DamageNumbers {
   draw(g: CanvasRenderingContext2D) {
     for (const n of this.nums) {
       const k = n.t / n.life;
-      const pop = k < 0.15 ? 1 + (0.15 - k) * 4 : 1;
       g.globalAlpha = k > 0.7 ? 1 - (k - 0.7) / 0.3 : 1;
+      if (n.crit) {
+        // Crits slam in big, bounce, and shoot a starburst behind them.
+        const pop = k < 0.12 ? 1.6 - k * 5 : k < 0.22 ? 1 + (0.22 - k) * 1.5 : 1;
+        const rise = k < 0.2 ? 0 : (k - 0.2) * 16;
+        if (k < 0.35) {
+          const r = 6 + k * 40;
+          g.fillStyle = `rgba(255,240,150,${0.9 - k * 2.4})`;
+          for (let i = 0; i < 8; i++) {
+            const a = (i / 8) * Math.PI * 2 + n.x;
+            g.fillRect(Math.round(n.x + Math.cos(a) * r) - 1, Math.round(n.y + 6 + Math.sin(a) * r * 0.7) - 1, 2, 2);
+          }
+        }
+        this.font.draw(g, n.text, n.x, n.y - rise - 4 * (pop - 1), n.color, n.scale * pop);
+        continue;
+      }
+      const pop = k < 0.15 ? 1 + (0.15 - k) * 3 : 1;
       this.font.draw(g, n.text, n.x, n.y - k * 14, n.color, n.scale * pop);
     }
     g.globalAlpha = 1;
-    g.font = '8px "Press Start 2P", monospace';
+    g.font = '6px "Press Start 2P", monospace';
     g.textAlign = 'center';
     for (const l of this.labels) {
       const k = l.t / l.life;

@@ -3,6 +3,9 @@ import { Sim, DT } from '../src/game/sim.ts';
 import { metaBonuses } from '../src/meta/shop.ts';
 import { botChoose, botSteer } from '../src/game/bot.ts';
 import { LINES } from '../src/data/pokedex.ts';
+import { xpForLevel } from '../src/game/sim.ts';
+import { generateOffers } from '../src/game/levelup.ts';
+import { Rng } from '../src/engine/math.ts';
 
 const stage = process.argv[2] ?? 'viridian';
 const secs = +(process.argv[3] ?? 900);
@@ -16,6 +19,9 @@ for (const lineId of lines) {
   const sim = new Sim({ stageId: stage, seed: 7, players: [{ name: 'bot', lineId, shiny: false, meta: metaBonuses(shop), tms: [] }] });
   let maxEnemies = 0, worstStep = 0, steps = 0;
   const bossLog: string[] = [];
+  const minutes: string[] = [];
+  let nextMin = 60, lastKills = 0, lastTaken = 0, completeAt = -1, megaCount = 0;
+  const xpTotal = () => { let t = sim.xp; for (let l = 1; l < sim.level; l++) t += xpForLevel(l); return t; };
   let steerT = 0;
   let steer = { x: 0, y: 0 };
   while (sim.time < secs) {
@@ -34,7 +40,16 @@ for (const lineId of lines) {
     sim.update(DT);
     worstStep = Math.max(worstStep, performance.now() - s0);
     steps++;
+    if (sim.time >= nextMin) {
+      const p0 = sim.players[0];
+      minutes.push(`${nextMin / 60}m:L${sim.level}/xp${Math.round(xpTotal())}/k${sim.kills - lastKills}/dmg${Math.round(p0.dmgTaken - lastTaken)}`);
+      lastKills = sim.kills; lastTaken = p0.dmgTaken; nextMin += 60;
+      if (completeAt < 0 && generateOffers(p0, new Rng(1), 6, []).every((o) => o.kind === "vitamin" || o.kind === "heal" || (o.kind === "moveUp" && o.level > 8))) { completeAt = sim.time; console.log(p0.moves.map((m) => m.id + m.level).join(), p0.items.map((i) => i.id + i.level).join()); }
+    }
     for (const ev of sim.events) {
+      if ((ev as { e: string }).e === 'mega') megaCount++;
+      if ((ev as { e: string }).e === 'megaStone') bossLog.push(`STONE@${(sim.time / 60).toFixed(1)}`);
+      if ((ev as { e: string }).e === 'alphaDown') bossLog.push(`ALPHA@${(sim.time / 60).toFixed(1)}`);
       if (ev.e === 'boss') bossLog.push(`${ev.species}@${(sim.time / 60).toFixed(1)}`);
       if (ev.e === 'bossDown') bossLog.push(`X${ev.species}@${(sim.time / 60).toFixed(1)}`);
     }
@@ -47,5 +62,7 @@ for (const lineId of lines) {
     `${lineId.padEnd(11)} ${sim.phase.padEnd(7)} t=${(sim.time / 60).toFixed(1)}m lvl=${sim.level} kills=${sim.kills} bosses=${sim.bossesDefeated} ` +
     `$=${sim.money} sp=${p.speciesId} maxEn=${maxEnemies} step=${ms.toFixed(2)}ms worst=${worstStep.toFixed(1)}ms\n   moves: ${p.moves.map((m) => `${m.id}${m.level}(${Math.round(m.dmgDealt / 1000)}k)`).join(' ')}\n   items: ${p.items.map((i) => i.id + i.level).join(' ')}`,
   );
+  console.log(`   ${minutes.join(' ')}
+   build complete @ ${completeAt < 0 ? '-' : (completeAt / 60).toFixed(1) + 'm'}  megas=${megaCount}`);
   console.log(`   hp=${Math.round(p.hp)}/${Math.round(p.stats.maxHp)} taken=${Math.round(p.dmgTaken)} bosses: ${bossLog.join(' ')}`);
 }

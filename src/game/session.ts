@@ -80,6 +80,7 @@ export class LocalSession implements RunSession {
       if (this.firstHit === Infinity && me.dmgTaken > 0) this.firstHit = this.sim.time;
       this.onTick?.();
     }
+    this.sim.alpha = this.acc / DT;
   }
 
   drainEvents() {
