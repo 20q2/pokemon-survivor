@@ -4,7 +4,7 @@ import { assets } from '../render/assets.ts';
 import type { RunSession } from '../game/session.ts';
 import type { Player } from '../game/types.ts';
 import { RUN_LENGTH, type BossDef } from '../data/stages.ts';
-import { fmtTime, h, img, uiIcon } from './dom.ts';
+import { fmtTime, h, img, minuteFlipped, uiIcon } from './dom.ts';
 import { hideTip, itemSlot, moveSlot, tipped, vitaminTip } from './tips.ts';
 import { Minimap } from './minimap.ts';
 import { DamageMeter } from './meter.ts';
@@ -16,6 +16,7 @@ export class Hud {
   private xpFill!: HTMLDivElement;
   private lv!: HTMLDivElement;
   private timer!: HTMLDivElement;
+  private lastTime = -1;
   private stats!: HTMLDivElement;
   private left!: HTMLDivElement;
   private boss!: HTMLDivElement;
@@ -189,6 +190,13 @@ export class Hud {
     this.lv.textContent = `Lv ${w.level}`;
     const remaining = RUN_LENGTH - w.time;
     this.timer.textContent = remaining > 0 ? fmtTime(w.time) : `${fmtTime(w.time)}`;
+    if (minuteFlipped(this.lastTime, w.time)) {
+      // Restart the CSS animation: drop the class, force reflow, re-add.
+      this.timer.classList.remove('pulse');
+      void this.timer.offsetWidth;
+      this.timer.classList.add('pulse');
+    }
+    this.lastTime = w.time;
     this.timer.style.color = remaining <= 30 && remaining > 0 ? '#ff7b7b' : '#fff';
     this.stats.innerHTML = '';
     this.stats.append(

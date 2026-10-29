@@ -14,7 +14,7 @@ import { loadSave, storeSave, type SaveData } from './meta/save.ts';
 import { metaBonuses } from './meta/shop.ts';
 import { assets } from './render/assets.ts';
 import { Renderer } from './render/renderer.ts';
-import { banner, MenuNav, toast, uiIcon } from './ui/dom.ts';
+import { banner, MenuNav, notice, toast, uiIcon, waveBanner } from './ui/dom.ts';
 import { chestShow, preloadChestFaces, type ChestShow } from './ui/chest.ts';
 import { CHEST_BALL, CHEST_NAME } from './game/types.ts';
 import { Hud } from './ui/hud.ts';
@@ -330,6 +330,14 @@ export class App {
         banner(ev.text, false, 2200);
         audio.sfx('warn');
         break;
+      case 'wave':
+        waveBanner(ev.text, assets.portraitUrl(ev.species), 2200);
+        audio.sfx('wave');
+        break;
+      case 'toast':
+        notice(ev.text);
+        audio.sfx('tick');
+        break;
       case 'faint':
         audio.sfx('faint');
         if (ev.player === me && s.coop) banner('You fainted! Stand by a teammate to be revived.', false, 3500);
@@ -372,11 +380,11 @@ export class App {
       case 'poi':
         if (ev.kind === 'cache') toast('Itemfinder', 'Something is buried nearby. Check the map!', assets.itemUrl('dowsing-machine'));
         else if (ev.kind === 'mega-stone') { banner('A MEGA STONE is shining somewhere! Check the map!', false, 3200); audio.sfx('shiny'); }
-        else toast('Alpha spotted!', `An Alpha ${SPECIES[ev.species!].name} roams nearby. Defeat it for big rewards!`, uiIcon('alpha'));
+        else notice(`Alpha ${SPECIES[ev.species!].name} spotted nearby!`);
         break;
       case 'alphaDown':
         this.alphasDown++;
-        banner(`The Alpha ${SPECIES[ev.species].name.toUpperCase()} was defeated!`, false, 2400);
+        notice(`The Alpha ${SPECIES[ev.species].name} was defeated!`);
         audio.sfx('chest');
         break;
       case 'shiny':

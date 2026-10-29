@@ -85,6 +85,11 @@ export function cap(s: string) {
   return s ? s[0].toUpperCase() + s.slice(1) : s;
 }
 
+/** True when the whole-minute count differs; prev < 0 means no sample yet. */
+export function minuteFlipped(prev: number, cur: number) {
+  return prev >= 0 && Math.floor(cur / 60) !== Math.floor(prev / 60);
+}
+
 export function fmtTime(sec: number) {
   const s = Math.max(0, Math.floor(sec));
   return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
@@ -216,4 +221,22 @@ export function banner(text: string, boss = false, ms = 2600) {
   box.appendChild(h('div', { class: `dialog${boss ? ' boss' : ''}` }, text));
   clearTimeout(bannerTimer);
   bannerTimer = window.setTimeout(() => { box.innerHTML = ''; }, ms);
+}
+
+/** Minute-change banner: species sprite plus a line, styled apart from the red alert banner. */
+export function waveBanner(text: string, sprite: string, ms = 2200) {
+  const box = document.getElementById('banner')!;
+  box.innerHTML = '';
+  box.appendChild(h('div', { class: 'dialog wave' }, img(sprite, 'px'), text));
+  clearTimeout(bannerTimer);
+  bannerTimer = window.setTimeout(() => { box.innerHTML = ''; }, ms);
+}
+
+/** Quiet one-line notice under the banner; never replaces or blocks it. */
+let noticeTimer = 0;
+export function notice(text: string, ms = 2800) {
+  const box = document.getElementById('notice')!;
+  box.replaceChildren(h('div', { class: 'notice' }, text));
+  clearTimeout(noticeTimer);
+  noticeTimer = window.setTimeout(() => box.replaceChildren(), ms);
 }
