@@ -292,7 +292,12 @@ export type GameEvent =
   | { e: 'boom'; x: number; y: number; r: number; type: PType }
   | { e: 'faint'; player: number }
   | { e: 'revive'; player: number }
+  /** Red alert banner: swarms, rings and other set pieces that need the player's eyes now. */
   | { e: 'warn'; text: string }
+  /** Quiet notice (treasure carrier, Alpha sighted…): a small toast, no alarm sound. */
+  | { e: 'toast'; text: string }
+  /** A new minute wave began: `species` is its headline newcomer (sprite for the banner), `text` the line to show. */
+  | { e: 'wave'; minute: number; species: string; text: string }
   | { e: 'status'; x: number; y: number; kind: StatusKind }
   | { e: 'shiny'; x: number; y: number }
   | { e: 'repel' }
