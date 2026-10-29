@@ -553,6 +553,13 @@ function alphaAI(sim: Sim, e: Enemy, target: Player, d: number, dx: number, dy: 
   const hx = e.homeX - e.x, hy = e.homeY - e.y;
   const hd = Math.hypot(hx, hy) || 1;
   e.ai -= dt;
+  if (e.aiState === 2) {
+    // Walking home after being lured too far: a partner that follows it re-provokes it;
+    // otherwise it reaches its territory fully recovered and settles down again.
+    if (d < 250) { e.aiState = 1; e.ai = 1.5; }
+    else if (hd < 110) { e.aiState = 0; e.hp = e.maxHp; e.ai = 0; }
+    else return { x: hx / hd, y: hy / hd, speed: 1 };
+  }
   if (e.aiState === 0) {
     if (d < 250 || e.hp < e.maxHp) {
       e.aiState = 1;
@@ -568,8 +575,8 @@ function alphaAI(sim: Sim, e: Enemy, target: Player, d: number, dx: number, dy: 
     return { x: e.aiX, y: e.aiY, speed: 0.25 };
   }
   if (hd > 950) {
-    // Lured too far: give up, go home and recover.
-    e.aiState = 0;
+    // Lured too far: give up and walk home (it heals fully once it gets there).
+    e.aiState = 2;
     e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.3);
     return { x: hx / hd, y: hy / hd, speed: 1 };
   }

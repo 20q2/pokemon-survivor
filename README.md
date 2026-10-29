@@ -84,6 +84,7 @@ their own upgrades, fainted teammates are revived by standing next to them.
 | `src/ui/` | DOM menus, HUD, level-up cards, lobby; keyboard/gamepad menu navigation |
 | `src/meta/` | Save data, shop, achievements, run → save progression |
 | `scripts/balance.ts` | Headless balance runs with a kiting bot (`node scripts/balance.ts mtmoon 900`) |
+| `scripts/pacing.ts` | Pacing telemetry for a headless run: level-up gaps, enemies alive / in view, hits per second (`node scripts/pacing.ts viridian charmander 900`) |
 | `scripts/*.mjs` | Playwright screenshot / flow / co-op / perf checks (uses installed Edge) |
 | `scripts/render-music.mjs` | Renders every song with the real synth (levels report + optional WAVs) |
 | `scripts/sfx-levels.mjs` | Renders every sound effect with the real synth and prints peak/RMS |
