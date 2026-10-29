@@ -55,8 +55,12 @@ const midiHz = (m: number) => 440 * Math.pow(2, (m - 69) / 12);
 
 /** Pentatonic semitone offsets for the kill streak; the top (a 12th up) stays near 1.2 kHz. */
 export const KILL_LADDER = [0, 2, 4, 7, 9, 12, 14, 16, 19];
-/** Combo steps lost per second: a lull of 0.4 s drops ~2 steps, so a lone kill is plain again. */
-const KILL_DRAIN = 6;
+/**
+ * Combo steps lost per second. Each played kill adds 1, so kills closer than 1/2.5 = 0.4 s apart
+ * climb (slowly near 0.4 s, fast near the 0.06 s gate), slower ones hold at the bottom, and a 1 s
+ * lull drops 2.5 steps.
+ */
+const KILL_DRAIN = 2.5;
 export const drainKillCombo = (combo: number, dt: number) => Math.max(0, combo - Math.max(0, dt) * KILL_DRAIN);
 export const killStep = (combo: number) => Math.min(KILL_LADDER.length - 1, Math.floor(combo));
 

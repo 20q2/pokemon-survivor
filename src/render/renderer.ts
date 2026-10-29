@@ -1520,9 +1520,9 @@ function inView(x: number, y: number, L: number, T: number, W: number, H: number
   return x > L - m && x < L + W + m && y > T - m && y < T + H + m;
 }
 
-/** Camera zoom multiplier per evolution stage of the local partner. */
 /** Sprite sheet row facing the camera (kill events carry no heading). */
 const DOWN_ROW = dirRow(0, 1);
+/** Camera zoom multiplier per evolution stage of the local partner. */
 const EVO_ZOOM = [1, 0.9, 0.8];
 /** Partners draw larger as they evolve (cosmetic; hitboxes are unchanged). With EVO_ZOOM the
  * partner keeps roughly its on-screen size while the world around it shrinks. */
