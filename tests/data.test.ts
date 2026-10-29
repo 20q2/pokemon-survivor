@@ -112,10 +112,34 @@ describe('data integrity', () => {
   });
 
   it('wave quotas follow the shared non-monotonic table', () => {
-    const table = [12, 25, 45, 35, 25, 10, 60, 90, 30, 10, 200, 40, 150, 120, 220, 260];
+    const table = [15, 35, 75, 60, 45, 10, 110, 150, 60, 10, 260, 70, 220, 190, 280, 300];
     for (const st of STAGES) {
       expect(st.waves.map((w) => w.min), st.id).toEqual(table);
       for (const w of st.waves) if (w.elite) expect(st.elites, st.id).toContain(w.elite);
+    }
+  });
+});
+
+describe('wave set pieces', () => {
+  const RING_MINUTES = [5, 9, 13];
+  const SWARM_MINUTES = [2, 4, 7, 11, 14];
+  it('events live only in the authored minutes, on every stage', () => {
+    for (const st of STAGES) {
+      const withEvents = st.waves.flatMap((w, m) => (w.events?.length ? [m] : []));
+      expect(withEvents, st.id).toEqual([...RING_MINUTES, ...SWARM_MINUTES].sort((a, b) => a - b));
+      for (const m of RING_MINUTES) expect(st.waves[m].events!.map((e) => e.kind), `${st.id} m${m}`).toEqual(['ring']);
+      for (const m of SWARM_MINUTES) expect(st.waves[m].events!.map((e) => e.kind), `${st.id} m${m}`).toEqual(['swarm']);
+    }
+  });
+  it('ring minutes are the breathing minutes and every event ends inside its minute', () => {
+    for (const st of STAGES) {
+      for (const m of RING_MINUTES.slice(0, 2)) expect(st.waves[m].min, `${st.id} m${m}`).toBe(10);
+      for (const [m, w] of st.waves.entries()) {
+        for (const ev of w.events ?? []) {
+          const end = ev.kind === 'swarm' ? ev.at + (ev.repeats ?? 0) * (ev.every ?? 0) : ev.at + ev.duration;
+          expect(end, `${st.id} m${m}`).toBeLessThan(60);
+        }
+      }
     }
   });
 });

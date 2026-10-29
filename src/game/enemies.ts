@@ -1,5 +1,5 @@
 import { SPECIES } from '../data/pokedex.ts';
-import { ENEMY_ROLE, RUN_LENGTH, type BossDef, type EnemyRole, type SpawnEntry, type WaveDef, waveAt } from '../data/stages.ts';
+import { ENEMY_ROLE, RUN_LENGTH, type BossDef, type EnemyRole, type SpawnEntry, type WaveDef, type WaveEvent, waveAt } from '../data/stages.ts';
 import { TAU, dist2 } from '../engine/math.ts';
 import { freshStatus, makeProjectile, rawDamageEnemy } from './combat.ts';
 import { megaOnKill } from './mega.ts';
@@ -16,6 +16,8 @@ export interface SpawnOpts {
   elite?: boolean;
   boss?: BossDef;
   swarmDir?: { x: number; y: number };
+  /** Slow-closing wall member: walks at `speed` px/s toward the nearest player, vanishes after `ttl` s. */
+  wall?: { speed: number; ttl: number };
   shiny?: boolean;
   alpha?: boolean;
   /** Guards map treasure: drops no treasure of its own. */
@@ -29,10 +31,10 @@ export class Spawner {
   private pendingElites: { at: number; species: string }[] = [];
   private nextTreasure = 100;
   private nextItemBall = 40;
-  private events: { at: number; kind: 'swarm' | 'ring' }[] = [
-    { at: 150, kind: 'swarm' }, { at: 240, kind: 'ring' }, { at: 450, kind: 'swarm' }, { at: 540, kind: 'ring' },
-    { at: 690, kind: 'swarm' }, { at: 780, kind: 'ring' }, { at: 840, kind: 'swarm' },
-  ];
+  /** The current minute's set pieces as absolute firing times (rebuilt whenever the minute changes). */
+  private pendingEvents: { at: number; ev: WaveEvent }[] = [];
+  private nextOvertime = 0;
+  private overtimeRing = false;
   private bossIdx = 0;
   /** Far-off treasure on the map (shown on the minimap); guardians appear as you get close. */
   private pois: { kind: 'cache' | 'mega-stone'; id: number; x: number; y: number; guarded: boolean }[] = [];
@@ -93,15 +95,7 @@ export class Spawner {
       sim.spawnPickup(kind, p.x + Math.cos(a) * d, p.y + Math.sin(a) * d, kind === 'coin' ? 10 : 1);
     }
     this.updatePois(t);
-    while (this.events.length && t >= this.events[0].at) {
-      const ev = this.events.shift()!;
-      if (ev.kind === 'swarm') this.swarm();
-      else this.ring();
-    }
-    // From the midgame on, keep the set-pieces coming (faster still in overtime).
-    if (t >= 600 && this.events.length === 0) {
-      this.events.push({ at: t + (t >= RUN_LENGTH ? 35 : 55), kind: sim.rng.chance(0.5) ? 'swarm' : 'ring' });
-    }
+    this.updateEvents(t);
     const bosses = sim.stage.bosses;
     if (this.bossIdx < bosses.length && t >= bosses[this.bossIdx].at) {
       const b = bosses[this.bossIdx++];
@@ -116,9 +110,15 @@ export class Spawner {
     const { idx, wave: w } = waveAt(sim.stage, t);
     const n = sim.players.length;
     if (idx !== this.waveIdx) {
-      const prev = sim.stage.waves[this.waveIdx];
+      const prev = sim.stage.waves[Math.max(0, idx - 1)];
       this.waveIdx = idx;
       this.nextQuota = t; // the new minute's quota lands with its banner
+      this.pendingEvents = [];
+      for (const ev of w.events ?? []) {
+        const swarm = ev.kind === 'swarm' ? ev : undefined;
+        for (let k = 0; k <= (swarm?.repeats ?? 0); k++) this.pendingEvents.push({ at: idx * 60 + ev.at + k * (swarm?.every ?? 0), ev });
+      }
+      this.pendingEvents.sort((x, y) => x.at - y.at);
       if (idx > 0) {
         const species = w.headline ?? (w.species.find((e) => !prev.species.some((p) => p.species === e.species)) ?? w.species[0]).species;
         sim.emit({ e: 'wave', minute: idx, species, text: w.text ?? `${SPECIES[species].name} appear!` });
@@ -136,7 +136,7 @@ export class Spawner {
     this.nextQuota = t + w.interval;
     // Only filler counts toward the quota; set pieces and carriers have their own pacing.
     let alive = 0;
-    for (const e of sim.enemies) if (e.alive && !e.boss && !e.elite && !e.alpha && e.role !== 'treasure' && e.aiState !== 9) alive++;
+    for (const e of sim.enemies) if (e.alive && !e.boss && !e.elite && !e.alpha && e.role !== 'treasure' && e.aiState !== 9 && e.aiState !== 10) alive++;
     const min = Math.round(w.min * (1 + 0.35 * (n - 1)) * (sim.elite ? 1.25 : 1));
     if (alive < min) {
       // Instant backfill; spawnEnemy stops at MAX_ENEMIES.
@@ -146,6 +146,22 @@ export class Spawner {
     } else {
       for (const e of w.species) this.spawnOffscreen(e.species);
     }
+  }
+
+  /** Fires the wave's set pieces once each; past the run's end a bare minute gets an alternating swarm/ring. */
+  private updateEvents(t: number) {
+    while (this.pendingEvents.length && t >= this.pendingEvents[0].at) {
+      const { ev } = this.pendingEvents.shift()!;
+      if (ev.kind === 'swarm') this.swarm();
+      else this.ring(ev.duration);
+    }
+    if (t < RUN_LENGTH || this.wave.events?.length) return;
+    if (this.nextOvertime === 0) this.nextOvertime = t;
+    if (t < this.nextOvertime) return;
+    this.nextOvertime = t + 35;
+    this.overtimeRing = !this.overtimeRing;
+    if (this.overtimeRing) this.ring(40);
+    else this.swarm();
   }
 
   private updatePois(t: number) {
@@ -246,16 +262,17 @@ export class Spawner {
     }
   }
 
-  private ring() {
+  /** A wall of the wave's main species on an ellipse around the anchor, all walking slowly inward. */
+  private ring(duration: number) {
     const sim = this.sim;
     const p = this.anchor();
     const count = 26 + Math.floor(this.minute * 2);
-    const species = sim.rng.weighted(this.wave.species, (e: SpawnEntry) => e.w)!.species;
+    const species = this.wave.species.reduce((best, e) => (e.w > best.w ? e : best)).species;
     sim.emit({ e: 'warn', text: 'You’re surrounded!' });
-    const r = Math.max(p.viewW, p.viewH) * 0.42;
+    const r = Math.max(p.viewW, p.viewH) * 0.6;
     for (let i = 0; i < count; i++) {
       const a = (i / count) * TAU;
-      spawnEnemy(sim, species, p.x + Math.cos(a) * r, p.y + Math.sin(a) * r * 0.75);
+      spawnEnemy(sim, species, p.x + Math.cos(a) * r, p.y + Math.sin(a) * r * 0.75, { wall: { speed: sim.rng.range(25, 35), ttl: duration } });
     }
   }
 }
@@ -288,6 +305,10 @@ export function spawnEnemy(sim: Sim, speciesId: string, x: number, y: number, op
   if (opts.alpha) {
     hp *= 44; dmg *= 1.8; xp = 80; scale = 2.1; radius = 19; knockResist = 0.95; speed = Math.min(118, speed * 1.1);
   }
+  if (opts.wall) {
+    // Pushing through is worth it: three times a tank's hp for tank xp; walls ignore separation shoves.
+    hp = (4 + bhp * 0.12) * ROLE_HP.tank * 3 * sim.spawner.hpMult(); xp = 2; knockResist = 0.6; speed = opts.wall.speed;
+  }
   if (role === 'treasure') { speed = Math.max(speed, 80); xp = 5; }
   if (shiny) { hp *= 3; xp *= 5; }
   const e: Enemy = {
@@ -295,11 +316,12 @@ export function spawnEnemy(sim: Sim, speciesId: string, x: number, y: number, op
     hp, maxHp: hp, speed, dmg, special: bspa > batk, xp, elite: !!opts.elite, boss: !!opts.boss,
     final: !!opts.boss?.final, shiny, alpha: !!opts.alpha, guardian: !!opts.guardian, homeX: x, homeY: y, alive: true, flash: 0,
     st: freshStatus(),
-    contactCd: 0, ai: sim.rng.range(0, 2), aiState: opts.swarmDir ? 9 : 0, aiX: opts.swarmDir?.x ?? 0, aiY: opts.swarmDir?.y ?? 0,
+    contactCd: 0, ai: sim.rng.range(0, 2), aiState: opts.swarmDir ? 9 : opts.wall ? 10 : 0, aiX: opts.swarmDir?.x ?? 0, aiY: opts.swarmDir?.y ?? 0,
     patterns: opts.boss?.patterns ?? [], patternIdx: 0, minions: opts.boss?.minions ?? [], knockResist, scale,
     lastHitBy: 0, animOffset: sim.rng.range(0, 10),
   };
   if (opts.swarmDir) { e.speed = Math.max(e.speed, 85); e.ai = 14; }
+  if (opts.wall) e.ai = opts.wall.ttl;
   sim.enemies.push(e);
   sim.seenSpecies.add(speciesId);
   if (shiny) sim.emit({ e: 'shiny', x, y });
@@ -400,6 +422,10 @@ export function updateEnemies(sim: Sim, dt: number) {
         mx = e.aiX; my = e.aiY;
         e.ai -= dt;
         if (e.ai <= 0) { e.alive = false; continue; }
+      } else if (e.aiState === 10) {
+        // wall: keep marching at the fixed slow speed (mx/my already point at the player), then give up
+        e.ai -= dt;
+        if (e.ai <= 0) { e.alive = false; continue; }
       } else if (e.elite && st.charm <= 0 && eliteRaid(sim, e, player, d, dt)) {
         mult = 0;
       } else if (st.charm <= 0) {
@@ -464,7 +490,7 @@ export function updateEnemies(sim: Sim, dt: number) {
     e.vy *= damp;
     if ((mx || my) && mult > 0) { e.dirX = mx; e.dirY = my; }
     // ─ recycle enemies left far behind
-    if (!e.boss && !e.alpha && e.aiState !== 9 && player) {
+    if (!e.boss && !e.alpha && e.aiState !== 9 && e.aiState !== 10 && player) {
       const lim = Math.max(player.viewW, player.viewH) * 0.9 + 150;
       if (Math.abs(e.x - player.x) > lim || Math.abs(e.y - player.y) > lim) {
         if (e.role === 'treasure') { e.alive = false; continue; }
@@ -531,6 +557,7 @@ function separate(sim: Sim, dt: number) {
         e.st.ffCd = 0.6;
         rawDamageEnemy(sim, o, Math.max(4, o.maxHp * 0.08), e.types[0], e.lastHitBy, e.st.charm > 0 ? 'disarming-voice' : 'confusion');
       }
+      if (e.aiState === 10) return; // walls hold their line against regulars
       const d = Math.sqrt(d2);
       const push = (rr - d) * 0.25;
       const wE = e.boss ? 0.05 : o.boss ? 1.6 : 1;
@@ -655,9 +682,11 @@ function eliteRaid(sim: Sim, e: Enemy, target: Player, d: number, dt: number): b
     return true;
   }
   if (e.role === 'bomber') return false;
+  // The first half of a run is pure crowd-shepherding; guardians keep their old tempo.
+  if (!e.guardian && sim.time < 360) return false;
   e.raidCd = (e.raidCd ?? sim.rng.range(2, 5)) - dt;
   if (e.raidCd > 0 || d > (e.role === 'ranged' ? 260 : 170) || e.st.freeze > 0 || e.st.flinch > 0) return false;
-  e.raidCd = sim.rng.range(5, 8);
+  e.raidCd = e.guardian ? sim.rng.range(5, 8) : sim.rng.range(12, 16);
   e.casting = castRaid(sim, e, eliteMove(e), target, 'elite');
   return true;
 }

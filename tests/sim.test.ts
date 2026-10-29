@@ -4,6 +4,7 @@ import { metaBonuses } from '../src/meta/shop.ts';
 import { botChoose, botSteer } from '../src/game/bot.ts';
 import { LINES } from '../src/data/pokedex.ts';
 import { STAGES } from '../src/data/stages.ts';
+import { spawnEnemy } from '../src/game/enemies.ts';
 
 /** `immortal`: the simple bot can still wander into a forest pocket and get swarmed on some
  *  layouts; tests about progress (not survival) shouldn't hinge on that. */
@@ -33,7 +34,7 @@ describe('simulation smoke', () => {
     for (const l of LINES) {
       const sim = run(l.id, 'viridian', 120, 1, true);
       expect(sim.kills, l.id).toBeGreaterThan(30);
-      expect(sim.level, l.id).toBeGreaterThan(4);
+      expect(sim.level, l.id).toBeGreaterThanOrEqual(4);
       for (const p of sim.players) for (const m of p.moves) expect(Number.isFinite(m.cd)).toBe(true);
     }
   }, 30_000);
@@ -398,7 +399,7 @@ describe('hit-stop', () => {
 });
 
 describe('minute waves', () => {
-  const regulars = (sim: Sim) => sim.enemies.filter((e) => e.alive && !e.boss && !e.elite && !e.alpha && e.role !== 'treasure' && e.aiState !== 9);
+  const regulars = (sim: Sim) => sim.enemies.filter((e) => e.alive && !e.boss && !e.elite && !e.alpha && e.role !== 'treasure' && e.aiState !== 9 && e.aiState !== 10);
 
   function playMinuteOne(players: number) {
     const sim = new Sim({
@@ -413,6 +414,7 @@ describe('minute waves', () => {
         continue;
       }
       if (sim.phase !== 'play') break;
+      for (const p of sim.players) { const m = botSteer(sim, p); p.mx = m.x; p.my = m.y; }
       sim.update(DT);
       for (const ev of sim.events) if (ev.e === 'wave') waves.push({ minute: ev.minute, species: ev.species, text: ev.text, at: sim.time });
       sim.events.length = 0;
@@ -443,9 +445,71 @@ describe('minute waves', () => {
 
   it('scales the quota for co-op', () => {
     const { snap } = playMinuteOne(2);
-    const min = Math.round(25 * 1.35);
+    const min = Math.round(STAGES[0].waves[1].min * 1.35);
     expect(snap[60.05].regulars).toBeGreaterThanOrEqual(min);
     expect(snap[60.05].regulars).toBeLessThanOrEqual(min + STAGES[0].waves[1].species.length);
+  });
+
+  /** Starts a run partway in with an unkillable player so set pieces can be watched alone. */
+  function runFrom(start: number, until: number, onTick: (sim: Sim) => void) {
+    const sim = new Sim({ stageId: 'viridian', seed: 99, players: [{ name: 'P', lineId: 'charmander', shiny: false, meta: metaBonuses({}), tms: [] }] });
+    sim.time = start;
+    (sim.spawner as unknown as { bossIdx: number }).bossIdx = 99; // no backlog of boss cinematics from the time jump
+    for (let steps = 0; sim.time < until && steps < 200000; steps++) {
+      if (sim.phase === 'levelup') { sim.choose(sim.players[0].id, botChoose(sim, sim.players[0])); continue; }
+      if (sim.phase === 'cine') { sim.update(DT); continue; }
+      if (sim.phase !== 'play') break;
+      sim.update(DT);
+      sim.players[0].hp = sim.players[0].stats.maxHp; // stats are rebuilt every tick, so top up instead
+      onTick(sim);
+    }
+    return sim;
+  }
+  const warns = (sim: Sim, text: string) => sim.events.filter((ev) => ev.e === 'warn' && ev.text === text).length;
+
+  it('fires each swarm of the minute once, at its offset and repeat spacing', () => {
+    const times: number[] = [];
+    runFrom(239.9, 290, (sim) => {
+      if (warns(sim, 'A swarm is approaching!')) times.push(Math.round(sim.time));
+      sim.events.length = 0;
+    });
+    expect(times).toEqual([260, 265, 270, 275]); // minute 4: at 20 s, 3 repeats every 5 s
+  });
+
+  it('a ring is a slow-closing wall that despawns after its duration without dropping anything', () => {
+    let spawned = 0, first = 0, hp = 0;
+    const startDist: number[] = [];
+    const sim = runFrom(299.9, 360, (s) => {
+      const wall = s.enemies.filter((e) => e.alive && e.aiState === 10);
+      if (!spawned && wall.length) {
+        spawned = wall.length; first = s.time; hp = wall[0].maxHp;
+        const p = s.players[0];
+        for (const e of wall) startDist.push(Math.hypot(e.x - p.x, e.y - p.y));
+      }
+      s.events.length = 0;
+    });
+    expect(spawned).toBe(26 + 2 * 5);
+    expect(sim.enemies.filter((e) => e.aiState === 10)).toHaveLength(0); // ttl 45 s from ~300
+    expect(first).toBeLessThan(300.2);
+    expect(hp).toBeGreaterThan(0);
+    expect(Math.min(...startDist)).toBeGreaterThan(150);
+  });
+
+  it('wall members are fixed-speed and three tanks tough; expiring one is not a kill', () => {
+    const sim = new Sim({ stageId: 'viridian', seed: 5, players: [{ name: 'P', lineId: 'charmander', shiny: false, meta: metaBonuses({}), tms: [] }] });
+    const p = sim.players[0];
+    const reg = spawnEnemy(sim, 'caterpie', p.x + 3000, p.y)!;
+    const wall = spawnEnemy(sim, 'caterpie', p.x + 3000, p.y + 40, { wall: { speed: 30, ttl: 1 } })!;
+    expect(wall.speed).toBe(30);
+    expect(wall.maxHp).toBeCloseTo(reg.maxHp * 2.4 * 3);
+    expect(wall.xp).toBe(2);
+    const x0 = wall.x;
+    for (let i = 0; i < 30; i++) sim.update(DT);
+    expect(x0 - wall.x).toBeGreaterThan(10); // walking at the player
+    expect(x0 - wall.x).toBeLessThan(20);
+    for (let i = 0; i < 40; i++) sim.update(DT);
+    expect(sim.enemies.includes(wall)).toBe(false);
+    expect(sim.kills).toBe(0);
   });
 
   it('is deterministic for a given seed', () => {

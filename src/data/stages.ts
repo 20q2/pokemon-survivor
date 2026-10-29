@@ -9,6 +9,14 @@ export type EnemyRole = 'chaser' | 'fast' | 'tank' | 'ranged' | 'bomber' | 'trea
 export type BossPattern = 'charge' | 'radial' | 'aimed' | 'summon' | 'slam' | 'spiral' | 'quake' | 'donut' | 'meteor' | 'beam' | 'cone' | 'cross';
 
 export interface SpawnEntry { species: string; w: number }
+/**
+ * A set piece inside a wave; `at` is seconds into the minute. A swarm (a line of crossers of the
+ * stage's `swarm` species) fires `1 + repeats` times, `every` seconds apart; a ring is a wall of the
+ * wave's dominant species that closes in slowly and gives up after `duration` seconds.
+ */
+export type WaveEvent =
+  | { kind: 'swarm'; at: number; repeats?: number; every?: number }
+  | { kind: 'ring'; at: number; duration: number };
 /** One minute of a stage: what spawns, how many regulars to keep alive, and how sturdy they are. */
 export interface WaveDef {
   species: SpawnEntry[];
@@ -23,6 +31,7 @@ export interface WaveDef {
   /** Species shown on the minute banner (defaults to the first newcomer). */
   headline?: string;
   text?: string;
+  events?: WaveEvent[];
 }
 export interface BossDef { species: string; at: number; patterns: BossPattern[]; final?: boolean; minions?: string[] }
 
@@ -54,7 +63,18 @@ export const ENEMY_ROLE: Record<string, EnemyRole> = {
 };
 
 /** Quota shape shared by every stage (after Vampire Survivors' Mad Forest); minutes 5 and 9 breathe. */
-export const WAVE_MIN = [12, 25, 45, 35, 25, 10, 60, 90, 30, 10, 200, 40, 150, 120, 220, 260];
+export const WAVE_MIN = [15, 35, 75, 60, 45, 10, 110, 150, 60, 10, 260, 70, 220, 190, 280, 300];
+/** Set pieces shared by every stage: rings own the breathing minutes (5, 9) and 13, swarms ramp up late. */
+export const WAVE_EVENTS: Record<number, WaveEvent[]> = {
+  2: [{ kind: 'swarm', at: 30, repeats: 1 }],
+  4: [{ kind: 'swarm', at: 20, repeats: 3, every: 5 }],
+  5: [{ kind: 'ring', at: 0, duration: 45 }],
+  7: [{ kind: 'swarm', at: 10, repeats: 3, every: 5 }],
+  9: [{ kind: 'ring', at: 0, duration: 45 }],
+  11: [{ kind: 'swarm', at: 15, repeats: 5, every: 4 }],
+  13: [{ kind: 'ring', at: 0, duration: 40 }],
+  14: [{ kind: 'swarm', at: 5, repeats: 6, every: 3 }],
+};
 export const WAVE_INTERVAL = [1, 1, 0.5, 0.5, 0.5, 0.25, 0.25, 0.25, 0.25, 0.25, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1];
 /** Roughly 1 + 0.15m + 0.025m^2 + 0.0025m^3 at whole minutes. */
 export const WAVE_HP = [1, 1.18, 1.42, 1.74, 2.16, 2.69, 3.34, 4.13, 5.08, 6.2, 7.5, 9, 10.7, 12.6, 14.7, 17.1];
@@ -82,6 +102,7 @@ function waves(elites: string[], minutes: string[], text: Record<number, string>
     min: WAVE_MIN[m], interval: WAVE_INTERVAL[m], hpTier: WAVE_HP[m],
     ...(ELITE_MINUTES.has(m) ? { elite: elites[ei++ % elites.length] } : {}),
     ...(text[m] ? { text: text[m] } : {}),
+    ...(WAVE_EVENTS[m] ? { events: WAVE_EVENTS[m] } : {}),
   }));
 }
 
