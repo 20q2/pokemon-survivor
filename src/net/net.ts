@@ -21,7 +21,7 @@ interface PlayerState {
 }
 
 type HostMsg =
-  | { t: 'lobby'; players: LobbyPlayer[]; stage: string; you: number }
+  | { t: 'lobby'; players: LobbyPlayer[]; stage: string; you: number; elite: boolean }
   | { t: 'start'; cfg: SimConfig; you: number }
   | { t: 'tick'; ph: Phase; cine: Cinematic | null; lv: number; xp: number; xn: number; m: number; k: number; b: number; tm: number;
       of: UpgradeOffer[] | null; wait: string[]; ev: GameEvent[]; np: unknown[][]; dp: number[]; nk: unknown[][]; dk: [number, number][]; ps?: PlayerState[] }
@@ -57,6 +57,7 @@ export class NetHost {
   private remotes = new Map<string, Remote>();
   lobbyInit: PlayerInit;
   stage = 'viridian';
+  elite = false;
   session: LocalSession | null = null;
   onLobby: (() => void) | null = null;
   onError: ((msg: string) => void) | null = null;
@@ -172,7 +173,7 @@ export class NetHost {
 
   broadcastLobby() {
     const players = this.lobbyPlayers();
-    for (const r of this.remotes.values()) this.send(r, { t: 'lobby', players, stage: this.stage, you: r.slot });
+    for (const r of this.remotes.values()) this.send(r, { t: 'lobby', players, stage: this.stage, you: r.slot, elite: this.elite });
     this.onLobby?.();
   }
 
@@ -190,7 +191,7 @@ export class NetHost {
     const remap = new Map<number, number>();
     slots.forEach((s, i) => { remap.set(s.slot, i); inits.push(bySlot.get(s.slot)!); });
     for (const r of this.remotes.values()) r.slot = remap.get(r.slot)!;
-    const cfg: SimConfig = { stageId: this.stage, players: inits, seed: (Math.random() * 2 ** 31) | 0 };
+    const cfg: SimConfig = { stageId: this.stage, elite: this.elite, players: inits, seed: (Math.random() * 2 ** 31) | 0 };
     const session = new LocalSession(cfg, true);
     this.session = session;
     session.sim.eventTap = (e) => this.evBuf.push(e);
@@ -293,6 +294,7 @@ export class NetClient {
   private ctl: DataConnection | null = null;
   private snap: DataConnection | null = null;
   slot = -1;
+  elite = false;
   lobby: LobbyPlayer[] = [];
   stage = 'viridian';
   onLobby: (() => void) | null = null;
@@ -336,7 +338,7 @@ export class NetClient {
     let msg: HostMsg;
     try { msg = JSON.parse(d); } catch { return; }
     switch (msg.t) {
-      case 'lobby': this.lobby = msg.players; this.stage = msg.stage; this.slot = msg.you; this.onLobby?.(); break;
+      case 'lobby': this.lobby = msg.players; this.stage = msg.stage; this.elite = msg.elite; this.slot = msg.you; this.onLobby?.(); break;
       case 'start': this.slot = msg.you; this.onStart?.(msg.cfg, msg.you); break;
       case 'tick': this.onTick?.(msg); break;
       case 'full': this.closed = true; this.onError?.(msg.reason); break;

@@ -23,6 +23,7 @@ export interface RunSummary {
   stabOnly: boolean;
   defeatedChansey: boolean;
   died: boolean;
+  elite: boolean;
 }
 
 export type Reward = { line: string } | { money: number } | { tm: string };
@@ -81,6 +82,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   A({ id: 'clear-tower', name: 'Ghostbuster', desc: 'Clear Pokémon Tower.', icon: 'spell-tag', reward: { money: 2500 }, check: (s) => cleared(s, 'tower') }),
   A({ id: 'clear-cinnabar', name: 'Fire Walker', desc: 'Clear Cinnabar Volcano.', icon: 'charcoal', reward: { money: 3000 }, check: (s) => cleared(s, 'cinnabar') }),
   A({ id: 'clear-cerulean', name: 'Champion', desc: 'Clear Cerulean Cave and defeat Mewtwo.', icon: 'master-ball', reward: { money: 5000 }, check: (s) => cleared(s, 'cerulean') }),
+  A({ id: 'elite-clear', name: 'Elite Four Material', desc: 'Clear any route in Elite mode.', icon: 'ultra-ball', reward: { money: 3000 }, check: (_s, r) => !!r && r.cleared && r.elite }),
   A({ id: 'clear-all-lines', name: 'Gotta Clear ’Em All', desc: 'Clear a stage with every Pokémon line.', icon: 'species:mewtwo', reward: { money: 10000 }, check: (s) => (s.flags?.clearedLines?.length ?? 0) >= 14 }),
 ];
 

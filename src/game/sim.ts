@@ -24,6 +24,8 @@ export interface PlayerInit {
 
 export interface SimConfig {
   stageId: string;
+  /** Elite mode: tougher, denser waves for more Poké Dollars. */
+  elite?: boolean;
   players: PlayerInit[];
   seed?: number;
 }
@@ -53,6 +55,7 @@ export function xpForLevel(level: number): number {
 
 export class Sim {
   readonly stage: StageDef;
+  readonly elite: boolean;
   readonly rng: Rng;
   readonly grid = new SpatialGrid<Enemy>(48);
   time = 0;
@@ -92,6 +95,7 @@ export class Sim {
 
   constructor(cfg: SimConfig) {
     this.stage = STAGE[cfg.stageId];
+    this.elite = !!cfg.elite;
     this.rng = new Rng(cfg.seed);
     this.spawner = new Spawner(this);
     cfg.players.forEach((pi, slot) => this.addPlayer(pi, slot));

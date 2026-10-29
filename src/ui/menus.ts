@@ -177,7 +177,7 @@ function stageSwatch(stage: (typeof STAGES)[number]) {
 export function stageScreen(app: App, lineId: string, onStart: (stageId: string) => void, onBack?: () => void) {
   const grid = h('div', { class: 'stages' });
   for (const st of STAGES) {
-    const open = stageUnlocked(app.save, st.id);
+    const open = stageUnlocked(app.save, st.id) && (!app.eliteMode || (app.save.cleared[st.id] ?? 0) > 0);
     const clears = app.save.cleared[st.id] ?? 0;
     const best = app.save.bestTimes[st.id];
     const stars = Math.round(st.difficulty * 1.5);
@@ -198,9 +198,14 @@ export function stageScreen(app: App, lineId: string, onStart: (stageId: string)
     grid.append(el);
   }
   const line = LINE[lineId];
+  const anyClear = Object.keys(app.save.cleared).length > 0;
+  const eliteToggle = anyClear ? h('label', { class: 'row panel', style: 'padding:8px 12px;margin-bottom:12px;gap:8px' },
+    h('input', { type: 'checkbox', class: 'toggle', checked: app.eliteMode, onchange: (e: Event) => { app.eliteMode = (e.target as HTMLInputElement).checked; app.show(stageScreen(app, lineId, onStart, onBack)); } }),
+    h('b', null, 'Elite mode'), h('span', { class: 'hint' }, 'Cleared routes only — tougher waves, ×1.75 ₽, ×1.5 friendship')) : null;
   return screen('',
     topbar('Choose a route', onBack ?? (() => app.show(selectScreen(app, (l) => app.show(stageScreen(app, l, onStart)))))),
     h('div', { class: 'hint', style: 'color:#fff;margin-bottom:12px' }, `Partner: ${line.name}. Routes are themed around types — bring moves that hit them super effectively!`),
+    eliteToggle,
     grid,
   );
 }
@@ -425,7 +430,7 @@ export function resultsScreen(app: App, data: { session: RunSession; summary: Ru
   const totalDmg = Math.max(1, me.dmgDealt);
   const title = r.cleared ? 'STAGE CLEAR!' : 'You blacked out…';
   return screen('',
-    h('div', { class: `big-title ${r.cleared ? 'win' : 'lose'}` }, title),
+    h('div', { class: `big-title ${r.cleared ? 'win' : 'lose'}` }, title, r.elite ? h('div', { class: 'hint', style: 'color:#ffd94a;font-size:12px;margin-top:8px' }, 'ELITE MODE') : null),
     h('div', { class: 'results' },
       h('div', { class: 'panel col' },
         h('div', { class: 'row' }, img(assets.portraitUrl(me.speciesId, me.shiny)), h('div', null, h('b', null, SPECIES[me.speciesId].name), h('div', { class: 'hint' }, data.session.stage.name))),
@@ -456,7 +461,7 @@ export function resultsScreen(app: App, data: { session: RunSession; summary: Ru
       ),
     ),
     h('div', { class: 'row mt', style: 'flex-wrap:wrap;justify-content:center' },
-      data.session.coop ? null : btn('Play again', () => void app.startSolo(r.lineId, r.stageId), 'primary', { 'data-autofocus': true }),
+      data.session.coop ? null : btn('Play again', () => void app.startSolo(r.lineId, r.stageId, r.elite), 'primary', { 'data-autofocus': true }),
       btn('Poké Mart', () => app.show(shopScreen(app))),
       btn('Main menu', () => app.goTitle(), '', { 'data-back': true }),
     ),

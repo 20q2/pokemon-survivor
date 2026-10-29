@@ -13,7 +13,7 @@ export interface RunRewards {
 }
 
 export function friendshipGain(r: RunSummary): number {
-  return Math.round(r.time / 60 * 8 + r.kills / 120 + r.bosses * 25 + (r.cleared ? 120 : 0) + r.evolutions * 10);
+  return Math.round((r.time / 60 * 8 + r.kills / 120 + r.bosses * 25 + (r.cleared ? 120 : 0) + r.evolutions * 10) * (r.elite ? 1.5 : 1));
 }
 
 /** End-of-run bonus on top of collected Poké Dollars. */
@@ -33,7 +33,7 @@ export function applyRun(save: SaveData, r: RunSummary, seen: Iterable<string>, 
   st.superEffective += r.superEff;
   st.maxLevel = Math.max(st.maxLevel, r.level);
   if (r.coop) st.coopRuns++;
-  const money = r.moneyEarned + runBonus(r);
+  const money = Math.round((r.moneyEarned + runBonus(r)) * (r.elite ? 1.75 : 1));
   save.money += money;
   st.moneyEarned += money;
   for (const s of seen) save.seen[s] = 1;

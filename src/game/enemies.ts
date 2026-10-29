@@ -46,12 +46,12 @@ export class Spawner {
   hpMult() {
     const m = this.minute;
     const n = this.sim.players.length;
-    return (1 + 0.14 * m + 0.022 * m * m) * this.stageFactor() * (1 + 0.65 * (n - 1));
+    return (1 + 0.14 * m + 0.022 * m * m) * this.stageFactor() * (1 + 0.65 * (n - 1)) * (this.sim.elite ? 1.6 : 1);
   }
 
   dmgMult() {
     const grace = Math.min(1, 0.55 + this.minute * 0.15);
-    return grace * (1 + 0.075 * this.minute) * (0.75 + 0.25 * this.stageFactor());
+    return grace * (1 + 0.075 * this.minute) * (0.75 + 0.25 * this.stageFactor()) * (this.sim.elite ? 1.3 : 1);
   }
 
   update(dt: number) {
@@ -60,8 +60,8 @@ export class Spawner {
     const m = this.minute;
     const n = sim.players.length;
     const finalUp = t >= RUN_LENGTH;
-    const target = Math.min(MAX_ENEMIES - 40, (24 + m * 26) * (1 + 0.35 * (n - 1))) * (finalUp ? 0.5 : 1);
-    const rate = (3 + m * 2.2) * (1 + 0.3 * (n - 1));
+    const target = Math.min(MAX_ENEMIES - 40, (24 + m * 26) * (1 + 0.35 * (n - 1)) * (sim.elite ? 1.25 : 1)) * (finalUp ? 0.5 : 1);
+    const rate = (3 + m * 2.2) * (1 + 0.3 * (n - 1)) * (sim.elite ? 1.25 : 1);
     const alive = sim.enemies.length;
     if (alive < target) {
       this.acc += rate * dt * (alive < target * 0.5 ? 2 : 1);

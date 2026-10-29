@@ -37,6 +37,8 @@ export class App {
   private endTimer = 0;
   private bossMusic = false;
   private autoT = 0;
+  /** Last chosen Elite-mode toggle. */
+  eliteMode = false;
   net: NetHost | NetClient | null = null;
   /** Called every frame (screens use it for sprite previews). */
   onFrame: ((dt: number) => void) | null = null;
@@ -147,11 +149,12 @@ export class App {
     for (const icon of ['exp-candy-s', 'exp-candy-m', 'exp-candy-l', 'exp-candy-xl', 'oran-berry', 'sitrus-berry', 'magnet', 'max-repel', 'poke-ball', 'rare-candy', 'nugget']) assets.itemImage(icon);
   }
 
-  async startSolo(lineId: string, stageId: string) {
+  async startSolo(lineId: string, stageId: string, elite = this.eliteMode) {
+    this.eliteMode = elite;
     this.save.lastLine = lineId;
     this.save.lastStage = stageId;
     this.persist();
-    const s = new LocalSession({ stageId, players: [this.playerInit(lineId)] });
+    const s = new LocalSession({ stageId, elite, players: [this.playerInit(lineId)] });
     await this.preload(s);
     this.beginSession(s);
   }

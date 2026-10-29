@@ -137,5 +137,6 @@ export function summarize(session: RunSession, p: Player, cleared: boolean, extr
     stabOnly: moveTypesOk && !!line,
     defeatedChansey: extra.defeatedChansey,
     died: extra.died,
+    elite: !!(session.world as { elite?: boolean }).elite,
   };
 }

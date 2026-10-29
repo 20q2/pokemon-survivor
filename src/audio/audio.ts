@@ -29,7 +29,7 @@ interface SongSpec {
   density?: number;    // melody note density 0..1
 }
 
-const SONGS: Record<string, SongSpec> = {
+export const SONGS: Record<string, SongSpec> = {
   title: { seed: 11, bpm: 132, root: 62, mode: 'major', prog: [0, 4, 5, 3, 0, 4, 3, 4], progB: [5, 3, 0, 4, 5, 3, 1, 4], drums: 'march', lead: 0.25, arp: true, bassStyle: 'bounce', density: 0.7 },
   menu: { seed: 5, bpm: 104, root: 65, mode: 'major', prog: [0, 5, 1, 4, 0, 5, 1, 4], progB: [3, 4, 2, 5, 3, 4, 1, 4], drums: 'soft', lead: 0.125, arp: true, bassStyle: 'walk', density: 0.55, swing: 0.12 },
   forest: { seed: 23, bpm: 128, root: 60, mode: 'major', prog: [0, 3, 4, 0, 5, 3, 1, 4], progB: [3, 4, 0, 5, 3, 4, 1, 4], drums: 'march', lead: 0.25, arp: true, bassStyle: 'bounce', density: 0.75 },
@@ -45,7 +45,7 @@ const SONGS: Record<string, SongSpec> = {
 
 interface Note { t: number; ch: 0 | 1 | 2 | 3; midi: number; dur: number; vol: number; duty?: number; drum?: 'kick' | 'snare' | 'hat' }
 
-function compose(spec: SongSpec): { notes: Note[]; length: number; step: number } {
+export function compose(spec: SongSpec): { notes: Note[]; length: number; step: number } {
   const rng = new Rng(spec.seed * 7919);
   const step = 60 / spec.bpm / 4; // 16th note
   const scale = SCALES[spec.mode];
