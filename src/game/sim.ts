@@ -482,8 +482,9 @@ export class Sim {
         }
       }
       if (!rewards.length) {
-        this.money += 60;
-        rewards.push({ kind: 'money', id: 'nugget', level: 60 });
+        const amount = Math.round(80 + this.time / 6);
+        this.money += amount;
+        rewards.push({ kind: 'money', id: 'nugget', level: amount });
       }
     }
     this.refreshStats();

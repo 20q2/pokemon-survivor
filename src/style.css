@@ -240,3 +240,10 @@ table.dmg td.n { text-align: right; font-variant-numeric: tabular-nums; }
 .credits-list div { break-inside: avoid; margin-bottom: 6px; }
 .center { text-align: center; }
 .mt { margin-top: 14px; }
+
+.lu-build { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; align-items: center; max-width: 900px; opacity: 0.95; }
+.lu-build .type { font-size: 8px; padding: 5px 7px 4px; }
+.lu-item { display: inline-flex; align-items: center; gap: 2px; background: rgba(255,255,255,0.85); border-radius: 6px; padding: 0 6px 0 0; font-family: var(--head); font-size: 8px; }
+.lu-item img { width: 24px; image-rendering: pixelated; }
+.matchup { font-size: 14px; margin-top: 6px; }
+.matchup.good { color: #1f8a3b; } .matchup.bad { color: #b3261e; }

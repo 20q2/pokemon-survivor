@@ -146,10 +146,15 @@ export class LevelUpUI {
         this.sync(session);
       }, 'small') : null,
     );
+    const build = h('div', { class: 'lu-build' },
+      ...me.moves.map((m) => h('span', { class: 'type', style: `background:${TYPE_COLORS[MOVES[m.id].type]}` }, `${MOVES[m.id].name} ${MOVES[m.id].mastery ? '★' : m.level}`)),
+      ...me.items.map((it) => h('span', { class: 'lu-item' }, img(assets.itemUrl(it.id)), String(it.level))),
+    );
     this.el = h('div', { class: 'levelup' },
       h('h2', null, this.banishMode ? 'Banish which?' : `Level ${session.world.level}!`),
       cards,
       actions,
+      build,
     );
     this.root.appendChild(this.el);
     (cards.firstElementChild as HTMLElement | null)?.focus();

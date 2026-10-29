@@ -1,10 +1,10 @@
 import type { App } from '../app.ts';
 import { audio } from '../audio/audio.ts';
-import { ABILITIES, LINE, SPECIES, SPECIES_LIST, type Line } from '../data/pokedex.ts';
-import { MOVES } from '../data/moves.ts';
-import { ITEMS } from '../data/items.ts';
+import { ABILITIES, LINE, LINES, SPECIES, SPECIES_LIST, type Line } from '../data/pokedex.ts';
+import { MOVES, MOVE_LIST } from '../data/moves.ts';
+import { ITEMS, ITEM_LIST } from '../data/items.ts';
 import { STAGES } from '../data/stages.ts';
-import { TYPE_COLORS } from '../data/types.ts';
+import { TYPE_COLORS, TYPES, effectiveness, type PType } from '../data/types.ts';
 import { ACHIEVEMENTS, rewardText, stageUnlocked } from '../meta/achievements.ts';
 import { checkAchievements, type RunRewards } from '../meta/progression.ts';
 import type { RunSummary } from '../meta/achievements.ts';
@@ -156,6 +156,16 @@ export function selectScreen(app: App, onConfirm: (lineId: string) => void, titl
 
 // ─────────────────────────── stage select ───────────────────────────
 
+/** How the partner's own types fare offensively and defensively on a route. */
+function matchupHint(lineId: string, routeTypes: PType[]) {
+  const types = SPECIES[LINE[lineId].stages[0]].types;
+  const off = Math.max(...types.map((t) => routeTypes.reduce((a, rt) => a + effectiveness(t, [rt]), 0) / routeTypes.length));
+  const def = routeTypes.reduce((a, rt) => a + effectiveness(rt, types), 0) / routeTypes.length;
+  const score = off - def;
+  const text = score > 0.25 ? 'Great matchup for your partner' : score < -0.25 ? 'Tough matchup — learn coverage moves!' : 'Even matchup';
+  return h('div', { class: `matchup ${score > 0.25 ? 'good' : score < -0.25 ? 'bad' : ''}` }, text);
+}
+
 function stageSwatch(stage: (typeof STAGES)[number]) {
   const [a, b, c] = stage.ground;
   return h('div', {
@@ -180,6 +190,7 @@ export function stageScreen(app: App, lineId: string, onStart: (stageId: string)
         h('h3', null, open ? st.name : '???'),
         h('div', { class: 'hint' }, open ? st.subtitle : 'Clear the previous stage to unlock.'),
         h('div', { class: 'row mt', style: 'flex-wrap:wrap;gap:4px' }, st.types.map(typeBadge)),
+        open ? matchupHint(lineId, st.types) : null,
         h('div', { class: 'row mt' }, h('span', { class: 'stars' }, '★'.repeat(stars) + '☆'.repeat(Math.max(0, 5 - stars))), h('span', { class: 'spacer' }),
           h('span', { class: 'hint' }, clears ? `✔ Cleared ×${clears}` : best ? `Best ${fmtTime(best)}` : '')),
       ));
@@ -278,21 +289,49 @@ export function achievementsScreen(app: App) {
   return screen('', topbar(`Achievements ${done.length}/${ACHIEVEMENTS.length}`, () => app.goTitle()), list);
 }
 
-export function dexScreen(app: App) {
-  const grid = h('div', { class: 'dex-grid' });
+export function dexScreen(app: App, tab: 'mons' | 'moves' | 'items' = 'mons') {
   const seen = Object.keys(app.save.seen).length;
-  for (const sp of [...SPECIES_LIST].sort((a, b) => a.dex - b.dex)) {
-    const isSeen = !!app.save.seen[sp.id] || app.save.lines.some((l) => LINE[l].stages.includes(sp.id));
-    const def = app.save.defeated[sp.id] ?? 0;
-    grid.append(h('div', { class: `panel dex${isSeen ? '' : ' unseen'}`, title: isSeen ? sp.name : '???' },
-      img(assets.portraitUrl(sp.id)),
-      h('div', null, `#${String(sp.dex).padStart(3, '0')}`),
-      h('div', null, isSeen ? sp.name : '???'),
-      isSeen ? h('div', { class: 'row', style: 'justify-content:center;gap:2px;flex-wrap:wrap' }, sp.types.map((t) => h('span', { class: 'type', style: `background:${TYPE_COLORS[t]};font-size:6px;padding:2px 3px` }, t))) : null,
-      def ? h('div', { class: 'hint' }, `⚔ ${def.toLocaleString()}`) : null,
-    ));
+  const tabs = h('div', { class: 'row', style: 'margin-bottom:12px;flex-wrap:wrap;justify-content:center' },
+    btn('Pokémon', () => app.show(dexScreen(app, 'mons')), tab === 'mons' ? 'small primary' : 'small'),
+    btn('Moves', () => app.show(dexScreen(app, 'moves')), tab === 'moves' ? 'small primary' : 'small'),
+    btn('Held items', () => app.show(dexScreen(app, 'items')), tab === 'items' ? 'small primary' : 'small'),
+  );
+  let body: HTMLElement;
+  if (tab === 'mons') {
+    body = h('div', { class: 'dex-grid' });
+    for (const sp of [...SPECIES_LIST].sort((a, b) => a.dex - b.dex)) {
+      const isSeen = !!app.save.seen[sp.id] || app.save.lines.some((l) => LINE[l].stages.includes(sp.id));
+      const def = app.save.defeated[sp.id] ?? 0;
+      body.append(h('div', { class: `panel dex${isSeen ? '' : ' unseen'}`, title: isSeen ? sp.name : '???' },
+        img(isSeen ? assets.portraitUrl(sp.id) : assets.itemUrl('poke-ball')),
+        h('div', null, `#${String(sp.dex).padStart(3, '0')}`),
+        h('div', null, isSeen ? sp.name : '???'),
+        isSeen ? h('div', { class: 'row', style: 'justify-content:center;gap:2px;flex-wrap:wrap' }, sp.types.map((t) => h('span', { class: 'type', style: `background:${TYPE_COLORS[t]};font-size:6px;padding:2px 3px` }, t))) : null,
+        def ? h('div', { class: 'hint' }, `⚔ ${def.toLocaleString()}`) : null,
+      ));
+    }
+  } else if (tab === 'moves') {
+    body = h('div', { class: 'ach-list' });
+    const order = [...MOVE_LIST].sort((a, b) => TYPES.indexOf(a.type) - TYPES.indexOf(b.type) || Number(!!a.mastery) - Number(!!b.mastery));
+    for (const m of order) {
+      const learners = LINES.filter((l) => l.starter === m.id || l.learnset.some((e) => e.move === m.id) || Object.values(l.branchMoves ?? {}).some((ms) => ms.includes(m.id)));
+      const tm = (TM_LIST as { id: string }[]).some((t) => t.id === m.id);
+      body.append(h('div', { class: `panel ach${m.mastery ? ' done' : ''}` },
+        h('div', { class: 'ic', style: `background:${TYPE_COLORS[m.type]};width:44px;height:44px;border-radius:8px;display:grid;place-items:center;grid-row:span 3;font-family:var(--head);font-size:7px;color:#fff;text-shadow:1px 1px 0 #000;text-align:center` }, m.name.split(/[\s-]/).map((w) => w.slice(0, 4)).join(' ').toUpperCase()),
+        h('div', { class: 'nm' }, m.mastery ? `★ ${m.name}` : m.name, ' ', h('span', { class: `cat ${m.cat}` }, cap(m.cat))),
+        h('div', { class: 'ds' }, m.desc),
+        h('div', { class: 'rw' }, m.mastery
+          ? `Master ${MOVES[m.mastery.from].name} (Lv5) + hold ${ITEMS[m.mastery.item].name}, then open a treasure.`
+          : [learners.length ? `Learned by: ${learners.map((l) => l.name).join(', ')}` : '', tm ? (learners.length ? ' · TM' : 'TM') : ''].join('') || '—'),
+      ));
+    }
+  } else {
+    body = h('div', { class: 'ach-list' });
+    for (const it of ITEM_LIST) {
+      body.append(h('div', { class: 'panel ach' }, img(assets.itemUrl(it.id)), h('div', { class: 'nm' }, it.name), h('div', { class: 'ds' }, it.desc(1)), h('div', { class: 'rw' }, `At Lv5: ${it.desc(5)}`)));
+    }
   }
-  return screen('', topbar(`Pokédex — seen ${seen}/${SPECIES_LIST.length}`, () => app.goTitle()), grid);
+  return screen('', topbar(tab === 'mons' ? `Pokédex — seen ${seen}/${SPECIES_LIST.length}` : tab === 'moves' ? `Moves (${MOVE_LIST.length})` : 'Held items', () => app.goTitle()), tabs, body);
 }
 
 // ─────────────────────────── options & credits ───────────────────────────
@@ -312,6 +351,7 @@ export function optionsScreen(app: App, onBack: () => void) {
       slider('Sound effects', o.sfx, (v) => (o.sfx = v)),
       check('Screen shake', o.shake, (v) => (o.shake = v)),
       check('Damage numbers', o.damageNumbers, (v) => (o.damageNumbers = v)),
+      check('Auto-pick upgrades', o.autoPick, (v) => (o.autoPick = v)),
       check('Show FPS', o.showFps, (v) => (o.showFps = v)),
       h('div', { class: 'mt' }, h('b', null, 'Save data')),
       h('div', { class: 'row mt', style: 'flex-wrap:wrap' },

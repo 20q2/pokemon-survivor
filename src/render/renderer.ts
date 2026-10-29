@@ -311,7 +311,7 @@ export class Renderer {
     }
     const frozen = e.st.freeze > 0 || e.st.flinch > 0;
     const t = frozen ? e.animOffset : time * (e.st.slow > 0 || e.st.paralyze > 0 ? 0.5 : 1) + e.animOffset;
-    this.drawAnim(set.walk, e.x, e.y, t, dirRow(e.dirX, e.dirY), e.scale, e.flash * 10);
+    this.drawAnim(set.walk, e.x, e.y, t, dirRow(e.dirX, e.dirY), e.scale, Math.min(0.65, e.flash * 8));
     if (e.st.freeze > 0) {
       g.fillStyle = 'rgba(170,225,255,0.45)';
       g.fillRect(e.x - 10 * e.scale, e.y - 24 * e.scale, 20 * e.scale, 24 * e.scale);

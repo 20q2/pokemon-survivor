@@ -1,5 +1,6 @@
 import type { Sim } from './sim.ts';
-import type { Player } from './types.ts';
+import type { Player, UpgradeOffer } from './types.ts';
+import { MOVES, MASTERY_OF } from '../data/moves.ts';
 
 /** Simple kiting AI used for headless balance runs and attract-mode demos. */
 export function botSteer(sim: Sim, p: Player): { x: number; y: number } {
@@ -59,5 +60,20 @@ export function botChoose(sim: Sim, p: Player): number {
   const score = (k: string) => ({ newMove: 4, moveUp: 3, newItem: 2.5, itemUp: 2, heal: 1, money: 0 }[k] ?? 0);
   let bi = 0;
   offers.forEach((o, i) => { if (score(o.kind) > score(offers[bi].kind)) bi = i; });
+  return bi;
+}
+
+/** Upgrade choice for the "auto-pick" option: works from any session's offers. */
+export function autoChoice(s: { offers(): UpgradeOffer[] | null; world: { players: Player[] }; localId: number }): number {
+  const offers = s.offers() ?? [];
+  const me = s.world.players[s.localId];
+  const score = (o: UpgradeOffer) => {
+    let v = { newMove: 40, moveUp: 30, newItem: 22, itemUp: 18, heal: 5, money: 0 }[o.kind];
+    if (o.kind === 'newMove' && me.types.includes(MOVES[o.id].type)) v += 8;
+    if ((o.kind === 'newItem' || o.kind === 'itemUp') && me.moves.some((m) => MASTERY_OF[m.id]?.mastery?.item === o.id)) v += 25;
+    return v + Math.random() * 6;
+  };
+  let bi = 0;
+  offers.forEach((o, i) => { if (score(o) > score(offers[bi])) bi = i; });
   return bi;
 }

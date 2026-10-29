@@ -4,7 +4,7 @@ import { STAGE } from './data/stages.ts';
 import { TYPES } from './data/types.ts';
 import { MOVES } from './data/moves.ts';
 import { Input } from './engine/input.ts';
-import { botChoose, botSteer } from './game/bot.ts';
+import { botChoose, botSteer, autoChoice } from './game/bot.ts';
 import { LocalSession, summarize, type RunSession } from './game/session.ts';
 import type { PlayerInit } from './game/sim.ts';
 import type { GameEvent } from './game/types.ts';
@@ -36,6 +36,7 @@ export class App {
   private ended = false;
   private endTimer = 0;
   private bossMusic = false;
+  private autoT = 0;
   net: NetHost | NetClient | null = null;
   /** Called every frame (screens use it for sprite previews). */
   onFrame: ((dt: number) => void) | null = null;
@@ -333,6 +334,10 @@ export class App {
       this.renderer.render(s.world, s.paused ? 0 : dt);
       if (!this.ended) {
         this.hud.update(s, dt);
+        if (this.save.options.autoPick && s.phase() === 'levelup' && s.offers()) {
+          this.autoT += dt;
+          if (this.autoT > 0.35) { this.autoT = 0; s.choose(autoChoice(s)); }
+        }
         this.levelUp.sync(s);
         const ph = s.phase();
         if (ph === 'over' || ph === 'victory') {
