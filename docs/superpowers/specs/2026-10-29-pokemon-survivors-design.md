@@ -127,6 +127,7 @@ events, and its own music track.
   give small per-line perks (+dmg, +HP, start with a signature move). **Shiny unlock**:
   clear any stage at max friendship *or* clear Cerulean Cave with that line → shiny
   toggle (cosmetic sparkle, alt palette sprite, +10% Poké Dollars).
+- **Elite mode** (cleared routes): +60% enemy HP, +30% damage, denser waves; ×1.75 ₽, ×1.5 friendship.
 - Wild shiny enemies appear rarely (1/512 spawns), flee, and drop a treasure.
 - **Pokédex**: tracks species seen/defeated; filling it is itself an achievement set.
 
