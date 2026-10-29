@@ -32,8 +32,8 @@ export class DeathPops {
 
   /** Age every live pop. Oldest sits at the tail, so expired ones are always a prefix to drop. */
   update(dt: number) {
-    for (let k = 0; k < this.n; k++) this.t[(this.head - this.n + k + MAX_POPS) % MAX_POPS] += dt;
-    while (this.n > 0 && this.t[(this.head - this.n + MAX_POPS) % MAX_POPS] >= POP_TIME) this.n--;
+    for (let k = 0; k < this.n; k++) this.t[this.slot(k)] += dt;
+    while (this.n > 0 && this.t[this.slot(0)] >= POP_TIME) this.n--;
   }
 
   /** Slot index of the k-th live pop (0 = oldest). */

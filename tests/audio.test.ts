@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compileSong, drainKillCombo, KILL_LADDER, killStep, SONGS } from '../src/audio/audio.ts';
+import { compileSong, KILL_LADDER, Ladder, SONGS } from '../src/audio/audio.ts';
 import { parseMml, TICKS_PER_WHOLE } from '../src/audio/mml.ts';
 import type { Mode } from '../src/audio/songs.ts';
 import { STAGES } from '../src/data/stages.ts';
@@ -110,26 +110,24 @@ describe('sound effects', async () => {
 // The kill ladder is checked as pure math: vitest runs in node, which has no OfflineAudioContext, so
 // there is no offline render here (AudioEngine.renderSfxOffline('kill', n) is for browser/script use).
 describe('kill streak ladder', () => {
-  it('a lone kill is plain, a 60/s mow climbs and tops out', () => {
-    expect(killStep(0)).toBe(0);
-    let combo = 0, last = 0;
-    for (let i = 0; i < 40; i++) { // gated plays ~16/s
-      combo = drainKillCombo(combo, 0.06);
-      last = killStep(combo);
-      combo = Math.min(KILL_LADDER.length + 1, combo + 1);
-    }
-    expect(last).toBe(KILL_LADDER.length - 1);
-    expect(KILL_LADDER[last]).toBeLessThanOrEqual(19);
+  const kills = () => new Ladder(KILL_LADDER.length, 2.5);
+  const run = (gap: number, n: number) => {
+    const l = kills();
+    let step = 0;
+    for (let i = 0; i < n; i++) step = l.step(i * gap);
+    return step;
+  };
+  it('a lone kill is plain, a 16/s mow tops out', () => {
+    expect(kills().step(10)).toBe(0);
+    expect(run(0.06, 40)).toBe(KILL_LADDER.length - 1);
+    expect(KILL_LADDER[KILL_LADDER.length - 1]).toBeLessThanOrEqual(19);
   });
   it('drains back to the bottom when kills stop', () => {
-    expect(killStep(drainKillCombo(KILL_LADDER.length + 1, 5))).toBe(0);
+    const l = kills();
+    for (let i = 0; i < 40; i++) l.step(i * 0.06);
+    expect(l.step(2.4 + 5)).toBe(0);
   });
   it('a slow trickle (1.5/s) never climbs, but a 3/s run does', () => {
-    const run = (gap: number, n: number) => {
-      let combo = 0, step = 0;
-      for (let i = 0; i < n; i++) { combo = drainKillCombo(combo, gap); step = killStep(combo); combo += 1; }
-      return step;
-    };
     expect(run(1 / 1.5, 20)).toBe(0);
     expect(run(1 / 3, 20)).toBeGreaterThan(0);
   });

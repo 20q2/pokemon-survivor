@@ -141,7 +141,7 @@ export class Renderer {
         break;
       case 'kill': {
         // bosses have their own cinematic; everyone else flashes white and squashes before the puff
-        if (!ev.boss) this.pops.add(ev.x, ev.y, ev.species, ev.shiny, ev.scale, DOWN_ROW, world.time);
+        if (!ev.boss) this.pops.add(ev.x, ev.y, ev.species, ev.shiny, ev.scale, DOWN_ROW, world.time + ev.anim);
         // faint "poof": a smoke puff cluster, a pop ring and a few type-coloured sparks
         P.burst(ev.x, ev.y - 8, ev.boss ? 26 : 3, ev.boss ? 120 : 36, '#e8e8f0', ev.boss ? 0.7 : 0.3, ev.boss ? 6 : 3, false, -20, Shape.PUFF);
         P.ring(ev.x, ev.y - 6, ev.boss ? 48 : 14, '#ffffff', ev.boss ? 0.45 : 0.22);
@@ -289,7 +289,7 @@ export class Renderer {
       else this.drawTallDecor(d.d, d.x, d.y, me);
     }
 
-    this.drawPops();
+    this.drawPops(L, T, W, H);
 
     // projectiles & effects above sprites
     this.beginFx(W, H, fxL, fxT);
@@ -404,7 +404,8 @@ export class Renderer {
     const fullH = anim.fh * scale;
     const dx = (Math.round(x * z) - Math.round((w / 2) * z)) / z, dy = (Math.round(y * z) - Math.round((fullH / 2 + 6 * scale) * z)) / z + (fullH - h);
     if (alpha < 1) g.globalAlpha = alpha;
-    g.drawImage(anim.img, f * anim.fw, r * anim.fh, anim.fw, anim.fh, dx, dy, w, h);
+    // a fully white sheet covers the sprite, so skip the base draw
+    if (flash < 1 || alpha < 1) g.drawImage(anim.img, f * anim.fw, r * anim.fh, anim.fw, anim.fh, dx, dy, w, h);
     if (flash > 0) {
       g.globalAlpha = Math.min(1, flash) * alpha;
       g.drawImage(anim.whiteSheet(), f * anim.fw, r * anim.fh, anim.fw, anim.fh, dx, dy, w, h);
@@ -412,12 +413,13 @@ export class Renderer {
     g.globalAlpha = 1;
   }
 
-  private drawPops() {
+  // Known limitation: a pop ignores slow/freeze (frame) and Sky Uppercut lift (height) of the live enemy.
+  private drawPops(L: number, T: number, W: number, H: number) {
     const P = this.pops;
     for (let k = 0; k < P.n; k++) {
       const i = P.slot(k);
       const set = assets.get(P.species[i], P.shiny[i] === 1);
-      if (!set) continue;
+      if (!set || !inView(P.x[i], P.y[i], L, T, W, H, 60 * P.scale[i])) continue;
       const { sx, sy } = popSquash(P.t[i] / POP_TIME);
       this.drawAnim(set.walk, P.x[i], P.y[i], P.animT[i], P.row[i], P.scale[i], 1, 1, sx, sy);
     }

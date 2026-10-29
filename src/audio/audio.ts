@@ -56,13 +56,33 @@ const midiHz = (m: number) => 440 * Math.pow(2, (m - 69) / 12);
 /** Pentatonic semitone offsets for the kill streak; the top (a 12th up) stays near 1.2 kHz. */
 export const KILL_LADDER = [0, 2, 4, 7, 9, 12, 14, 16, 19];
 /**
- * Combo steps lost per second. Each played kill adds 1, so kills closer than 1/2.5 = 0.4 s apart
- * climb (slowly near 0.4 s, fast near the 0.06 s gate), slower ones hold at the bottom, and a 1 s
- * lull drops 2.5 steps.
+ * A combo that each use raises by 1 and that drains `drainPerSec` steps a second, so only a burst
+ * climbs the rungs. `step(now)` drains, stamps the time, returns the current rung (clamped to the
+ * top) and then advances the combo. Draining is linear in time, so calling it only for sounds that
+ * pass the gate is the same as calling it for every event.
+ */
+export class Ladder {
+  combo = 0;
+  private last = 0;
+  readonly steps: number;
+  readonly drainPerSec: number;
+  constructor(steps: number, drainPerSec: number) { this.steps = steps; this.drainPerSec = drainPerSec; }
+  step(now: number): number {
+    this.combo = Math.max(0, this.combo - Math.max(0, now - this.last) * this.drainPerSec);
+    this.last = now;
+    const rung = Math.min(this.steps - 1, Math.floor(this.combo));
+    this.combo = Math.min(this.steps + 1, this.combo + 1);
+    return rung;
+  }
+}
+
+/** Candy drains ~5 steps/s: a steady trickle stays near the bottom and only a real burst climbs. */
+const CANDY_LADDER = [0, 2, 4, 7, 9, 12, 14, 16];
+/**
+ * Kills drain 2.5 steps/s. Kills closer than 1/2.5 = 0.4 s apart climb (slowly near 0.4 s, fast
+ * near the 0.06 s gate), slower ones hold at the bottom, and a 1 s lull drops 2.5 steps.
  */
 const KILL_DRAIN = 2.5;
-export const drainKillCombo = (combo: number, dt: number) => Math.max(0, combo - Math.max(0, dt) * KILL_DRAIN);
-export const killStep = (combo: number) => Math.min(KILL_LADDER.length - 1, Math.floor(combo));
 
 export class AudioEngine {
   ctx: BaseAudioContext | null = null;
@@ -84,12 +104,10 @@ export class AudioEngine {
   private pass = 0;
   private timer: number | null = null;
   private lastPlay = new Map<string, number>();
-  /** Rises with each candy, drains continuously, so only a burst of pickups climbs the scale. */
-  private pickupCombo = 0;
-  private pickupT = 0;
-  /** Same idea for kills: a mowing streak climbs the ladder, a lone kill stays at the bottom. */
-  private killCombo = 0;
-  private killT = 0;
+  private candyLadder = new Ladder(CANDY_LADDER.length, 5);
+  private killLadder = new Ladder(KILL_LADDER.length, KILL_DRAIN);
+  /** Added to currentTime for the ladders; offline renders advance it since the context clock is frozen. */
+  private clockSkew = 0;
   private sfxCache = new Map<string, CompiledSong>();
   musicVol = 0.5;
   sfxVol = 0.6;
@@ -123,12 +141,10 @@ export class AudioEngine {
     const ctx = new OfflineAudioContext(2, Math.ceil(seconds * sampleRate), sampleRate);
     e.init(ctx);
     e.setVolumes(0, 1);
-    if (name === 'candy') {
-      // currentTime is frozen before rendering, so fake the pickup clock to space the run out
-      for (let i = 0; i < arg; i++) { e.lastPlay.clear(); e.pickupT -= 0.08; e.sfx('candy'); }
-    } else if (name === 'kill') {
-      // same frozen-clock trick, at a 60 kills/s mow
-      for (let i = 0; i < arg; i++) { e.lastPlay.clear(); e.killT -= 1 / 60; e.sfx('kill'); }
+    if (name === 'candy' || name === 'kill') {
+      // currentTime is frozen before rendering, so step the ladder clock to space the run out
+      const gap = name === 'candy' ? 0.08 : 1 / 60; // a candy burst, or a 60 kills/s mow
+      for (let i = 0; i < arg; i++) { e.lastPlay.clear(); e.clockSkew += gap; e.sfx(name); }
     } else e.sfx(name, arg);
     return ctx.startRendering();
   }
@@ -472,15 +488,10 @@ export class AudioEngine {
         break;
       }
       case 'kill': {
-        // Drain on every kill event (like candy) so the combo reflects real time between kills;
-        // the ladder then advances once per kill sound that actually plays. That is ~16 steps/s at
-        // the 0.06 s gate, which still climbs audibly in a 60 kills/s mow.
-        const now = this.ctx.currentTime;
-        this.killCombo = drainKillCombo(this.killCombo, now - this.killT);
-        this.killT = now;
+        // The ladder advances once per kill sound that actually plays: ~16 steps/s at the 0.06 s
+        // gate, which still climbs audibly in a 60 kills/s mow.
         if (!this.gate('kill', 0.06)) return;
-        const step = killStep(this.killCombo);
-        this.killCombo = Math.min(KILL_LADDER.length + 1, this.killCombo + 1);
+        const step = this.killLadder.step(this.ctx.currentTime + this.clockSkew);
         const midi = 67 + KILL_LADDER[step];
         const vol = 0.08 * (1 - step * 0.06);
         this.tone(d, t, midiHz(midi), 0.08, vol, 'pulse', 0.125, midiHz(midi - 12));
@@ -488,19 +499,12 @@ export class AudioEngine {
         break;
       }
       case 'candy': {
-        // A soft pluck on a pentatonic ladder. The combo drains ~5 steps a second, so a steady
-        // trickle of candies stays near the bottom and only a real burst climbs, and it tops out
-        // a little over an octave up instead of shrieking.
-        const now = this.ctx.currentTime;
-        this.pickupCombo = Math.max(0, this.pickupCombo - (now - this.pickupT) * 5);
-        this.pickupT = now;
+        // A soft pluck on a pentatonic ladder that tops out a little over an octave up instead of shrieking.
         if (!this.gate('candy', 0.055)) return;
-        const LADDER = [0, 2, 4, 7, 9, 12, 14, 16];
-        const step = Math.min(LADDER.length - 1, Math.floor(this.pickupCombo));
-        this.pickupCombo = Math.min(LADDER.length + 1, this.pickupCombo + 1);
+        const step = this.candyLadder.step(this.ctx.currentTime + this.clockSkew);
         const vol = 0.085 * (1 - step * 0.05);
-        this.tone(d, t, midiHz(67 + LADDER[step]), 0.07, vol, 'pulse', 0.125);
-        this.tone(d, t, midiHz(55 + LADDER[step]), 0.05, vol * 0.6, 'triangle');
+        this.tone(d, t, midiHz(67 + CANDY_LADDER[step]), 0.07, vol, 'pulse', 0.125);
+        this.tone(d, t, midiHz(55 + CANDY_LADDER[step]), 0.05, vol * 0.6, 'triangle');
         break;
       }
       case 'coin':
