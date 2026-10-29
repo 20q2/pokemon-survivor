@@ -88,6 +88,7 @@ export function offerCard(o: UpgradeOffer, p: Player, index: number, onPick: () 
 export class LevelUpUI {
   el: HTMLElement | null = null;
   private shownFor: UpgradeOffer[] | null = null;
+  private shownSig = '';
   private banishMode = false;
   private keyHandler = (e: KeyboardEvent) => this.onKey(e);
   private session: RunSession | null = null;
@@ -119,7 +120,8 @@ export class LevelUpUI {
     const phase = session.phase();
     const offers = session.offers();
     if (phase !== 'levelup') return this.close();
-    if (offers && offers === this.shownFor && this.el) return;
+    // Offers arrive as fresh arrays every network tick: compare by content.
+    if (offers && this.el && this.shownSig === JSON.stringify(offers) && this.shownFor) return;
     if (!offers) {
       // waiting for teammates
       const waiting = session.waitingOn();
@@ -133,6 +135,7 @@ export class LevelUpUI {
     }
     this.close();
     this.shownFor = offers;
+    this.shownSig = JSON.stringify(offers);
     const me = session.world.players[session.localId];
     audio.sfx('levelup');
     const cards = h('div', { class: 'cards' }, offers.map((o, i) => offerCard(o, me, i, () => this.pick(i))));
@@ -142,7 +145,7 @@ export class LevelUpUI {
       me.skips > 0 ? btn(`Skip (${me.skips})`, () => session.skip(), 'small') : null,
       me.banishes > 0 ? btn(this.banishMode ? 'Cancel banish' : `Banish (${me.banishes})`, () => {
         this.banishMode = !this.banishMode;
-        this.shownFor = null;
+        this.shownSig = '';
         this.sync(session);
       }, 'small') : null,
     );
@@ -165,6 +168,7 @@ export class LevelUpUI {
     this.el?.remove();
     this.el = null;
     this.shownFor = null;
+    this.shownSig = '';
   }
 }
 

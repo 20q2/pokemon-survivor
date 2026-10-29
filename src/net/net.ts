@@ -28,6 +28,8 @@ type HostMsg =
   | { t: 'full'; reason: string }
   | { t: 'bye' };
 
+const LEVELUP_TIMEOUT_MS = 30000;
+
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 export function makeCode() {
   let s = '';
@@ -198,8 +200,26 @@ export class NetHost {
     return session;
   }
 
+  /** Nobody can stall the team: unanswered level-ups auto-pick after a while. */
+  private offerSince = new Map<number, number>();
+
+  private enforceTimeouts() {
+    const sim = this.session!.sim;
+    const now = performance.now();
+    for (const id of [...this.offerSince.keys()]) if (!sim.offers.has(id)) this.offerSince.delete(id);
+    for (const id of sim.offers.keys()) {
+      const since = this.offerSince.get(id);
+      if (since === undefined) this.offerSince.set(id, now);
+      else if (now - since > LEVELUP_TIMEOUT_MS) {
+        this.offerSince.delete(id);
+        sim.choose(id, 0);
+      }
+    }
+  }
+
   private tick() {
     const sim = this.session!.sim;
+    this.enforceTimeouts();
     this.sendT += 1 / 60;
     if (this.sendT < 1 / SNAP_HZ) return;
     this.sendT = 0;
@@ -358,6 +378,7 @@ export class ClientSession implements RunSession {
   private enemyMap = new Map<number, Enemy & { tx: number; ty: number }>();
   private hostPhase: Phase = 'play';
   private hostOffers: UpgradeOffer[] | null = null;
+  private answered = '';
   private wait: string[] = [];
   private inT = 0;
   private seenSet = new Set<string>();
@@ -396,7 +417,10 @@ export class ClientSession implements RunSession {
     sim.kills = m.k;
     sim.bossesDefeated = m.b;
     if (Math.abs(sim.time - m.tm) > 0.5) sim.time = m.tm;
-    this.hostOffers = m.of;
+    // Ignore stale copies of offers we've already answered.
+    const sig = m.of ? JSON.stringify(m.of) : '';
+    this.hostOffers = sig && sig === this.answered ? null : m.of;
+    if (!m.of) this.answered = '';
     this.wait = m.wait;
     for (const e of m.ev) {
       this.events.push(e);
@@ -544,10 +568,14 @@ export class ClientSession implements RunSession {
   phase() { return this.hostPhase; }
   offers() { return this.hostOffers; }
   waitingOn() { return this.wait; }
-  choose(i: number) { this.net.send({ t: 'choose', i }); this.hostOffers = null; }
-  reroll() { this.net.send({ t: 'reroll' }); }
-  skip() { this.net.send({ t: 'skip' }); this.hostOffers = null; }
-  banish(i: number) { this.net.send({ t: 'banish', i }); }
+  private answer() {
+    this.answered = this.hostOffers ? JSON.stringify(this.hostOffers) : '';
+    this.hostOffers = null;
+  }
+  choose(i: number) { if (!this.hostOffers) return; this.net.send({ t: 'choose', i }); this.answer(); }
+  reroll() { if (!this.hostOffers) return; this.net.send({ t: 'reroll' }); this.answer(); }
+  skip() { if (!this.hostOffers) return; this.net.send({ t: 'skip' }); this.answer(); }
+  banish(i: number) { if (!this.hostOffers) return; this.net.send({ t: 'banish', i }); this.answer(); }
   seen() { return this.seenSet; }
   defeated() { return this.defeatedMap; }
   dispose() { this.net.close(); }

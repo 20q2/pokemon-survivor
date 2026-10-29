@@ -311,6 +311,8 @@ export class Sim {
   // ───────────────────────────── progression ─────────────────────────────
 
   private checkProgress() {
+    // A cinematic started this tick (boss down, chest…): resolve level-ups after it ends.
+    if (this.phase === 'cine') return;
     if (this.xp >= this.xpNext) {
       this.xp -= this.xpNext;
       this.level++;
@@ -380,7 +382,7 @@ export class Sim {
     if (c.kind === 'evolve') this.applyEvolution(this.players[c.player], c.to!);
     this.cine = null;
     if (this.cineQueue.length) return this.startNextCine();
-    if (c.kind === 'bossDown' && this.finalDefeated) {
+    if (this.finalDefeated) {
       this.phase = 'victory';
       return;
     }

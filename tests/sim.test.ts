@@ -42,3 +42,43 @@ describe('simulation smoke', () => {
     }
   });
 });
+
+describe('phase handling', () => {
+  it('reaches victory when the final boss dies while another cinematic is queued', async () => {
+    const { spawnEnemy, killEnemy } = await import('../src/game/enemies.ts');
+    const sim = new Sim({ stageId: 'viridian', seed: 3, players: [{ name: 'a', lineId: 'charmander', shiny: false, meta: metaBonuses({}), tms: [] }] });
+    const boss = spawnEnemy(sim, 'scyther', 100, 0, { boss: { species: 'scyther', at: 900, patterns: ['charge'], final: true } })!;
+    sim.openChest(sim.players[0]);          // chest cinematic starts
+    killEnemy(sim, boss, 0);                // boss-down cinematic queued behind it
+    sim.xp = sim.xpNext + 1;                // and a level-up is pending
+    for (let i = 0; i < 60 * 10 && sim.phase !== 'victory'; i++) {
+      if (sim.phase === 'levelup') sim.choose(0, 0);
+      else sim.update(DT);
+    }
+    expect(sim.phase).toBe('victory');
+  });
+
+  it('evolves at the threshold level and swaps species', () => {
+    const sim = new Sim({ stageId: 'viridian', seed: 4, players: [{ name: 'a', lineId: 'squirtle', shiny: false, meta: metaBonuses({}), tms: [] }] });
+    sim.level = 11;
+    sim.xp = sim.xpNext;
+    for (let i = 0; i < 600 && sim.players[0].speciesId === 'squirtle'; i++) {
+      if (sim.phase === 'levelup') sim.choose(0, 0);
+      else sim.update(DT);
+    }
+    expect(sim.players[0].speciesId).toBe('wartortle');
+  });
+
+  it('Eevee evolves by dominant move type', () => {
+    const sim = new Sim({ stageId: 'viridian', seed: 5, players: [{ name: 'a', lineId: 'eevee', shiny: false, meta: metaBonuses({}), tms: [] }] });
+    const p = sim.players[0];
+    p.moves = [{ id: 'ember', level: 4, cd: 1, dmgDealt: 0, kills: 0 }, { id: 'swift', level: 2, cd: 1, dmgDealt: 0, kills: 0 }];
+    sim.level = 13;
+    sim.xp = sim.xpNext;
+    for (let i = 0; i < 600 && p.speciesId === 'eevee'; i++) {
+      if (sim.phase === 'levelup') sim.choose(0, 0);
+      else sim.update(DT);
+    }
+    expect(p.speciesId).toBe('flareon');
+  });
+});
