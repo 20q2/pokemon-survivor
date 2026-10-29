@@ -1,194 +1,94 @@
-import { Rng } from '../engine/math.ts';
+import { parseMml, TICKS_PER_WHOLE, type MmlNote } from './mml.ts';
+import { SONGS, type SongDef } from './songs.ts';
+
+export { SONGS };
 
 /**
- * Original procedural chiptune: a tiny NES-style synth (2 pulse + triangle + noise) and a
- * composer that builds songs from a chord progression, a seeded motif and AABA form.
+ * Chiptune engine: hand-composed MML scores (songs.ts) played on a small Game Boy-flavoured
+ * synth (two pulse channels with duty cycles, a stepped triangle bass and LFSR noise drums),
+ * mixed through per-channel stereo buses and a light room reverb. Sound effects share the synth.
  */
 
-type Mode = 'major' | 'minor' | 'dorian' | 'mixolydian' | 'harmonic';
-const SCALES: Record<Mode, number[]> = {
-  major: [0, 2, 4, 5, 7, 9, 11],
-  minor: [0, 2, 3, 5, 7, 8, 10],
-  dorian: [0, 2, 3, 5, 7, 9, 10],
-  mixolydian: [0, 2, 4, 5, 7, 9, 10],
-  harmonic: [0, 2, 3, 5, 7, 8, 11],
-};
+type Ch = 0 | 1 | 2 | 3;
+export interface SongEvent extends MmlNote { ch: Ch }
+export interface CompiledSong { events: SongEvent[]; length: number; loopTick: number; loopIdx: number; spt: number }
 
-interface SongSpec {
-  seed: number;
-  bpm: number;
-  root: number;        // midi note of tonic (octave 4-ish)
-  mode: Mode;
-  prog: number[];      // scale degrees (0-based) per bar, 8 bars = one section
-  progB?: number[];    // bridge progression
-  drums: 'march' | 'drive' | 'soft' | 'none' | 'half';
-  lead: number;        // duty 0.125/0.25/0.5
-  swing?: number;
-  arp?: boolean;
-  bassStyle?: 'bounce' | 'walk' | 'pedal' | 'octave';
-  density?: number;    // melody note density 0..1
-}
+const DUTY = [0.125, 0.25, 0.5, 0.75];
+/** Per-channel mix: base gain, stereo pan, reverb send. */
+const MIX: { gain: number; pan: number; send: number }[] = [
+  { gain: 0.17, pan: -0.18, send: 0.22 },
+  { gain: 0.12, pan: 0.24, send: 0.28 },
+  { gain: 0.34, pan: 0, send: 0.05 },
+  { gain: 0.3, pan: 0.06, send: 0.08 },
+];
 
-export const SONGS: Record<string, SongSpec> = {
-  title: { seed: 11, bpm: 132, root: 62, mode: 'major', prog: [0, 4, 5, 3, 0, 4, 3, 4], progB: [5, 3, 0, 4, 5, 3, 1, 4], drums: 'march', lead: 0.25, arp: true, bassStyle: 'bounce', density: 0.7 },
-  menu: { seed: 5, bpm: 104, root: 65, mode: 'major', prog: [0, 5, 1, 4, 0, 5, 1, 4], progB: [3, 4, 2, 5, 3, 4, 1, 4], drums: 'soft', lead: 0.125, arp: true, bassStyle: 'walk', density: 0.55, swing: 0.12 },
-  forest: { seed: 23, bpm: 128, root: 60, mode: 'major', prog: [0, 3, 4, 0, 5, 3, 1, 4], progB: [3, 4, 0, 5, 3, 4, 1, 4], drums: 'march', lead: 0.25, arp: true, bassStyle: 'bounce', density: 0.75 },
-  cave: { seed: 41, bpm: 112, root: 57, mode: 'dorian', prog: [0, 0, 6, 6, 5, 5, 4, 4], progB: [3, 3, 0, 0, 5, 6, 4, 4], drums: 'half', lead: 0.5, arp: true, bassStyle: 'pedal', density: 0.5 },
-  ice: { seed: 77, bpm: 118, root: 64, mode: 'minor', prog: [0, 5, 2, 6, 0, 5, 3, 4], progB: [5, 6, 2, 0, 3, 4, 5, 4], drums: 'soft', lead: 0.125, arp: true, bassStyle: 'octave', density: 0.6 },
-  factory: { seed: 91, bpm: 140, root: 58, mode: 'mixolydian', prog: [0, 0, 6, 3, 0, 0, 6, 4], progB: [3, 3, 0, 0, 6, 6, 4, 4], drums: 'drive', lead: 0.25, arp: true, bassStyle: 'octave', density: 0.7 },
-  tower: { seed: 13, bpm: 96, root: 59, mode: 'harmonic', prog: [0, 0, 5, 5, 3, 3, 4, 4], progB: [5, 3, 0, 4, 5, 3, 1, 4], drums: 'none', lead: 0.125, arp: true, bassStyle: 'pedal', density: 0.45 },
-  volcano: { seed: 66, bpm: 150, root: 57, mode: 'harmonic', prog: [0, 5, 3, 4, 0, 5, 6, 4], progB: [3, 4, 5, 4, 3, 4, 6, 4], drums: 'drive', lead: 0.25, arp: true, bassStyle: 'octave', density: 0.8 },
-  finale: { seed: 150, bpm: 144, root: 62, mode: 'minor', prog: [0, 5, 2, 6, 0, 5, 3, 4], progB: [5, 6, 0, 4, 5, 6, 4, 4], drums: 'drive', lead: 0.25, arp: true, bassStyle: 'bounce', density: 0.8 },
-  boss: { seed: 200, bpm: 168, root: 57, mode: 'harmonic', prog: [0, 0, 5, 4, 0, 0, 5, 6], progB: [3, 4, 3, 4, 5, 6, 4, 4], drums: 'drive', lead: 0.25, arp: true, bassStyle: 'octave', density: 0.85 },
-  shop: { seed: 333, bpm: 112, root: 67, mode: 'major', prog: [0, 3, 0, 4, 0, 3, 4, 0], progB: [3, 3, 0, 0, 1, 4, 0, 4], drums: 'soft', lead: 0.125, arp: false, bassStyle: 'walk', density: 0.65, swing: 0.15 },
-};
-
-interface Note { t: number; ch: 0 | 1 | 2 | 3; midi: number; dur: number; vol: number; duty?: number; drum?: 'kick' | 'snare' | 'hat' }
-
-export function compose(spec: SongSpec): { notes: Note[]; length: number; step: number } {
-  const rng = new Rng(spec.seed * 7919);
-  const step = 60 / spec.bpm / 4; // 16th note
-  const scale = SCALES[spec.mode];
-  const deg = (d: number) => {
-    const o = Math.floor(d / 7);
-    const i = ((d % 7) + 7) % 7;
-    return spec.root + o * 12 + scale[i];
-  };
-  const notes: Note[] = [];
-  const sections = [spec.prog, spec.prog, spec.progB ?? spec.prog, spec.prog];
-  // A motif: rhythm (16 steps / 2 bars x 8) and contour offsets reused per phrase
-  const makeRhythm = (density: number) => {
-    const r: number[] = [];
-    for (let i = 0; i < 32; i++) {
-      const strong = i % 4 === 0;
-      const p = strong ? 0.85 : i % 2 === 0 ? density * 0.7 : density * 0.35;
-      r.push(rng.chance(p) ? 1 : 0);
+export function compileSong(def: SongDef): CompiledSong {
+  const tracks = [def.p1, def.p2, def.tri, def.noise].map((src, i) => (src.trim() ? parseMml(src, def.macros, i === 3) : null));
+  const length = Math.max(...tracks.map((t) => t?.length ?? 0));
+  const loopTick = tracks[0]?.loopTick ?? 0;
+  const events: SongEvent[] = [];
+  tracks.forEach((t, ch) => t?.notes.forEach((n) => events.push({ ...n, ch: ch as Ch })));
+  if (def.echo && tracks[0]) {
+    for (const n of tracks[0].notes) {
+      let tick = n.tick + def.echo.delay;
+      if (tick >= length) tick = loopTick + (tick - length);
+      events.push({ ...n, tick, vol: n.vol * def.echo.vol, vib: 0, ch: 1 });
     }
-    r[0] = 1;
-    return r;
-  };
-  const motifA = makeRhythm(spec.density ?? 0.6);
-  const motifB = makeRhythm((spec.density ?? 0.6) * 0.8);
-  let bar = 0;
-  let prevDeg = 7 + 2;
-  sections.forEach((prog, si) => {
-    const isB = si === 2;
-    const isLast = si === 3;
-    for (let b = 0; b < prog.length; b++, bar++) {
-      const chord = prog[b];
-      const t0 = bar * 16 * step;
-      const chordTones = [chord, chord + 2, chord + 4];
-      // ── bass (triangle)
-      for (let s = 0; s < 16; s += 2) {
-        let d = chord - 7;
-        switch (spec.bassStyle) {
-          case 'bounce': d = s % 4 === 0 ? chord - 7 : chord - 7 + 4; break;
-          case 'octave': d = s % 4 === 0 ? chord - 7 : chord; break;
-          case 'walk': d = chord - 7 + [0, 2, 4, 2, 0, 2, 4, 5][s / 2]; break;
-          case 'pedal': d = (s % 8 === 0 ? 0 : chord) - 7; break;
-        }
-        notes.push({ t: t0 + s * step, ch: 2, midi: deg(d) - 12, dur: step * 1.8, vol: 0.5 });
-      }
-      // ── arpeggio (pulse 2, quiet)
-      if (spec.arp) {
-        for (let s = 0; s < 16; s++) {
-          if (s % 2 && spec.bpm > 130) continue;
-          const tone = chordTones[s % 3] + (s % 6 >= 3 ? 7 : 0);
-          notes.push({ t: t0 + s * step, ch: 1, midi: deg(tone), dur: step * 0.8, vol: 0.12, duty: 0.125 });
-        }
-      } else {
-        for (let s = 0; s < 16; s += 4) {
-          for (const ct of chordTones) notes.push({ t: t0 + s * step, ch: 1, midi: deg(ct + 7), dur: step * 1.5, vol: 0.07, duty: 0.5 });
-        }
-      }
-      // ── melody (pulse 1)
-      const motif = isB ? motifB : motifA;
-      const half = (b % 2) * 16;
-      const variation = isLast && b >= prog.length - 2;
-      for (let s = 0; s < 16; s++) {
-        if (!motif[half + s] && !(variation && s === 0)) continue;
-        let len = 1;
-        while (s + len < 16 && !motif[half + s + len] && len < 4) len++;
-        // choose a pitch: chord tones on strong beats, stepwise otherwise
-        let d: number;
-        if (s % 4 === 0) {
-          const options = chordTones.map((c) => c + 7).concat(chordTones.map((c) => c + 14));
-          d = options.reduce((best, o) => (Math.abs(o - prevDeg) < Math.abs(best - prevDeg) ? o : best), options[0]);
-          if (rng.chance(0.25)) d += rng.chance(0.5) ? 2 : -2;
-        } else {
-          d = prevDeg + rng.pick([-2, -1, -1, 1, 1, 2, 0]);
-        }
-        d = Math.max(5, Math.min(18, d));
-        // final cadence resolves to tonic
-        if (variation && b === prog.length - 1 && s === 0) d = 7;
-        prevDeg = d;
-        const swing = spec.swing && s % 2 ? spec.swing * step : 0;
-        notes.push({ t: t0 + s * step + swing, ch: 0, midi: deg(d), dur: step * len * 0.9, vol: 0.22, duty: spec.lead });
-        if (variation && b === prog.length - 1) break;
-      }
-      // ── drums
-      for (let s = 0; s < 16; s++) {
-        const tt = t0 + s * step;
-        switch (spec.drums) {
-          case 'march':
-            if (s % 8 === 0) notes.push({ t: tt, ch: 3, midi: 0, dur: 0.12, vol: 0.5, drum: 'kick' });
-            if (s % 8 === 4) notes.push({ t: tt, ch: 3, midi: 0, dur: 0.1, vol: 0.35, drum: 'snare' });
-            if (s % 2 === 0) notes.push({ t: tt, ch: 3, midi: 0, dur: 0.03, vol: 0.12, drum: 'hat' });
-            if (s === 14 && b % 4 === 3) notes.push({ t: tt, ch: 3, midi: 0, dur: 0.08, vol: 0.3, drum: 'snare' });
-            break;
-          case 'drive':
-            if (s % 4 === 0) notes.push({ t: tt, ch: 3, midi: 0, dur: 0.12, vol: 0.5, drum: 'kick' });
-            if (s % 8 === 4) notes.push({ t: tt, ch: 3, midi: 0, dur: 0.1, vol: 0.38, drum: 'snare' });
-            notes.push({ t: tt, ch: 3, midi: 0, dur: 0.025, vol: s % 2 ? 0.07 : 0.13, drum: 'hat' });
-            break;
-          case 'half':
-            if (s === 0) notes.push({ t: tt, ch: 3, midi: 0, dur: 0.14, vol: 0.45, drum: 'kick' });
-            if (s === 8) notes.push({ t: tt, ch: 3, midi: 0, dur: 0.1, vol: 0.3, drum: 'snare' });
-            if (s % 4 === 2) notes.push({ t: tt, ch: 3, midi: 0, dur: 0.03, vol: 0.08, drum: 'hat' });
-            break;
-          case 'soft':
-            if (s === 0 || s === 10) notes.push({ t: tt, ch: 3, midi: 0, dur: 0.1, vol: 0.3, drum: 'kick' });
-            if (s % 4 === 2) notes.push({ t: tt, ch: 3, midi: 0, dur: 0.03, vol: 0.07, drum: 'hat' });
-            break;
-          default:
-            break;
-        }
-      }
-    }
-  });
-  return { notes, length: bar * 16 * step, step };
+  }
+  events.sort((a, b) => a.tick - b.tick || a.ch - b.ch);
+  const loopIdx = Math.max(0, events.findIndex((e) => e.tick >= loopTick));
+  return { events, length, loopTick, loopIdx, spt: 60 / def.bpm / (TICKS_PER_WHOLE / 4) };
 }
 
 const midiHz = (m: number) => 440 * Math.pow(2, (m - 69) / 12);
 
-class AudioEngine {
-  ctx: AudioContext | null = null;
+export class AudioEngine {
+  ctx: BaseAudioContext | null = null;
   private master!: GainNode;
   private musicGain!: GainNode;
   private sfxGain!: GainNode;
   private waves = new Map<number, PeriodicWave>();
   private noise!: AudioBuffer;
-  private song: { notes: Note[]; length: number } | null = null;
+  private metal!: AudioBuffer;
+  private buses: GainNode[] = [];
+  private triWave: PeriodicWave | null = null;
+  private song: CompiledSong | null = null;
   private songName = '';
   private songStart = 0;
   private nextIdx = 0;
-  private loopCount = 0;
+  private pass = 0;
   private timer: number | null = null;
   private lastPlay = new Map<string, number>();
   private pickupCombo = 0;
   private pickupT = 0;
   musicVol = 0.5;
   sfxVol = 0.6;
-  private cache = new Map<string, { notes: Note[]; length: number }>();
+  private cache = new Map<string, CompiledSong>();
 
   /** Must be called from a user gesture. */
   unlock() {
     if (this.ctx) {
-      if (this.ctx.state === 'suspended') void this.ctx.resume();
+      if (this.ctx.state === 'suspended' && this.ctx instanceof AudioContext) void this.ctx.resume();
       return;
     }
     const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    this.ctx = new AC();
+    this.init(new AC());
+  }
+
+  /** Render a song with the real synth into a buffer (used for level checks and previews). */
+  static async renderOffline(name: string, seconds: number, sampleRate = 44100): Promise<AudioBuffer> {
+    const e = new AudioEngine();
+    const ctx = new OfflineAudioContext(2, Math.ceil(seconds * sampleRate), sampleRate);
+    e.init(ctx);
+    e.musicVol = 1;
+    e.playMusic(name);
+    if (e.timer !== null) { clearInterval(e.timer); e.timer = null; }
+    e.scheduleUntil(seconds);
+    return ctx.startRendering();
+  }
+
+  private init(ctx: BaseAudioContext) {
+    this.ctx = ctx;
     this.master = this.ctx.createGain();
     this.master.gain.value = 0.8;
     const comp = this.ctx.createDynamicsCompressor();
@@ -197,13 +97,31 @@ class AudioEngine {
     this.master.connect(comp).connect(this.ctx.destination);
     this.musicGain = this.ctx.createGain();
     this.sfxGain = this.ctx.createGain();
-    this.musicGain.connect(this.master);
+    // Music: gentle top-end roll-off, then per-channel pan + reverb send.
+    const tone = this.ctx.createBiquadFilter();
+    tone.type = 'lowpass';
+    tone.frequency.value = 10500;
+    this.musicGain.connect(tone).connect(this.master);
     this.sfxGain.connect(this.master);
+    const verb = this.ctx.createConvolver();
+    verb.buffer = this.makeImpulse(1.7);
+    const verbOut = this.ctx.createGain();
+    verbOut.gain.value = 0.55;
+    verb.connect(verbOut).connect(this.musicGain);
+    this.buses = MIX.map((m) => {
+      const g = this.ctx!.createGain();
+      g.gain.value = m.gain;
+      const pan = this.ctx!.createStereoPanner();
+      pan.pan.value = m.pan;
+      const send = this.ctx!.createGain();
+      send.gain.value = m.send;
+      g.connect(pan).connect(this.musicGain);
+      g.connect(send).connect(verb);
+      return g;
+    });
     this.setVolumes(this.musicVol, this.sfxVol);
-    const len = this.ctx.sampleRate;
-    this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
-    const d = this.noise.getChannelData(0);
-    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    this.noise = this.lfsrNoise(false);
+    this.metal = this.lfsrNoise(true);
     if (this.songName) {
       const n = this.songName;
       this.songName = '';
@@ -223,7 +141,7 @@ class AudioEngine {
     const key = Math.round(duty * 1000);
     let w = this.waves.get(key);
     if (w) return w;
-    const n = 32;
+    const n = 64;
     const real = new Float32Array(n), imag = new Float32Array(n);
     for (let i = 1; i < n; i++) imag[i] = (2 / (i * Math.PI)) * Math.sin(i * Math.PI * duty);
     w = this.ctx!.createPeriodicWave(real, imag);
@@ -248,10 +166,10 @@ class AudioEngine {
     o.stop(t + dur + 0.02);
   }
 
-  private noiseHit(dest: AudioNode, t: number, dur: number, vol: number, hp: number, lp = 12000) {
+  private noiseHit(dest: AudioNode, t: number, dur: number, vol: number, hp: number, lp = 12000, metal = false) {
     const ctx = this.ctx!;
     const s = ctx.createBufferSource();
-    s.buffer = this.noise;
+    s.buffer = metal ? this.metal : this.noise;
     s.playbackRate.value = 1;
     const f1 = ctx.createBiquadFilter();
     f1.type = 'highpass';
@@ -269,15 +187,70 @@ class AudioEngine {
 
   // ─────────────────────────── music ───────────────────────────
 
+  /** Game Boy-style noise: a 15-bit LFSR (or the short 7-bit "metallic" mode), held a few samples per step. */
+  private lfsrNoise(short: boolean): AudioBuffer {
+    const ctx = this.ctx!;
+    const len = ctx.sampleRate;
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    let r = 0x7fff;
+    const hold = short ? 3 : 2;
+    let v = 1;
+    for (let i = 0; i < len; i++) {
+      if (i % hold === 0) {
+        const bit = (r ^ (r >> 1)) & 1;
+        r = (r >> 1) | (bit << 14);
+        if (short) r = (r & ~0x40) | (bit << 6);
+        v = r & 1 ? 1 : -1;
+      }
+      d[i] = v * 0.8;
+    }
+    return buf;
+  }
+
+  /** Small stereo room: exponentially decaying noise with a short pre-delay. */
+  private makeImpulse(seconds: number): AudioBuffer {
+    const ctx = this.ctx!;
+    const len = Math.floor(ctx.sampleRate * seconds);
+    const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+    const pre = Math.floor(ctx.sampleRate * 0.018);
+    for (let c = 0; c < 2; c++) {
+      const d = buf.getChannelData(c);
+      for (let i = pre; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - (i - pre) / (len - pre), 3.2);
+    }
+    return buf;
+  }
+
+  /** NES-like 4-bit stepped triangle: a little grit that reads well on small speakers. */
+  private triangleWave(): PeriodicWave {
+    if (this.triWave) return this.triWave;
+    const N = 32, H = 24;
+    const samples: number[] = [];
+    for (let i = 0; i < N; i++) samples.push(((i < 16 ? i : 31 - i) / 15) * 2 - 1);
+    const real = new Float32Array(H), imag = new Float32Array(H);
+    for (let k = 1; k < H; k++) {
+      let re = 0, im = 0;
+      for (let i = 0; i < N; i++) {
+        const a = (2 * Math.PI * k * (i + 0.5)) / N;
+        re += samples[i] * Math.cos(a);
+        im += samples[i] * Math.sin(a);
+      }
+      real[k] = (re / N) * 2;
+      imag[k] = (im / N) * 2;
+    }
+    this.triWave = this.ctx!.createPeriodicWave(real, imag);
+    return this.triWave;
+  }
+
   playMusic(name: string) {
     if (name === this.songName) return;
     this.songName = name;
     if (!this.ctx) return;
-    const spec = SONGS[name];
-    if (!spec) return;
+    const def = SONGS[name];
+    if (!def) return;
     let song = this.cache.get(name);
     if (!song) {
-      song = compose(spec);
+      song = compileSong(def);
       this.cache.set(name, song);
     }
     // quick fade between songs
@@ -286,10 +259,10 @@ class AudioEngine {
     this.musicGain.gain.setValueAtTime(0, now);
     this.musicGain.gain.linearRampToValueAtTime(this.musicVol * 0.55, now + 0.4);
     this.song = song;
-    this.songStart = now + 0.08;
+    this.songStart = now + 0.1;
     this.nextIdx = 0;
-    this.loopCount = 0;
-    if (this.timer === null) this.timer = window.setInterval(() => this.schedule(), 30);
+    this.pass = 0;
+    if (this.timer === null) this.timer = window.setInterval(() => this.schedule(), 25);
   }
 
   stopMusic() {
@@ -298,26 +271,84 @@ class AudioEngine {
   }
 
   private schedule() {
+    if (this.ctx) this.scheduleUntil(this.ctx.currentTime + 0.25);
+  }
+
+  private scheduleUntil(ahead: number) {
     if (!this.ctx || !this.song) return;
-    const ahead = this.ctx.currentTime + 0.2;
     const song = this.song;
-    for (;;) {
-      if (this.nextIdx >= song.notes.length) {
-        this.nextIdx = 0;
-        this.loopCount++;
+    for (let guard = 0; guard < 200000; guard++) {
+      if (this.nextIdx >= song.events.length) {
+        this.nextIdx = song.loopIdx;
+        this.pass++;
       }
-      const n = song.notes[this.nextIdx];
-      const t = this.songStart + this.loopCount * song.length + n.t;
+      const ev = song.events[this.nextIdx];
+      const offset = this.pass === 0 ? 0 : song.length + (this.pass - 1) * (song.length - song.loopTick) - song.loopTick;
+      const t = this.songStart + (offset + ev.tick) * song.spt;
       if (t > ahead) break;
       this.nextIdx++;
-      if (t < this.ctx.currentTime - 0.05) continue;
-      const dest = this.musicGain;
-      if (n.ch === 3) {
-        if (n.drum === 'kick') this.tone(dest, t, 140, 0.12, n.vol, 'sine', 0.5, 45);
-        else if (n.drum === 'snare') this.noiseHit(dest, t, n.dur, n.vol * 0.7, 1200, 9000);
-        else this.noiseHit(dest, t, n.dur, n.vol * 0.6, 7000);
-      } else if (n.ch === 2) this.tone(dest, t, midiHz(n.midi), n.dur, n.vol, 'triangle');
-      else this.tone(dest, t, midiHz(n.midi), n.dur, n.vol, 'pulse', n.duty ?? 0.5);
+      if (t < this.ctx.currentTime - 0.03) continue;
+      this.playEvent(ev, t, song.spt);
+    }
+  }
+
+  private playEvent(ev: SongEvent, t: number, spt: number) {
+    const ctx = this.ctx!;
+    const bus = this.buses[ev.ch];
+    const dur = ev.dur * spt;
+    if (ev.ch === 3) return this.drum(bus, ev.drum!, t, ev.vol);
+    const o = ctx.createOscillator();
+    const hz = midiHz(ev.midi[0]);
+    if (ev.ch === 2) o.setPeriodicWave(this.triangleWave());
+    else o.setPeriodicWave(this.pulseWave(DUTY[ev.duty] ?? 0.5));
+    if (ev.midi.length > 1) {
+      // fast arpeggio: cycle the chord tones like a sound chip would
+      const step = 1 / 36;
+      for (let k = 0, tt = t; tt < t + dur; k++, tt += step) o.frequency.setValueAtTime(midiHz(ev.midi[k % ev.midi.length]), tt);
+    } else o.frequency.setValueAtTime(hz, t);
+    if (ev.vib && dur > 0.24 && ev.midi.length === 1) {
+      // delayed vibrato, so short notes stay clean and held notes sing
+      const lfo = ctx.createOscillator();
+      lfo.frequency.value = 5.5;
+      const depth = ctx.createGain();
+      depth.gain.setValueAtTime(0, t);
+      depth.gain.setValueAtTime(0, t + 0.16);
+      depth.gain.linearRampToValueAtTime(hz * (Math.pow(2, (ev.vib * 6) / 1200) - 1), t + 0.42);
+      lfo.connect(depth).connect(o.frequency);
+      lfo.start(t);
+      lfo.stop(t + dur + 0.06);
+    }
+    const g = ctx.createGain();
+    const peak = ev.vol;
+    const rel = ev.ch === 2 ? 0.012 : 0.03;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(peak, t + 0.004);
+    // envelopes: E1 plucked decay, E2 soft decay to a sustain, E0 organ
+    const end = ev.ch !== 2 && ev.env === 1 ? peak * Math.exp(-Math.max(0, dur - 0.01) / 0.13) * 0.92 + peak * 0.08
+      : ev.ch !== 2 && ev.env === 2 ? peak * 0.62 + peak * 0.38 * Math.exp(-Math.max(0, dur - 0.02) / 0.16)
+      : peak;
+    if (end !== peak) g.gain.exponentialRampToValueAtTime(Math.max(0.0005, end), t + Math.max(0.005, dur));
+    else g.gain.setValueAtTime(peak, t + Math.max(0.005, dur));
+    g.gain.linearRampToValueAtTime(0, t + dur + rel);
+    o.connect(g).connect(bus);
+    o.start(t);
+    o.stop(t + dur + rel + 0.02);
+  }
+
+  private drum(bus: AudioNode, d: string, t: number, vol: number) {
+    switch (d) {
+      case 'k':
+        this.tone(bus, t, 160, 0.13, vol * 0.9, 'triangle', 0.5, 42);
+        this.noiseHit(bus, t, 0.012, vol * 0.25, 1500, 8000);
+        break;
+      case 's':
+        this.noiseHit(bus, t, 0.14, vol * 0.65, 1300, 9500);
+        this.tone(bus, t, 200, 0.06, vol * 0.35, 'triangle', 0.5, 150);
+        break;
+      case 'h': this.noiseHit(bus, t, 0.035, vol * 0.45, 7500, 16000, true); break;
+      case 'p': this.noiseHit(bus, t, 0.16, vol * 0.4, 6500, 16000, true); break;
+      case 'x': this.noiseHit(bus, t, 0.8, vol * 0.45, 3500, 15000); break;
+      case 't': this.tone(bus, t, 230, 0.16, vol * 0.75, 'triangle', 0.5, 105); break;
     }
   }
 
