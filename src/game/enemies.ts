@@ -1,5 +1,5 @@
 import { SPECIES } from '../data/pokedex.ts';
-import { ENEMY_ROLE, RUN_LENGTH, type BossDef, type EnemyRole, type SpawnEntry, type WaveDef } from '../data/stages.ts';
+import { ENEMY_ROLE, RUN_LENGTH, type BossDef, type EnemyRole, type SpawnEntry, type WaveDef, waveAt } from '../data/stages.ts';
 import { TAU, dist2 } from '../engine/math.ts';
 import { freshStatus, makeProjectile, rawDamageEnemy } from './combat.ts';
 import { megaOnKill } from './mega.ts';
@@ -51,8 +51,7 @@ export class Spawner {
 
   /** The current minute's wave; after the last minute it keeps applying (overtime). */
   get wave(): WaveDef {
-    const waves = this.sim.stage.waves;
-    return waves[Math.min(waves.length - 1, Math.floor(this.sim.time / 60))];
+    return waveAt(this.sim.stage, this.sim.time).wave;
   }
 
   /** Stage difficulty eases in over the first minutes so every route starts fair. */
@@ -76,8 +75,7 @@ export class Spawner {
   update() {
     const sim = this.sim;
     const t = sim.time;
-    const n = sim.players.length;
-    this.updateWave(t, n);
+    this.updateWave(t);
     if (t >= this.nextTreasure) {
       this.nextTreasure += sim.rng.range(80, 130);
       if (sim.rng.chance(0.65)) {
@@ -113,15 +111,16 @@ export class Spawner {
   }
 
   /** Minute changes, wave bosses and the quota backfill. */
-  private updateWave(t: number, n: number) {
+  private updateWave(t: number) {
     const sim = this.sim;
-    const idx = Math.min(sim.stage.waves.length - 1, Math.floor(t / 60));
+    const { idx, wave: w } = waveAt(sim.stage, t);
+    const n = sim.players.length;
     if (idx !== this.waveIdx) {
       const prev = sim.stage.waves[this.waveIdx];
       this.waveIdx = idx;
-      const w = sim.stage.waves[idx];
+      this.nextQuota = t; // the new minute's quota lands with its banner
       if (idx > 0) {
-        const species = w.headline ?? (w.species.find((e) => !prev?.species.some((p) => p.species === e.species)) ?? w.species[0]).species;
+        const species = w.headline ?? (w.species.find((e) => !prev.species.some((p) => p.species === e.species)) ?? w.species[0]).species;
         sim.emit({ e: 'wave', minute: idx, species, text: w.text ?? `${SPECIES[species].name} appear!` });
       }
       if (w.elite) {
@@ -133,7 +132,6 @@ export class Spawner {
     while (this.pendingElites.length && t >= this.pendingElites[0].at) {
       this.spawnOffscreen(this.pendingElites.shift()!.species, { elite: true });
     }
-    const w = sim.stage.waves[idx];
     if (t < this.nextQuota) return;
     this.nextQuota = t + w.interval;
     // Only filler counts toward the quota; set pieces and carriers have their own pacing.
@@ -252,7 +250,7 @@ export class Spawner {
     const sim = this.sim;
     const p = this.anchor();
     const count = 26 + Math.floor(this.minute * 2);
-    const species = sim.rng.pick(this.wave.species).species;
+    const species = sim.rng.weighted(this.wave.species, (e: SpawnEntry) => e.w)!.species;
     sim.emit({ e: 'warn', text: 'You’re surrounded!' });
     const r = Math.max(p.viewW, p.viewH) * 0.42;
     for (let i = 0; i < count; i++) {

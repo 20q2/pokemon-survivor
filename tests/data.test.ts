@@ -132,3 +132,15 @@ describe('type chart', () => {
     expect(TYPES.length).toBe(18);
   });
 });
+
+describe('wave newcomers', () => {
+  it('every wave from minute 1 introduces a species or sets a headline', () => {
+    for (const st of STAGES) {
+      for (let i = 1; i < st.waves.length; i++) {
+        const prev = new Set(st.waves[i - 1].species.map((e) => e.species));
+        const fresh = st.waves[i].species.some((e) => !prev.has(e.species));
+        expect(fresh || !!st.waves[i].headline, `${st.id} minute ${i}`).toBe(true);
+      }
+    }
+  });
+});

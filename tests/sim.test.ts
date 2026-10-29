@@ -232,7 +232,7 @@ describe('playtest regressions', () => {
     const { runBonus } = await import('../src/meta/progression.ts');
     const { MAX_MOVE_LEVEL } = await import('../src/data/moves.ts');
     const { Rng } = await import('../src/engine/math.ts');
-    const sim = new Sim({ stageId: 'viridian', seed: 42, players: [{ name: 'a', lineId: 'pichu', shiny: false, meta: metaBonuses({}), tms: [] }] });
+    const sim = new Sim({ stageId: 'viridian', seed: 7, players: [{ name: 'a', lineId: 'pichu', shiny: false, meta: metaBonuses({}), tms: [] }] });
     sim.invulnerable = true;
     const p = sim.players[0];
     let realAt6 = -1;
@@ -394,5 +394,61 @@ describe('hit-stop', () => {
     for (let i = 0; i < 10; i++) { if (sim.hitStop > 1e-9) frozen++; sim.update(DT); }
     expect(frozen).toBe(5);
     expect(sim.time).toBeCloseTo(5 * DT);
+  });
+});
+
+describe('minute waves', () => {
+  const regulars = (sim: Sim) => sim.enemies.filter((e) => e.alive && !e.boss && !e.elite && !e.alpha && e.role !== 'treasure' && e.aiState !== 9);
+
+  function playMinuteOne(players: number) {
+    const sim = new Sim({
+      stageId: 'viridian', seed: 1234,
+      players: Array.from({ length: players }, (_, i) => ({ name: `P${i}`, lineId: 'charmander', shiny: false, meta: metaBonuses({}), tms: [] })),
+    });
+    const waves: { minute: number; species: string; text: string; at: number }[] = [];
+    const snap: Record<string, { regulars: number; elites: string[]; pos: string }> = {};
+    for (let steps = 0; sim.time < 63 && steps < 63 * 60 * 3; steps++) {
+      if (sim.phase === 'levelup') {
+        for (const p of sim.players) if (sim.offers.has(p.id)) sim.choose(p.id, botChoose(sim, p));
+        continue;
+      }
+      if (sim.phase !== 'play') break;
+      sim.update(DT);
+      for (const ev of sim.events) if (ev.e === 'wave') waves.push({ minute: ev.minute, species: ev.species, text: ev.text, at: sim.time });
+      sim.events.length = 0;
+      // 60.05: just after the minute-1 quota check (kills between checks legitimately dip below it).
+      for (const at of [60.05, 62.5]) {
+        if (sim.time >= at && !snap[at]) {
+          snap[at] = {
+            regulars: regulars(sim).length,
+            elites: sim.enemies.filter((e) => e.alive && e.elite).map((e) => e.speciesId),
+            pos: sim.enemies.map((e) => `${e.id}:${e.speciesId}:${e.x.toFixed(2)},${e.y.toFixed(2)}`).join('|'),
+          };
+        }
+      }
+    }
+    return { sim, waves, snap };
+  }
+
+  it('announces minute 1, spawns its elite after the banner and holds the quota', () => {
+    const { waves, snap } = playMinuteOne(1);
+    expect(waves.filter((w) => w.minute === 1)).toHaveLength(1);
+    expect(waves[0]).toMatchObject({ species: 'pidgey', text: 'Pidgey appear!' });
+    expect(waves[0].at).toBeLessThan(61.5);
+    const w1 = STAGES[0].waves[1];
+    expect(snap[62.5].elites).toContain(w1.elite);
+    expect(snap[60.05].regulars).toBeGreaterThanOrEqual(w1.min);
+    expect(snap[60.05].regulars).toBeLessThanOrEqual(w1.min + w1.species.length);
+  });
+
+  it('scales the quota for co-op', () => {
+    const { snap } = playMinuteOne(2);
+    const min = Math.round(25 * 1.35);
+    expect(snap[60.05].regulars).toBeGreaterThanOrEqual(min);
+    expect(snap[60.05].regulars).toBeLessThanOrEqual(min + STAGES[0].waves[1].species.length);
+  });
+
+  it('is deterministic for a given seed', () => {
+    expect(playMinuteOne(1).snap[62.5]).toEqual(playMinuteOne(1).snap[62.5]);
   });
 });

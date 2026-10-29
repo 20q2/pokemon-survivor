@@ -58,12 +58,19 @@ export const WAVE_MIN = [12, 25, 45, 35, 25, 10, 60, 90, 30, 10, 200, 40, 150, 1
 export const WAVE_INTERVAL = [1, 1, 0.5, 0.5, 0.5, 0.25, 0.25, 0.25, 0.25, 0.25, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1];
 /** Roughly 1 + 0.15m + 0.025m^2 + 0.0025m^3 at whole minutes. */
 export const WAVE_HP = [1, 1.18, 1.42, 1.74, 2.16, 2.69, 3.34, 4.13, 5.08, 6.2, 7.5, 9, 10.7, 12.6, 14.7, 17.1];
+/** The wave in force at run time `t` (seconds). Overtime (past minute 15) keeps the last wave as-is; a later task adds an overtime sweeper. */
+export function waveAt(stage: StageDef, t: number): { idx: number; wave: WaveDef } {
+  const idx = Math.min(stage.waves.length - 1, Math.floor(t / 60));
+  return { idx, wave: stage.waves[idx] };
+}
+
 /** Minutes that end with a wave boss (about one chest per minute); a second comes from minute 10. */
 const ELITE_MINUTES = new Set([1, 2, 3, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15]);
 
 /**
- * Builds the 16 waves from one line of species per minute (`name` or `name:weight`, first
- * listed is the most common) plus optional flavour text per minute. Elites rotate through `elites`.
+ * Builds the 16 waves from one line of species per minute plus optional flavour text per minute.
+ * Spawn weights default to 3 for the first species, 2 for the second and 1 for the rest; write
+ * `name:n` to override. Elites rotate through `elites`.
  */
 function waves(elites: string[], minutes: string[], text: Record<number, string> = {}): WaveDef[] {
   let ei = 0;
@@ -99,8 +106,7 @@ export const STAGES: StageDef[] = [
       'parasect spearow kakuna bellsprout oddish',
       'pidgeotto parasect bellsprout paras metapod',
       'pidgeotto parasect spearow kakuna bellsprout paras'
-    ],
-      {3: 'Metapod wall closing in!', 6: 'Spearow flock in!', 10: 'The forest wakes up!', 15: 'Everything in the forest is coming!'}),
+    ], {3: 'Metapod wall closing in!', 6: 'Spearow flock in!', 10: 'The forest wakes up!', 15: 'Everything in the forest is coming!'}),
     elites: ['pidgeotto', 'metapod', 'parasect'], swarm: 'spearow',
     bosses: [
       { species: 'beedrill', at: 180, patterns: ['charge', 'cone', 'aimed'], minions: ['weedle'] },
@@ -130,8 +136,7 @@ export const STAGES: StageDef[] = [
       'sandslash clefairy zubat graveler',
       'golbat graveler sandslash ekans sandshrew',
       'golbat graveler sandslash clefairy ekans zubat'
-    ],
-      {1: 'Diglett pop up everywhere!', 6: 'Golbat swoop in!', 10: 'The cavern shakes!', 15: 'The whole mountain is awake!'}),
+    ], {1: 'Diglett pop up everywhere!', 6: 'Golbat swoop in!', 10: 'The cavern shakes!', 15: 'The whole mountain is awake!'}),
     elites: ['golbat', 'graveler', 'sandslash'], swarm: 'zubat',
     bosses: [
       { species: 'onix', at: 180, patterns: ['charge', 'slam', 'quake'], minions: ['geodude'] },
@@ -161,8 +166,7 @@ export const STAGES: StageDef[] = [
       'spheal snorunt tentacool horsea jynx',
       'dewgong jynx krabby slowpoke snorunt',
       'dewgong jynx krabby spheal snorunt tentacool'
-    ],
-      {2: 'Krabby claw their way in!', 6: 'Slowpoke drift into the cave!', 10: 'The tide rolls in!', 15: 'A frozen wave crashes down!'}),
+    ], {2: 'Krabby claw their way in!', 6: 'Slowpoke drift into the cave!', 10: 'The tide rolls in!', 15: 'A frozen wave crashes down!'}),
     elites: ['dewgong', 'jynx', 'slowpoke'], swarm: 'tentacool',
     bosses: [
       { species: 'cloyster', at: 180, patterns: ['radial', 'beam', 'spiral'], minions: ['shellder'] },
@@ -192,8 +196,7 @@ export const STAGES: StageDef[] = [
       'magneton electrode grimer electrike magnemite',
       'elekid koffing mareep magneton voltorb',
       'electrode magneton elekid koffing mareep electrike'
-    ],
-      {4: 'Magnemite hum into range!', 8: 'Electrode charge up!', 10: 'The generators overload!', 15: 'Total blackout incoming!'}),
+    ], {4: 'Magnemite hum into range!', 8: 'Electrode charge up!', 10: 'The generators overload!', 15: 'Total blackout incoming!'}),
     elites: ['magneton', 'electrode', 'grimer'], swarm: 'voltorb',
     bosses: [
       { species: 'electabuzz', at: 180, patterns: ['charge', 'quake', 'radial'], minions: ['elekid'] },
@@ -223,8 +226,7 @@ export const STAGES: StageDef[] = [
       'dusclops banette misdreavus sableye zubat',
       'houndour murkrow hypno drowzee shuppet',
       'banette dusclops houndour sableye murkrow misdreavus'
-    ],
-      {1: 'Duskull drift through the walls!', 6: 'Houndour howl in the dark!', 10: 'The graves open!', 15: 'Every spirit is rising!'}),
+    ], {1: 'Duskull drift through the walls!', 6: 'Houndour howl in the dark!', 10: 'The graves open!', 15: 'Every spirit is rising!'}),
     elites: ['banette', 'dusclops', 'hypno'], swarm: 'murkrow',
     bosses: [
       { species: 'hypno', at: 180, patterns: ['spiral', 'donut', 'summon'], minions: ['drowzee'] },
@@ -254,8 +256,7 @@ export const STAGES: StageDef[] = [
       'magmar ponyta vulpix bagon rhyhorn',
       'hitmonlee shelgon primeape mankey slugma',
       'magmar shelgon hitmonlee primeape ponyta rhyhorn'
-    ],
-      {2: 'Ponyta stampede!', 6: 'Rhyhorn charge in!', 10: 'The volcano erupts!', 15: 'The mountain is on fire!'}),
+    ], {2: 'Ponyta stampede!', 6: 'Rhyhorn charge in!', 10: 'The volcano erupts!', 15: 'The mountain is on fire!'}),
     elites: ['magmar', 'hitmonlee', 'shelgon'], swarm: 'ponyta',
     bosses: [
       { species: 'hitmonlee', at: 180, patterns: ['charge', 'cross', 'aimed'], minions: ['mankey'] },
@@ -285,8 +286,7 @@ export const STAGES: StageDef[] = [
       'shelgon banette magmar electrode ditto',
       'jynx hypno electabuzz primeape graveler',
       'magmar electabuzz jynx hypno shelgon banette'
-    ],
-      {3: 'Ditto are everywhere!', 7: 'The cave grows restless!', 10: 'The strongest have arrived!', 15: 'Nothing holds back now!'}),
+    ], {3: 'Ditto are everywhere!', 7: 'The cave grows restless!', 10: 'The strongest have arrived!', 15: 'Nothing holds back now!'}),
     elites: ['kangaskhan', 'wobbuffet', 'arcanine'], swarm: 'golbat',
     bosses: [
       { species: 'kangaskhan', at: 180, patterns: ['charge', 'slam', 'quake'], minions: ['raticate'] },
