@@ -358,9 +358,8 @@ export class App {
           if (this.endTimer > (ph === 'over' ? 2 : 0.6)) this.finishRun(ph === 'victory');
         }
         if (s.lost) {
-          this.ended = true;
-          toast('Disconnected', 'Lost connection to the host.', assets.itemUrl('escape-rope'));
-          this.goTitle();
+          toast('Disconnected', 'Lost connection to the host. Your progress was saved.', assets.itemUrl('escape-rope'));
+          this.finishRun(false, true);
         }
       }
     } else if (this.attract) {

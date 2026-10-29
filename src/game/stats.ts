@@ -5,7 +5,7 @@ import type { DerivedStats, Player } from './types.ts';
 /** Maps a base stat (~20..160) into a gentle multiplier so every Pokémon stays viable. */
 export const statFactor = (base: number) => 0.75 + base / 200;
 
-export const BASE_PICKUP = 48;
+export const BASE_PICKUP = 56;
 
 export function derivePlayerStats(p: Player, level: number, time: number): DerivedStats {
   const sp = SPECIES[p.speciesId];

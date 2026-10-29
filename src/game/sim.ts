@@ -47,6 +47,8 @@ export const DT = 1 / 60;
 export const MAX_ENEMIES = 520;
 
 export function xpForLevel(level: number): number {
+  // Snappy first levels, then the long curve.
+  if (level < 10) return 4 + (level - 1) * 5;
   let need = 5 + (level - 1) * 7;
   if (level > 20) need += (level - 20) * 6;
   if (level > 40) need += (level - 40) * 10;
