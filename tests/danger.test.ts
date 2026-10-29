@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dangerStrength, heartbeatInterval } from '../src/game/danger.ts';
+import { dangerStrength, heartbeatInterval } from '../src/render/danger.ts';
 import { freshSave, migrate } from '../src/meta/save.ts';
 
 describe('danger cues', () => {
@@ -25,6 +25,10 @@ describe('readability options', () => {
     const s = migrate({ options: { ...old, music: 0.2 } });
     expect(s.options.fxOpacity).toBe(1);
     expect(s.options.numberCap).toBe(160);
+    const bad = migrate({ options: { fxOpacity: 9, numberCap: 7 } });
+    expect(bad.options.fxOpacity).toBe(1);
+    expect(bad.options.numberCap).toBe(160);
+    expect(migrate({ options: { fxOpacity: 0 } }).options.fxOpacity).toBe(0.25);
     expect(s.options.music).toBe(0.2);
   });
 });

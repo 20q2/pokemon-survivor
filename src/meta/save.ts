@@ -72,6 +72,15 @@ export function freshSave(): SaveData {
   };
 }
 
+function sanitizeOptions(o: Options): Options {
+  const fx = Number(o.fxOpacity);
+  return {
+    ...o,
+    fxOpacity: Number.isFinite(fx) ? Math.min(1, Math.max(0.25, fx)) : 1,
+    numberCap: o.numberCap === 40 || o.numberCap === 80 ? o.numberCap : 160,
+  };
+}
+
 /** Merge a possibly-old/partial save onto a fresh one so new fields always exist. */
 export function migrate(raw: unknown): SaveData {
   const base = freshSave();
@@ -82,7 +91,7 @@ export function migrate(raw: unknown): SaveData {
     ...r,
     v: 1,
     stats: { ...base.stats, ...(r.stats ?? {}) },
-    options: { ...base.options, ...(r.options ?? {}) },
+    options: sanitizeOptions({ ...base.options, ...(r.options ?? {}) }),
     flags: { ...base.flags, ...(r.flags ?? {}) },
     lines: Array.from(new Set([...(r.lines ?? []), ...STARTER_LINES])),
   };

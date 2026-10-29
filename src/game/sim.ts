@@ -89,6 +89,10 @@ export function xpForLevel(level: number): number {
   return Math.round(6 + 5 * k + 1.2 * k * k + (k > 24 ? 0.08 * (k - 24) ** 3 : 0));
 }
 
+/** Crit hit-stop: 2 frames, at most once per half second. */
+const CRIT_STOP = 2 / 60;
+const CRIT_STOP_GAP = 0.5;
+
 export class Sim {
   readonly stage: StageDef;
   readonly elite: boolean;
@@ -100,9 +104,10 @@ export class Sim {
   readonly flow: FlowField[] = [];
   time = 0;
   /** Sim-time freeze left (s): a sim-side time-scale so every co-op peer stops on the same tick. */
-  hitStop = 0;
+  private _hitStop = 0;
   /** `time` before which another crit may not trigger hit-stop. */
-  critStopReady = 0;
+  private critStopReady = 0;
+  get hitStop() { return this._hitStop; }
   phase: Phase = 'play';
   cine: Cinematic | null = null;
   cineQueue: Cinematic[] = [];
@@ -214,14 +219,28 @@ export class Sim {
   }
 
   /** Freeze the sim for `seconds` (never shortens a longer freeze already running). */
-  stop(seconds: number) { if (seconds > this.hitStop) this.hitStop = seconds; }
+  stop(seconds: number) { if (seconds > this._hitStop) this._hitStop = seconds; }
+
+  /** A crit landed: 2 frames of hit-stop, at most once per half second (crits can land 30x/s late game). */
+  critStop() {
+    if (this.time < this.critStopReady) return;
+    this.stop(CRIT_STOP);
+    this.critStopReady = this.time + CRIT_STOP_GAP;
+  }
 
   // ───────────────────────────── main loop ─────────────────────────────
 
   update(dt: number) {
     if (this.phase === 'cine') return this.updateCine(dt);
     if (this.phase !== 'play') return;
-    if (this.hitStop > 1e-9) { this.hitStop -= dt; return; }
+    if (this._hitStop > 1e-9) {
+      this._hitStop -= dt;
+      // Render interpolation still replays px -> x while frozen; pin it so nothing jerks back and re-slides.
+      for (const p of this.players) { p.px = p.x; p.py = p.y; }
+      for (const e of this.enemies) { e.px = e.x; e.py = e.y; }
+      for (const pr of this.projectiles) { pr.px = pr.x; pr.py = pr.y; }
+      return;
+    }
     this.time += dt;
     for (const p of this.players) { p.px = p.x; p.py = p.y; }
     for (const e of this.enemies) { e.px = e.x; e.py = e.y; }
@@ -458,6 +477,7 @@ export class Sim {
     const c = this.cineQueue.shift();
     if (!c) return;
     this.cine = c;
+    this._hitStop = 0;
     this.phase = 'cine';
     if (c.kind === 'evolve') this.emit({ e: 'evolve', player: c.player, from: c.from!, to: c.to! });
   }

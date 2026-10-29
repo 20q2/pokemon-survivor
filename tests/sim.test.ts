@@ -283,6 +283,18 @@ describe('hit-stop', () => {
     expect(sim.time).toBeCloseTo(t0 + DT);
   });
 
+  it('pins interpolation (px = x) while frozen', async () => {
+    const { spawnEnemy } = await import('../src/game/enemies.ts');
+    const sim = make();
+    const e = spawnEnemy(sim, 'rattata', 100, 0)!;
+    sim.update(DT);
+    e.x += 5; e.y += 3;
+    sim.stop(2 * DT);
+    sim.update(DT);
+    expect(e.px).toBe(e.x);
+    expect(e.py).toBe(e.y);
+  });
+
   it('a longer stop is not shortened by a shorter one', () => {
     const sim = make();
     sim.stop(7 / 60);
@@ -329,5 +341,12 @@ describe('hit-stop', () => {
     expect(b.time).toBe(a.time);
     expect(b.kills).toBe(a.kills);
     expect(b.xp).toBe(a.xp);
+    // and stops really happen: frozen ticks do not advance sim time
+    const sim = make();
+    sim.stop(5 * DT);
+    let frozen = 0;
+    for (let i = 0; i < 10; i++) { if (sim.hitStop > 1e-9) frozen++; sim.update(DT); }
+    expect(frozen).toBe(5);
+    expect(sim.time).toBeCloseTo(5 * DT);
   });
 });

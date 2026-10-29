@@ -27,9 +27,6 @@ export const PF_STICKY = 512;     // latch on and detonate later
 export const PF_PULSE = 1024;     // explode periodically along the path
 export const PF_REFRACT = 2048;   // beams: split into three at the first foe hit
 export const PF_NOIMPACT = 4096;  // applies status without dealing damage
-/** Crit hit-stop: 2 frames, at most once per half second so late-game crit spam doesn't stutter. */
-export const CRIT_STOP = 2 / 60;
-export const CRIT_STOP_GAP = 0.5;
 export const PF_DONE = 8192;      // one-shot latch (aftermath spawned, crit reset used, split done…)
 export const PF_FOCUS = 16384;    // fizzles if the owner is hurt before it goes off
 export const PF_PERCENT = 32768;  // damage is a slice of the foe's max HP
@@ -1166,7 +1163,7 @@ export function hitEnemy(sim: Sim, pr: Projectile, e: Enemy) {
     if (res.eff > 1) owner.superEff++;
     if (owner.stats.lifesteal) heal(owner, res.dmg * owner.stats.lifesteal, 'lifesteal');
     if (owner.stats.flinch && sim.rng.next() < owner.stats.flinch) applyStatus(sim, e, 'flinch', 0, owner);
-    if (res.crit && sim.time >= sim.critStopReady) { sim.stop(CRIT_STOP); sim.critStopReady = sim.time + CRIT_STOP_GAP; }
+    if (res.crit) sim.critStop();
     sim.emit({ e: 'hit', x: e.x, y: e.y - e.radius, dmg: res.dmg, eff: res.eff, crit: res.crit, type: pr.type });
     afterHit(sim, pr, e, owner, res.crit, res.dmg, shatter);
   }

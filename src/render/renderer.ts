@@ -9,7 +9,7 @@ import { Background, type DecorSprite } from './background.ts';
 import { DamageNumbers, Particles, Shape } from './fx.ts';
 import { DeathPops, POP_TIME, popSquash } from './pops.ts';
 import { HAZARD, HAZARD_IMPACT } from '../game/hazards.ts';
-import { dangerStrength } from '../game/danger.ts';
+import { dangerStrength } from './danger.ts';
 import { PF_FOCUS, PF_RETARGET, PF_STICKY } from '../game/combat.ts';
 import { STATUS_INFO, STATUS_ORDER } from '../data/status.ts';
 import type { WeatherKind } from '../data/moves.ts';
@@ -281,18 +281,11 @@ export class Renderer {
 
     // ground-level effects
     const fxL = Math.floor(L), fxT = Math.floor(T);
-    if (this.fxOpacity >= 1) {
-      this.beginFx(W, H, fxL, fxT);
-      for (const pr of world.projectiles) if (isGroundFx(pr)) this.drawGroundFx(pr, world);
-      this.endFx(fxL, fxT);
-    } else {
-      // Telegraphs, zones, trails and auras fade with the setting; terrain, mines and cages stay solid.
-      this.beginFx(W, H, fxL, fxT);
-      for (const pr of world.projectiles) if (isGroundFx(pr) && !isDimmable(pr)) this.drawGroundFx(pr, world);
-      this.endFx(fxL, fxT);
-      this.beginFx(W, H, fxL, fxT);
-      for (const pr of world.projectiles) if (isGroundFx(pr) && isDimmable(pr)) this.drawGroundFx(pr, world);
-      this.endFx(fxL, fxT, 'source-over', this.fxOpacity);
+    if (this.fxOpacity >= 1) this.drawGroundPass(world, fxL, fxT, W, H, () => true, 1);
+    else {
+      // Two layers below full opacity: the dimmed ones composite over the solid ones (a different layer order than one pass).
+      this.drawGroundPass(world, fxL, fxT, W, H, (pr) => !isDimmable(pr), 1);
+      this.drawGroundPass(world, fxL, fxT, W, H, isDimmable, this.fxOpacity);
     }
     for (const pk of world.pickups) if (inView(pk.x, pk.y, L, T, W, H, 20)) this.drawPickup(pk, world.time);
 
@@ -354,6 +347,13 @@ export class Renderer {
   }
 
   private mainG: CanvasRenderingContext2D | null = null;
+
+  /** Draw the ground effects matching `pick` into one effects layer and composite it at `alpha`. */
+  private drawGroundPass(world: WorldView, fxL: number, fxT: number, W: number, H: number, pick: (pr: Projectile) => boolean, alpha: number) {
+    this.beginFx(W, H, fxL, fxT);
+    for (const pr of world.projectiles) if (isGroundFx(pr) && pick(pr)) this.drawGroundFx(pr, world);
+    this.endFx(fxL, fxT, 'source-over', alpha);
+  }
 
   /** Redirect drawing into the low-res effects layer (world pixels, origin at fxL/fxT). */
   private beginFx(W: number, H: number, fxL: number, fxT: number) {
@@ -1556,14 +1556,17 @@ export const SLOT_COLORS = ['#ff6b6b', '#4dabf7', '#69db7c', '#ffd43b'];
 
 export const chestTier = (v: number) => Math.max(1, Math.min(4, Math.round(v))) as ChestTier;
 
-/** Ground effects the fx-opacity setting may fade: everything except terrain, mines and cages. */
-function isDimmable(pr: Projectile) {
-  return pr.moveId === HAZARD || !(pr.behavior === 'terrain' || pr.behavior === 'mine' || (pr.behavior === 'zone' && pr.shape === 'ring'));
-}
-
 function isGroundFx(pr: Projectile) {
   return pr.moveId === HAZARD || (!pr.hostile && (pr.behavior === 'zone' || pr.behavior === 'trail' || pr.behavior === 'aura'
     || pr.behavior === 'terrain' || (pr.behavior === 'mine' && pr.fx !== 'bubble')));
+}
+
+/**
+ * Ground effects the fx-opacity setting may fade: the player's own zones, trails and auras. Hostile
+ * telegraphs (HAZARD), terrain, mines and cages stay solid. Keep in sync with isGroundFx.
+ */
+function isDimmable(pr: Projectile) {
+  return pr.moveId !== HAZARD && !(pr.behavior === 'terrain' || pr.behavior === 'mine' || (pr.behavior === 'zone' && pr.shape === 'ring'));
 }
 
 /** True for pale badge colours that need dark text. */
@@ -1580,7 +1583,9 @@ function inView(x: number, y: number, L: number, T: number, W: number, H: number
 const DOWN_ROW = dirRow(0, 1);
 /** Camera zoom multiplier per evolution stage of the local partner. */
 const EVO_ZOOM = [1, 0.9, 0.8];
+/** Zoom-in on an elite kill, as a fraction of the normal zoom. */
 const PUNCH_ZOOM = 0.04;
+/** Seconds for that punch to settle back. */
 const PUNCH_LIFE = 0.25;
 /** Partners draw larger as they evolve (cosmetic; hitboxes are unchanged). With EVO_ZOOM the
  * partner keeps roughly its on-screen size while the world around it shrinks. */

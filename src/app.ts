@@ -11,7 +11,7 @@ import type { GameEvent } from './game/types.ts';
 import { applyRun, checkAchievements, type RunRewards } from './meta/progression.ts';
 import type { RunSummary } from './meta/achievements.ts';
 import { loadSave, storeSave, type SaveData } from './meta/save.ts';
-import { heartbeatInterval } from './game/danger.ts';
+import { heartbeatInterval } from './render/danger.ts';
 import { metaBonuses } from './meta/shop.ts';
 import { assets } from './render/assets.ts';
 import { Renderer } from './render/renderer.ts';
@@ -202,6 +202,7 @@ export class App {
     const me = s.world.players[s.localId];
     banner(`Go! ${SPECIES[me.speciesId].name.toUpperCase()}!`, false, 1800);
     this.alphasDown = 0;
+    this.heartT = 0;
     preloadChestFaces();
     this.tutorial = this.save.stats.runs === 0 ? [
       { at: 2.5, text: 'Moves fire automatically — just move to survive!' },
