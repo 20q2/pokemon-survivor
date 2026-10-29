@@ -45,6 +45,8 @@ export interface SaveData {
   lastStage: string;
   flags: { eeveelutions?: string[]; clearedLines?: string[] };
   bestTimes: Record<string, number>;
+  /** Moves each line has been offered or learned in a run (revealed in its move pool). */
+  movesSeen: Record<string, string[]>;
 }
 
 const KEY = 'pokesurvivors.save.v1';
@@ -58,7 +60,7 @@ export function freshSave(): SaveData {
       moneyEarned: 0, shiniesDefeated: 0, superEffective: 0, coopRuns: 0, maxLevel: 0, revives: 0,
     },
     options: { music: 0.5, sfx: 0.6, shake: true, damageNumbers: true, showFps: false, autoPick: false, name: 'Trainer' },
-    lastLine: 'charmander', lastStage: 'viridian', flags: {}, bestTimes: {},
+    lastLine: 'charmander', lastStage: 'viridian', flags: {}, bestTimes: {}, movesSeen: {},
   };
 }
 

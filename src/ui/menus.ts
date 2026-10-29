@@ -93,6 +93,31 @@ function unlockHint(lineId: string): string {
   return a ? `${a.name}: ${a.desc}` : 'Locked';
 }
 
+/** The line's learnable moves; ones never offered or learned with this Pokémon stay hidden. */
+function movePool(app: App, line: Line) {
+  const seen = new Set([line.starter, ...(app.save.movesSeen[line.id] ?? [])]);
+  const entries: { move: string; gate: string }[] = line.learnset.map((e) => ({
+    move: e.move,
+    gate: e.stage === 0 ? '' : line.branch ? 'Evolved' : `Lv${line.evoLevels[e.stage - 1]}+`,
+  }));
+  for (const [species, moves] of Object.entries(line.branchMoves ?? {})) {
+    for (const m of moves) if (!entries.some((e) => e.move === m)) entries.push({ move: m, gate: SPECIES[species].name });
+  }
+  const found = entries.filter((e) => seen.has(e.move)).length;
+  return h('div', { class: 'pool' },
+    h('div', null, h('b', null, 'Move pool '), h('span', { class: 'hint' }, `${found}/${entries.length} discovered`)),
+    h('div', { class: 'pool-grid' }, entries.map((e) => {
+      const known = seen.has(e.move);
+      const def = MOVES[e.move];
+      return h('div', {
+        class: `pool-move${known ? '' : ' unknown'}`,
+        style: known ? `--tc:${TYPE_COLORS[def.type]}` : '',
+        title: known ? `${def.name} (${cap(def.type)}, ${def.cat}): ${def.desc}` : 'Not discovered yet: learn or be offered it in a run.',
+      }, h('span', { class: 'mn' }, known ? def.name : '???'), e.gate ? h('span', { class: 'gate' }, e.gate) : null);
+    })),
+  );
+}
+
 export function selectScreen(app: App, onConfirm: (lineId: string) => void, title = 'Choose your partner', onBack = () => app.goTitle()) {
   let sel = app.lineUnlocked(app.save.lastLine) ? app.save.lastLine : 'charmander';
   const detail = h('div', { class: 'panel detail col' });
@@ -115,6 +140,7 @@ export function selectScreen(app: App, onConfirm: (lineId: string) => void, titl
       h('div', { class: 'hint' }, line.blurb),
       h('div', null, h('b', null, `Ability: ${ABILITIES[line.ability].name}`), h('div', { class: 'hint' }, ABILITIES[line.ability].desc)),
       h('div', null, h('b', null, 'Starts with: '), MOVES[line.starter].name, ' ', typeBadge(MOVES[line.starter].type)),
+      movePool(app, line),
       statBars(sp.id),
       h('div', { class: 'evo' }, img(assets.portraitUrl(sp.id, shinyOn(sel))),
         ...(line.branch ? [h('span', { class: 'arrow' }, `Lv${line.evoLevels[0]} →`), ...evo.map((e) => img(assets.portraitUrl(e, shinyOn(sel))))]

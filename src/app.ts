@@ -39,6 +39,13 @@ export class App {
   private autoT = 0;
   private tutorial: { at: number; text: string }[] = [];
   private alphasDown = 0;
+  private offersSeen: unknown = null;
+
+  /** Reveal moves in a line's move pool (shown on the partner select screen). */
+  private discover(lineId: string, moves: string[]) {
+    const seen = (this.save.movesSeen[lineId] ??= []);
+    for (const m of moves) if (!seen.includes(m)) seen.push(m);
+  }
   /** Last chosen Elite-mode toggle. */
   eliteMode = false;
   net: NetHost | NetClient | null = null;
@@ -290,6 +297,7 @@ export class App {
       case 'chest':
         audio.sfx(ev.rewards.some((r) => r.kind === 'mastery') ? 'mastery' : 'chest');
         if (ev.player === me) {
+          this.discover(s.world.players[me].lineId, ev.rewards.filter((r) => r.kind === 'move' || r.kind === 'mastery').map((r) => r.id));
           this.chestEl?.remove();
           this.chestEl = chestPopup(ev.rewards);
           this.ui.appendChild(this.chestEl);
@@ -315,6 +323,7 @@ export class App {
         break;
       case 'learn':
         if (ev.player === me) {
+          this.discover(s.world.players[me].lineId, [ev.move]);
           const p = s.world.players[me];
           banner(`${SPECIES[p.speciesId].name.toUpperCase()} learned ${MOVES[ev.move].name.toUpperCase()}!`, false, 1800);
         }
@@ -387,6 +396,12 @@ export class App {
           if (this.autoT > 0.35) { this.autoT = 0; s.choose(autoChoice(s)); }
         }
         this.levelUp.sync(s);
+        const offers = s.offers();
+        if (offers && offers !== this.offersSeen) {
+          this.offersSeen = offers;
+          const me = s.world.players[s.localId];
+          this.discover(me.lineId, offers.filter((o) => o.kind === 'newMove').map((o) => o.id));
+        }
         const ph = s.phase();
         if (ph === 'over' || ph === 'victory') {
           if (this.endTimer === 0) {
