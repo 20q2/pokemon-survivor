@@ -226,7 +226,7 @@ textarea { min-height: 70px; font-size: 12px; font-family: monospace; }
 /* banners & toasts */
 #banner { position: fixed; left: 50%; bottom: 14%; transform: translateX(-50%); z-index: 8; pointer-events: none; }
 .dialog { font-family: var(--head); font-size: clamp(10px, 1.6vw, 15px); line-height: 1.7; background: var(--panel); color: var(--ink); border: 4px solid var(--border); border-radius: 12px; padding: 14px 20px; box-shadow: inset 0 0 0 3px #c9c9bc, 0 6px 0 rgba(0,0,0,0.45); white-space: nowrap; animation: pop 0.25s ease-out; }
-#notice { position: fixed; left: 50%; bottom: 8%; transform: translateX(-50%); z-index: 8; pointer-events: none; }
+#notice { position: fixed; left: 50%; bottom: 4%; transform: translateX(-50%); z-index: 8; pointer-events: none; }
 .notice { font-family: var(--head); font-size: clamp(8px, 1.1vw, 10px); line-height: 1.6; background: var(--panel); color: var(--ink); border: 3px solid var(--border); border-radius: 8px; padding: 6px 12px; opacity: 0.92; white-space: nowrap; animation: pop 0.2s ease-out; }
 .dialog.boss { border-color: #7a1f1d; box-shadow: inset 0 0 0 3px #ffb3ad, 0 6px 0 rgba(0,0,0,0.45); }
 .dialog.wave { display: flex; align-items: center; gap: 12px; border-color: #1f4f7a; box-shadow: inset 0 0 0 3px #b3d6ff, 0 6px 0 rgba(0,0,0,0.45); }

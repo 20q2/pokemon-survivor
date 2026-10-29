@@ -92,6 +92,8 @@ export function xpForLevel(level: number): number {
 /** Crit hit-stop: 2 frames, at most once per half second. */
 const CRIT_STOP = 2 / 60;
 const CRIT_STOP_GAP = 0.5;
+/** Elite / alpha kill hit-stop: 7 frames. Bosses have their own cinematic. */
+const ELITE_STOP = 7 / 60;
 
 export class Sim {
   readonly stage: StageDef;
@@ -220,6 +222,9 @@ export class Sim {
 
   /** Freeze the sim for `seconds` (never shortens a longer freeze already running). */
   stop(seconds: number) { if (seconds > this._hitStop) this._hitStop = seconds; }
+
+  /** An elite or alpha died. */
+  eliteStop() { this.stop(ELITE_STOP); }
 
   /** A crit landed: 2 frames of hit-stop, at most once per half second (crits can land 30x/s late game). */
   critStop() {

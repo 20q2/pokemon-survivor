@@ -275,6 +275,7 @@ function sanitizeInit(i: PlayerInit): PlayerInit {
 
 function roundEvent(e: GameEvent): GameEvent {
   if (e.e === 'hit') return { ...e, x: Math.round(e.x), y: Math.round(e.y) };
+  if (e.e === 'kill') return { ...e, x: Math.round(e.x), y: Math.round(e.y), scale: Math.round(e.scale * 100) / 100, anim: Math.round(e.anim * 10) / 10 };
   if (e.e === 'chain') return { ...e, pts: e.pts.map((v) => Math.round(v)) };
   return e;
 }
