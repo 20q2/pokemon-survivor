@@ -276,7 +276,7 @@ export interface Pickup {
 
 export type GameEvent =
   | { e: 'hit'; x: number; y: number; dmg: number; eff: number; crit: boolean; type: PType }
-  | { e: 'kill'; x: number; y: number; species: string; boss: boolean; shiny: boolean; type: PType }
+  | { e: 'kill'; x: number; y: number; species: string; boss: boolean; shiny: boolean; scale: number; type: PType }
   | { e: 'pickup'; kind: PickupKind; player: number; value: number }
   | { e: 'hurt'; player: number; dmg: number }
   | { e: 'levelup'; level: number }

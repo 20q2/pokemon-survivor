@@ -725,7 +725,7 @@ export function killEnemy(sim: Sim, e: Enemy, killerId: number) {
   if (killer) killer.kills++;
   megaOnKill(sim, killer, e.elite, e.boss);
   sim.defeatedSpecies.set(e.speciesId, (sim.defeatedSpecies.get(e.speciesId) ?? 0) + 1);
-  sim.emit({ e: 'kill', x: e.x, y: e.y, species: e.speciesId, boss: e.boss, shiny: e.shiny, type: e.types[0] });
+  sim.emit({ e: 'kill', x: e.x, y: e.y, species: e.speciesId, boss: e.boss, shiny: e.shiny, scale: e.scale, type: e.types[0] });
   const r = sim.rng;
   dropCandy(sim, e);
   spreadOnDeath(sim, e);

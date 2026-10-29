@@ -53,6 +53,13 @@ export function compileSong(def: SongDef): CompiledSong {
 
 const midiHz = (m: number) => 440 * Math.pow(2, (m - 69) / 12);
 
+/** Pentatonic semitone offsets for the kill streak; the top (a 12th up) stays near 1.2 kHz. */
+export const KILL_LADDER = [0, 2, 4, 7, 9, 12, 14, 16, 19];
+/** Combo steps lost per second: a lull of 0.4 s drops ~2 steps, so a lone kill is plain again. */
+const KILL_DRAIN = 6;
+export const drainKillCombo = (combo: number, dt: number) => Math.max(0, combo - Math.max(0, dt) * KILL_DRAIN);
+export const killStep = (combo: number) => Math.min(KILL_LADDER.length - 1, Math.floor(combo));
+
 export class AudioEngine {
   ctx: BaseAudioContext | null = null;
   private master!: GainNode;
@@ -76,6 +83,9 @@ export class AudioEngine {
   /** Rises with each candy, drains continuously, so only a burst of pickups climbs the scale. */
   private pickupCombo = 0;
   private pickupT = 0;
+  /** Same idea for kills: a mowing streak climbs the ladder, a lone kill stays at the bottom. */
+  private killCombo = 0;
+  private killT = 0;
   private sfxCache = new Map<string, CompiledSong>();
   musicVol = 0.5;
   sfxVol = 0.6;
@@ -112,6 +122,9 @@ export class AudioEngine {
     if (name === 'candy') {
       // currentTime is frozen before rendering, so fake the pickup clock to space the run out
       for (let i = 0; i < arg; i++) { e.lastPlay.clear(); e.pickupT -= 0.08; e.sfx('candy'); }
+    } else if (name === 'kill') {
+      // same frozen-clock trick, at a 60 kills/s mow
+      for (let i = 0; i < arg; i++) { e.lastPlay.clear(); e.killT -= 1 / 60; e.sfx('kill'); }
     } else e.sfx(name, arg);
     return ctx.startRendering();
   }
@@ -447,11 +460,29 @@ export class AudioEngine {
         this.noiseHit(d, t, 0.07, 0.16, 900, 5000);
         this.tone(d, t, midiHz(76), 0.07, 0.07, 'pulse', 0.25, midiHz(83));
         break;
-      case 'kill':
-        if (!this.gate('kill', 0.06)) return;
-        this.tone(d, t, midiHz(69 + ((Math.random() * 3) | 0)), 0.08, 0.08, 'pulse', 0.125, midiHz(57));
-        this.noiseHit(d, t, 0.03, 0.06, 2500, 8000, true);
+      case 'crit': {
+        // sparkle layered over the normal hit: two quick high pings a fifth apart
+        if (!this.gate('crit', 0.08)) return;
+        this.tone(d, t, midiHz(93), 0.05, 0.045, 'pulse', 0.125);
+        this.tone(d, t + 0.035, midiHz(100), 0.07, 0.04, 'pulse', 0.125, midiHz(103));
         break;
+      }
+      case 'kill': {
+        // Drain on every kill event (like candy) so the combo reflects real time between kills;
+        // the ladder then advances once per kill sound that actually plays. That is ~16 steps/s at
+        // the 0.06 s gate, which still climbs audibly in a 60 kills/s mow.
+        const now = this.ctx.currentTime;
+        this.killCombo = drainKillCombo(this.killCombo, now - this.killT);
+        this.killT = now;
+        if (!this.gate('kill', 0.06)) return;
+        const step = killStep(this.killCombo);
+        this.killCombo = Math.min(KILL_LADDER.length + 1, this.killCombo + 1);
+        const midi = 67 + KILL_LADDER[step];
+        const vol = 0.08 * (1 - step * 0.06);
+        this.tone(d, t, midiHz(midi), 0.08, vol, 'pulse', 0.125, midiHz(midi - 12));
+        this.noiseHit(d, t, 0.03, 0.06 * (1 - step * 0.06), 2500, 8000, true);
+        break;
+      }
       case 'candy': {
         // A soft pluck on a pentatonic ladder. The combo drains ~5 steps a second, so a steady
         // trickle of candies stays near the bottom and only a real burst climbs, and it tops out

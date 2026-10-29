@@ -7,6 +7,7 @@ import { CHEST_BALL, CHEST_COLOR, type ChestTier, type Enemy, type GameEvent, ty
 import { assets, type Anim } from './assets.ts';
 import { Background, type DecorSprite } from './background.ts';
 import { DamageNumbers, Particles, Shape } from './fx.ts';
+import { DeathPops, POP_TIME, popSquash } from './pops.ts';
 import { HAZARD, HAZARD_IMPACT } from '../game/hazards.ts';
 import { PF_FOCUS, PF_RETARGET, PF_STICKY } from '../game/combat.ts';
 import { STATUS_INFO, STATUS_ORDER } from '../data/status.ts';
@@ -59,6 +60,7 @@ export class Renderer {
   private bgStage = '';
   private drawables: Drawable[] = [];
   private chains: { pts: number[]; color: string; t: number }[] = [];
+  private pops = new DeathPops();
   private booms: { x: number; y: number; r: number; color: string; t: number }[] = [];
   private labelCd = 0;
   private vignette: HTMLCanvasElement | null = null;
@@ -138,6 +140,8 @@ export class Renderer {
         }
         break;
       case 'kill': {
+        // bosses have their own cinematic; everyone else flashes white and squashes before the puff
+        if (!ev.boss) this.pops.add(ev.x, ev.y, ev.species, ev.shiny, ev.scale, DOWN_ROW, world.time);
         // faint "poof": a smoke puff cluster, a pop ring and a few type-coloured sparks
         P.burst(ev.x, ev.y - 8, ev.boss ? 26 : 3, ev.boss ? 120 : 36, '#e8e8f0', ev.boss ? 0.7 : 0.3, ev.boss ? 6 : 3, false, -20, Shape.PUFF);
         P.ring(ev.x, ev.y - 6, ev.boss ? 48 : 14, '#ffffff', ev.boss ? 0.45 : 0.22);
@@ -238,6 +242,7 @@ export class Renderer {
       this.camY = me.y - 8 + Math.round(this.lookY * z) / z;
     }
     this.particles.update(dt);
+    this.pops.update(dt);
     this.numbers.update(dt);
     this.labelCd -= dt;
     this.shake = Math.max(0, this.shake - dt * 18);
@@ -283,6 +288,8 @@ export class Renderer {
       else if (d.k === 1) this.drawPlayer(d.p, world.time);
       else this.drawTallDecor(d.d, d.x, d.y, me);
     }
+
+    this.drawPops();
 
     // projectiles & effects above sprites
     this.beginFx(W, H, fxL, fxT);
@@ -387,13 +394,15 @@ export class Renderer {
 
   // ─────────────────────────── sprites ───────────────────────────
 
-  private drawAnim(anim: Anim, x: number, y: number, t: number, row: number, scale: number, flash: number, alpha = 1) {
+  private drawAnim(anim: Anim, x: number, y: number, t: number, row: number, scale: number, flash: number, alpha = 1, sx = 1, sy = 1) {
     const g = this.g;
     const f = anim.frameAt(t);
     const r = row % anim.rows;
-    const w = anim.fw * scale, h = anim.fh * scale;
+    const w = anim.fw * scale * sx, h = anim.fh * scale * sy;
     const z = this.zoom;
-    const dx = (Math.round(x * z) - Math.round((w / 2) * z)) / z, dy = (Math.round(y * z) - Math.round((h / 2 + 6 * scale) * z)) / z;
+    // squash keeps the feet where the unsquashed sprite's feet would be
+    const fullH = anim.fh * scale;
+    const dx = (Math.round(x * z) - Math.round((w / 2) * z)) / z, dy = (Math.round(y * z) - Math.round((fullH / 2 + 6 * scale) * z)) / z + (fullH - h);
     if (alpha < 1) g.globalAlpha = alpha;
     g.drawImage(anim.img, f * anim.fw, r * anim.fh, anim.fw, anim.fh, dx, dy, w, h);
     if (flash > 0) {
@@ -401,6 +410,17 @@ export class Renderer {
       g.drawImage(anim.whiteSheet(), f * anim.fw, r * anim.fh, anim.fw, anim.fh, dx, dy, w, h);
     }
     g.globalAlpha = 1;
+  }
+
+  private drawPops() {
+    const P = this.pops;
+    for (let k = 0; k < P.n; k++) {
+      const i = P.slot(k);
+      const set = assets.get(P.species[i], P.shiny[i] === 1);
+      if (!set) continue;
+      const { sx, sy } = popSquash(P.t[i] / POP_TIME);
+      this.drawAnim(set.walk, P.x[i], P.y[i], P.animT[i], P.row[i], P.scale[i], 1, 1, sx, sy);
+    }
   }
 
   private drawEnemy(e: Enemy, time: number) {
@@ -1501,6 +1521,8 @@ function inView(x: number, y: number, L: number, T: number, W: number, H: number
 }
 
 /** Camera zoom multiplier per evolution stage of the local partner. */
+/** Sprite sheet row facing the camera (kill events carry no heading). */
+const DOWN_ROW = dirRow(0, 1);
 const EVO_ZOOM = [1, 0.9, 0.8];
 /** Partners draw larger as they evolve (cosmetic; hitboxes are unchanged). With EVO_ZOOM the
  * partner keeps roughly its on-screen size while the world around it shrinks. */

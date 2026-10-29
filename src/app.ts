@@ -278,6 +278,7 @@ export class App {
     switch (ev.e) {
       case 'hit':
         audio.sfx(ev.eff > 1 ? 'super' : 'hit');
+        if (ev.crit) audio.sfx('crit');
         break;
       case 'kill':
         audio.sfx('kill');
