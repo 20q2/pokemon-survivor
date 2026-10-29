@@ -3,7 +3,7 @@ import { MEGA, SPECIES } from '../data/pokedex.ts';
 import { assets } from '../render/assets.ts';
 import type { RunSession } from '../game/session.ts';
 import type { Player } from '../game/types.ts';
-import { RUN_LENGTH } from '../data/stages.ts';
+import { RUN_LENGTH, type BossDef } from '../data/stages.ts';
 import { fmtTime, h, img, uiIcon } from './dom.ts';
 import { hideTip, itemSlot, moveSlot, tipped, vitaminTip } from './tips.ts';
 import { Minimap } from './minimap.ts';
@@ -19,6 +19,12 @@ export class Hud {
   private stats!: HTMLDivElement;
   private left!: HTMLDivElement;
   private boss!: HTMLDivElement;
+  private next!: HTMLDivElement;
+  private nextImg!: HTMLImageElement;
+  private nextName!: HTMLSpanElement;
+  private nextTime!: HTMLSpanElement;
+  private nextFill!: HTMLDivElement;
+  private nextKey = '';
   private fps!: HTMLDivElement;
   private mega!: HTMLDivElement;
   private megaFill!: HTMLDivElement;
@@ -50,10 +56,17 @@ export class Hud {
     this.stats = h('div', { class: 'hud-stats' });
     this.left = h('div', { class: 'hud-left' });
     this.boss = h('div', { class: 'bossbar hidden' });
+    this.nextImg = img('', 'px');
+    this.nextName = h('span', { class: 'nm' });
+    this.nextTime = h('span', { class: 't' });
+    this.nextFill = h('div');
+    this.next = h('div', { class: 'next-boss hidden' }, this.nextImg,
+      h('div', null, h('div', { class: 'row' }, h('span', { class: 'lbl' }, 'BOSS'), this.nextName, this.nextTime), h('div', { class: 'bar' }, this.nextFill)));
+    this.nextKey = '';
     this.fps = h('div', { class: 'fps' });
     const pause = h('button', { class: 'btn small pause-btn', onclick: () => this.onPause?.(), 'aria-label': 'Pause' }, 'II');
     const meterBtn = h('button', { class: 'btn small meter-btn', onclick: () => this.onMeterToggle?.(), title: 'Damage tracker (T)', 'aria-label': 'Damage tracker' }, 'DMG');
-    this.el.append(h('div', { class: 'xpbar' }, this.xpFill, this.lv), this.timer, pause, meterBtn, h('div', { class: 'hud-right' }, this.stats, this.minimap.el, this.meter.el), this.left, this.boss, this.fps);
+    this.el.append(h('div', { class: 'xpbar' }, this.xpFill, this.lv), this.timer, pause, meterBtn, h('div', { class: 'hud-right' }, this.stats, this.minimap.el, this.meter.el), this.left, h('div', { class: 'top-center' }, this.next, this.boss), this.fps);
     this.el.classList.remove('hidden');
     this.sig = '';
   }
@@ -182,6 +195,7 @@ export class Hud {
       h('div', null, `${w.kills.toLocaleString()} `, img(assets.itemUrl('poke-ball'))),
       h('div', null, `₽${Math.round(w.money).toLocaleString()} `, img(assets.itemUrl('nugget'))),
     );
+    this.updateNextBoss(w.stage.bosses, w.time);
     const boss = w.enemies.find((e) => e.boss && e.alive);
     if (boss) {
       this.boss.classList.remove('hidden');
@@ -196,5 +210,24 @@ export class Hud {
       this.frames = 0;
       this.fpsT = 0;
     } else if (!this.showFps) this.fps.textContent = '';
+  }
+
+  /** Countdown to the next scheduled boss, with who it is and a bar filling up since the last one. */
+  private updateNextBoss(bosses: readonly BossDef[], time: number) {
+    const i = bosses.findIndex((b) => b.at > time);
+    this.next.classList.toggle('hidden', i < 0);
+    if (i < 0) return;
+    const b = bosses[i];
+    const key = `${i}:${b.species}`;
+    if (key !== this.nextKey) {
+      this.nextKey = key;
+      this.nextImg.src = assets.portraitUrl(b.species);
+      this.nextName.textContent = `${b.final ? '★ ' : ''}${SPECIES[b.species].name.toUpperCase()}`;
+    }
+    const prev = i ? bosses[i - 1].at : 0;
+    const left = b.at - time;
+    this.nextTime.textContent = fmtTime(Math.ceil(left));
+    this.nextFill.style.transform = `scaleX(${Math.min(1, Math.max(0, (time - prev) / (b.at - prev)))})`;
+    this.next.classList.toggle('soon', left <= 15);
   }
 }

@@ -54,9 +54,11 @@ export const STAGES: StageDef[] = [
     },
     elites: ['pidgeotto', 'metapod', 'parasect'], swarm: 'spearow',
     bosses: [
-      { species: 'beedrill', at: 300, patterns: ['charge', 'aimed'], minions: ['weedle'] },
-      { species: 'butterfree', at: 600, patterns: ['radial', 'spiral'], minions: ['caterpie'] },
-      { species: 'scyther', at: 900, patterns: ['charge', 'aimed', 'radial'], final: true },
+      { species: 'beedrill', at: 180, patterns: ['charge', 'cone', 'aimed'], minions: ['weedle'] },
+      { species: 'butterfree', at: 360, patterns: ['radial', 'donut', 'spiral'], minions: ['caterpie'] },
+      { species: 'parasect', at: 540, patterns: ['meteor', 'summon', 'quake'], minions: ['paras'] },
+      { species: 'pidgeotto', at: 720, patterns: ['charge', 'cone', 'beam', 'radial'], minions: ['pidgey'] },
+      { species: 'scyther', at: 900, patterns: ['charge', 'cross', 'aimed', 'meteor', 'radial'], final: true },
     ],
   },
   {
@@ -70,9 +72,11 @@ export const STAGES: StageDef[] = [
     },
     elites: ['golbat', 'graveler', 'sandslash'], swarm: 'zubat',
     bosses: [
-      { species: 'onix', at: 300, patterns: ['charge', 'slam'], minions: ['geodude'] },
-      { species: 'clefable', at: 600, patterns: ['radial', 'summon'], minions: ['clefairy'] },
-      { species: 'golem', at: 900, patterns: ['slam', 'charge', 'radial'], final: true },
+      { species: 'onix', at: 180, patterns: ['charge', 'slam', 'quake'], minions: ['geodude'] },
+      { species: 'sandslash', at: 360, patterns: ['charge', 'cross', 'meteor'], minions: ['sandshrew'] },
+      { species: 'clefable', at: 540, patterns: ['radial', 'donut', 'summon', 'meteor'], minions: ['clefairy'] },
+      { species: 'golbat', at: 720, patterns: ['spiral', 'cone', 'beam', 'summon'], minions: ['zubat'] },
+      { species: 'golem', at: 900, patterns: ['slam', 'quake', 'meteor', 'charge', 'donut'], final: true },
     ],
   },
   {
@@ -86,9 +90,11 @@ export const STAGES: StageDef[] = [
     },
     elites: ['dewgong', 'jynx', 'slowpoke'], swarm: 'tentacool',
     bosses: [
-      { species: 'cloyster', at: 300, patterns: ['radial', 'spiral'], minions: ['shellder'] },
-      { species: 'lapras', at: 600, patterns: ['aimed', 'slam'], minions: ['seel'] },
-      { species: 'articuno', at: 900, patterns: ['spiral', 'aimed', 'radial'], final: true },
+      { species: 'cloyster', at: 180, patterns: ['radial', 'beam', 'spiral'], minions: ['shellder'] },
+      { species: 'dewgong', at: 360, patterns: ['charge', 'cone', 'donut'], minions: ['seel'] },
+      { species: 'jynx', at: 540, patterns: ['aimed', 'meteor', 'cone', 'spiral'], minions: ['snorunt'] },
+      { species: 'lapras', at: 720, patterns: ['beam', 'slam', 'donut', 'aimed'], minions: ['seel'] },
+      { species: 'articuno', at: 900, patterns: ['spiral', 'meteor', 'beam', 'donut', 'radial'], final: true },
     ],
   },
   {
@@ -102,9 +108,11 @@ export const STAGES: StageDef[] = [
     },
     elites: ['magneton', 'electrode', 'grimer'], swarm: 'voltorb',
     bosses: [
-      { species: 'electabuzz', at: 300, patterns: ['charge', 'radial'], minions: ['elekid'] },
-      { species: 'magneton', at: 600, patterns: ['spiral', 'aimed', 'summon'], minions: ['magnemite'] },
-      { species: 'zapdos', at: 900, patterns: ['radial', 'charge', 'spiral'], final: true },
+      { species: 'electabuzz', at: 180, patterns: ['charge', 'quake', 'radial'], minions: ['elekid'] },
+      { species: 'electrode', at: 360, patterns: ['charge', 'quake', 'summon'], minions: ['voltorb'] },
+      { species: 'magneton', at: 540, patterns: ['spiral', 'beam', 'cross', 'summon'], minions: ['magnemite'] },
+      { species: 'raichu', at: 720, patterns: ['charge', 'meteor', 'donut', 'aimed'], minions: ['electrike'] },
+      { species: 'zapdos', at: 900, patterns: ['radial', 'meteor', 'cross', 'charge', 'beam'], final: true },
     ],
   },
   {
@@ -118,9 +126,11 @@ export const STAGES: StageDef[] = [
     },
     elites: ['banette', 'dusclops', 'hypno'], swarm: 'murkrow',
     bosses: [
-      { species: 'hypno', at: 300, patterns: ['spiral', 'summon'], minions: ['drowzee'] },
-      { species: 'marowak', at: 600, patterns: ['charge', 'aimed'], minions: ['cubone'] },
-      { species: 'gengar', at: 900, patterns: ['spiral', 'radial', 'summon'], final: true, minions: ['shuppet'] },
+      { species: 'hypno', at: 180, patterns: ['spiral', 'donut', 'summon'], minions: ['drowzee'] },
+      { species: 'banette', at: 360, patterns: ['aimed', 'cone', 'summon'], minions: ['shuppet'] },
+      { species: 'marowak', at: 540, patterns: ['charge', 'slam', 'cross', 'aimed'], minions: ['cubone'] },
+      { species: 'dusclops', at: 720, patterns: ['quake', 'meteor', 'summon', 'radial'], minions: ['duskull'] },
+      { species: 'gengar', at: 900, patterns: ['spiral', 'donut', 'meteor', 'cross', 'summon'], final: true, minions: ['shuppet'] },
     ],
   },
   {
@@ -134,9 +144,11 @@ export const STAGES: StageDef[] = [
     },
     elites: ['magmar', 'hitmonlee', 'shelgon'], swarm: 'ponyta',
     bosses: [
-      { species: 'arcanine', at: 300, patterns: ['charge', 'aimed'], minions: ['growlithe'] },
-      { species: 'machamp', at: 600, patterns: ['slam', 'charge'], minions: ['mankey'] },
-      { species: 'moltres', at: 900, patterns: ['spiral', 'radial', 'aimed'], final: true },
+      { species: 'hitmonlee', at: 180, patterns: ['charge', 'cross', 'aimed'], minions: ['mankey'] },
+      { species: 'arcanine', at: 360, patterns: ['charge', 'cone', 'aimed'], minions: ['growlithe'] },
+      { species: 'magmar', at: 540, patterns: ['cone', 'meteor', 'radial'], minions: ['slugma'] },
+      { species: 'machamp', at: 720, patterns: ['slam', 'cross', 'quake', 'charge'], minions: ['mankey'] },
+      { species: 'moltres', at: 900, patterns: ['spiral', 'meteor', 'cone', 'donut', 'radial'], final: true },
     ],
   },
   {
@@ -150,13 +162,15 @@ export const STAGES: StageDef[] = [
     },
     elites: ['kangaskhan', 'wobbuffet', 'arcanine'], swarm: 'golbat',
     bosses: [
-      { species: 'kangaskhan', at: 300, patterns: ['charge', 'slam'], minions: ['raticate'] },
-      { species: 'dragonite', at: 600, patterns: ['spiral', 'charge', 'aimed'], minions: ['bagon'] },
-      { species: 'mewtwo', at: 900, patterns: ['spiral', 'radial', 'aimed', 'summon'], final: true, minions: ['ditto'] },
+      { species: 'kangaskhan', at: 180, patterns: ['charge', 'slam', 'quake'], minions: ['raticate'] },
+      { species: 'alakazam', at: 360, patterns: ['spiral', 'donut', 'beam', 'summon'], minions: ['ditto'] },
+      { species: 'dragonite', at: 540, patterns: ['spiral', 'charge', 'beam', 'meteor'], minions: ['bagon'] },
+      { species: 'tyranitar', at: 720, patterns: ['slam', 'quake', 'meteor', 'cone'], minions: ['graveler'] },
+      { species: 'mewtwo', at: 900, patterns: ['spiral', 'cross', 'meteor', 'donut', 'beam', 'radial', 'summon'], final: true, minions: ['ditto'] },
     ],
   },
 ];
 
 export const STAGE: Record<string, StageDef> = Object.fromEntries(STAGES.map((s) => [s.id, s]));
 
-export const RUN_LENGTH = 900; // seconds until the final boss
+export const RUN_LENGTH = 900; // seconds until the final boss (a boss every 3 minutes before it)

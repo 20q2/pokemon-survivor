@@ -14,13 +14,13 @@ export interface RunRewards {
 }
 
 export function friendshipGain(r: RunSummary): number {
-  return Math.round((r.time / 60 * 8 + r.kills / 120 + r.bosses * 25 + (r.cleared ? 120 : 0) + r.evolutions * 10) * (r.elite ? 1.5 : 1));
+  return Math.round((r.time / 60 * 8 + r.kills / 120 + r.bosses * 15 + (r.cleared ? 120 : 0) + r.evolutions * 10) * (r.elite ? 1.5 : 1));
 }
 
 /** End-of-run bonus on top of collected Poké Dollars. */
 export function runBonus(r: RunSummary): number {
   const tier = 1 + 0.25 * Math.max(0, STAGES.findIndex((s) => s.id === r.stageId));
-  return Math.round((r.time / 60 * 6 + r.bosses * 40 + (r.cleared ? 250 : 0)) * tier);
+  return Math.round((r.time / 60 * 6 + r.bosses * 24 + (r.cleared ? 250 : 0)) * tier);
 }
 
 export function applyRun(save: SaveData, r: RunSummary, seen: Iterable<string>, defeated: Map<string, number>): RunRewards {

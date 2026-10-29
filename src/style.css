@@ -206,6 +206,18 @@ textarea { min-height: 70px; font-size: 12px; font-family: monospace; }
 .bossbar { position: absolute; top: 56px; left: 50%; transform: translateX(-50%); width: min(520px, 70vw); text-align: center; font-size: 10px; text-shadow: 2px 2px 0 #000; }
 .bossbar .bar { margin-top: 6px; height: 12px; background: #2a0000; border: 2px solid #000; }
 .bossbar .bar > div { height: 100%; background: linear-gradient(#ff7b7b, #d62828); transform-origin: left; }
+.top-center { position: absolute; top: 52px; left: 50%; transform: translateX(-50%); width: min(520px, 70vw); display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.top-center .bossbar { position: static; transform: none; width: 100%; }
+.next-boss { display: flex; align-items: center; gap: 6px; padding: 2px 8px 3px 2px; font-size: 8px; text-shadow: 1px 1px 0 #000; background: rgba(22, 36, 104, 0.8); border: 2px solid var(--frame, rgba(255,255,255,0.4)); border-radius: 6px; box-shadow: 0 0 0 2px var(--border, #000); }
+.next-boss img { width: 26px; height: 26px; image-rendering: pixelated; }
+.next-boss .row { display: flex; gap: 6px; align-items: baseline; white-space: nowrap; }
+.next-boss .lbl { color: #ff9b8a; }
+.next-boss .t { color: #ffe27a; min-width: 5ch; text-align: right; }
+.next-boss .bar { margin-top: 3px; height: 4px; background: #2a0000; border: 1px solid #000; }
+.next-boss .bar > div { height: 100%; background: linear-gradient(90deg, #ffb36b, #ff4b4b); transform-origin: left; }
+.next-boss.soon { border-color: #ff5a4a; animation: bossSoon 0.5s steps(2) infinite; }
+.next-boss.soon .t { color: #ff7b7b; }
+@keyframes bossSoon { 50% { box-shadow: 0 0 0 2px #fff; } }
 .pause-btn { position: absolute; top: 22px; left: 50%; margin-left: 70px; pointer-events: auto; font-size: 10px; padding: 6px 8px; }
 .fps { position: absolute; bottom: 6px; right: 8px; font-size: 9px; opacity: 0.7; }
 

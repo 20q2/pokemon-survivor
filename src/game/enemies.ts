@@ -255,7 +255,7 @@ export function spawnEnemy(sim: Sim, speciesId: string, x: number, y: number, op
   if (opts.boss) {
     const n = sim.players.length;
     hp = (50 + bhp * 1.6) * (opts.boss.final ? 2.4 : 1.1) * (1 + m * 0.3) * sim.stage.difficulty * (1 + 0.8 * (n - 1));
-    dmg *= 1.8; xp = 150; scale = opts.boss.final ? 2.4 : 2; radius = opts.boss.final ? 26 : 22; knockResist = 1;
+    dmg *= 1.8; xp = opts.boss.final ? 150 : 75; scale = opts.boss.final ? 2.4 : 2; radius = opts.boss.final ? 26 : 22; knockResist = 1;
     speed = Math.min(112, 82 + bspe * 0.24);
   }
   if (opts.alpha) {
@@ -648,8 +648,9 @@ export function killEnemy(sim: Sim, e: Enemy, killerId: number) {
   if (e.boss) {
     sim.bossesDefeated++;
     if (killer) killer.bossKills++;
-    sim.spawnPickup('chest', e.x, e.y, e.final ? 4 : 3);
-    for (let i = 0; i < 10; i++) sim.spawnPickup('coin', e.x, e.y, 5);
+    // A boss every 3 minutes: their treasure alternates Great / Ultra Ball, the final boss gives a Master Ball.
+    sim.spawnPickup('chest', e.x, e.y, e.final ? 4 : sim.bossesDefeated % 2 ? 2 : 3);
+    for (let i = 0; i < (e.final ? 10 : 6); i++) sim.spawnPickup('coin', e.x, e.y, 5);
     sim.spawnPickup('sitrus', e.x, e.y);
     if (e.final) sim.finalDefeated = true;
     sim.emit({ e: 'bossDown', species: e.speciesId, final: e.final });
