@@ -1,4 +1,4 @@
-import { MOVES, MOVE_LIST } from '../data/moves.ts';
+import { MAX_MOVE_LEVEL, MOVES, MOVE_LIST } from '../data/moves.ts';
 import { ITEMS, ITEM_LIST, VITAMIN, VITAMINS } from '../data/items.ts';
 import { TYPE_COLORS } from '../data/types.ts';
 import { assets } from '../render/assets.ts';
@@ -33,8 +33,13 @@ export function preloadChestFaces() {
 
 function label(r: ChestReward): HTMLElement {
   if (r.kind === 'mastery') return h('div', { class: 'reel-label mastery' }, img(uiIcon('mastery'), 'mastery-mark'), `${MOVES[r.from!].name} → ${MOVES[r.id].name}!`);
-  if (r.kind === 'move') return h('div', { class: 'reel-label' }, MOVES[r.id].name, h('span', null, r.level === 1 ? 'NEW' : `Lv ${r.level}`));
+  if (r.kind === 'move') {
+    const lv = r.level!;
+    return h('div', { class: 'reel-label' }, MOVES[r.id].name, h('span', null, lv === 1 ? 'NEW' : lv > MAX_MOVE_LEVEL ? `LIMIT ★${lv - MAX_MOVE_LEVEL}` : `Lv ${lv}`));
+  }
   if (r.kind === 'item') return h('div', { class: 'reel-label' }, ITEMS[r.id].name, h('span', null, r.level === 1 ? 'NEW' : `Lv ${r.level}`));
+  if (r.kind === 'gold') return h('div', { class: 'reel-label' }, 'Nugget', h('span', null, `₽${r.level}`));
+  if (r.kind === 'heal') return h('div', { class: 'reel-label' }, r.id === 'sitrus-berry' ? 'Sitrus Berry' : 'Oran Berry', h('span', null, 'HEAL'));
   return h('div', { class: 'reel-label' }, VITAMIN[r.id].name, h('span', null, `×${r.level}`));
 }
 

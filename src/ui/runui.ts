@@ -7,7 +7,7 @@ import type { Player, UpgradeOffer } from '../game/types.ts';
 import type { RunSession } from '../game/session.ts';
 import { audio } from '../audio/audio.ts';
 import { btn, catBadge, h, img, typeBadge } from './dom.ts';
-import { BEHAVIOR_TEXT, buildPanel, hideTip } from './tips.ts';
+import { BEHAVIOR_TEXT, hideTip } from './tips.ts';
 
 
 const STAT_LABEL: Partial<Record<keyof MoveStats, string>> = {
@@ -178,13 +178,15 @@ export class LevelUpUI {
             h('div', { class: 'ds' }, nd.desc))),
         h('div', { class: 'hint' }, `But ${SPECIES[me.speciesId].name} can't learn more than four moves. Forget one?`));
     } else heading = h('h2', null, this.banishMode ? 'Banish which?' : `Level ${session.world.level}!`);
-    this.el = h('div', { class: 'levelup' }, heading, cards, actions, buildPanel(me));
+    // Your current build and stats stay live in the HUD above this overlay (see Hud 'lifted').
+    this.el = h('div', { class: 'levelup' }, heading, cards, actions);
     this.root.appendChild(this.el);
     (cards.firstElementChild as HTMLElement | null)?.focus();
   }
 
   close() {
-    hideTip();
+    // Runs every frame outside level-ups, so only clear tooltips this screen owns (not the HUD's).
+    hideTip(this.el);
     this.el?.remove();
     this.el = null;
     this.shownFor = null;

@@ -451,6 +451,12 @@ export class AudioEngine {
       case 'boss':
         for (let i = 0; i < 4; i++) this.tone(d, t + i * 0.35, i % 2 ? 330 : 440, 0.3, 0.14, 'sawtooth', 0.5);
         break;
+      case 'raid':
+        // A rising siren as a big attack winds up (arg 1 = boss-sized).
+        if (!this.gate('raid', 0.3)) return;
+        this.tone(d, t, arg ? 140 : 220, arg ? 0.6 : 0.4, arg ? 0.1 : 0.06, 'sawtooth', 0.5, arg ? 560 : 660);
+        if (arg) this.tone(d, t + 0.05, 70, 0.6, 0.08, 'pulse', 0.5, 280);
+        break;
       case 'warn':
         this.tone(d, t, 660, 0.12, 0.1, 'pulse', 0.25);
         this.tone(d, t + 0.15, 660, 0.12, 0.1, 'pulse', 0.25);

@@ -133,7 +133,7 @@ class BitmapFont {
 }
 
 interface Num { x: number; y: number; text: string; color: FontColor; t: number; life: number; scale: number; crit: boolean }
-interface Label { x: number; y: number; text: string; color: string; t: number; life: number }
+interface Label { x: number; y: number; text: string; color: string; t: number; life: number; size: number }
 
 export class DamageNumbers {
   private font = new BitmapFont();
@@ -157,9 +157,9 @@ export class DamageNumbers {
     this.nums.push({ x, y, text: String(Math.round(value)), color: heal ? 'heal' : 'hurt', t: 0, life: 0.8, scale: 1.5, crit: false });
   }
 
-  label(x: number, y: number, text: string, color: string) {
+  label(x: number, y: number, text: string, color: string, life = 0.9, size = 6) {
     if (this.labels.length > 6) return;
-    this.labels.push({ x, y, text, color, t: 0, life: 0.9 });
+    this.labels.push({ x, y, text, color, t: 0, life, size });
   }
 
   update(dt: number) {
@@ -192,10 +192,10 @@ export class DamageNumbers {
       this.font.draw(g, n.text, n.x, n.y - k * 14, n.color, n.scale * pop);
     }
     g.globalAlpha = 1;
-    g.font = '6px "Press Start 2P", monospace';
     g.textAlign = 'center';
     for (const l of this.labels) {
       const k = l.t / l.life;
+      g.font = `${l.size}px "Press Start 2P", monospace`;
       g.globalAlpha = k > 0.6 ? 1 - (k - 0.6) / 0.4 : 1;
       g.fillStyle = '#000';
       g.fillText(l.text, l.x + 1, l.y - k * 10 + 1);

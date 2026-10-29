@@ -3,6 +3,7 @@ import { ENEMY_ROLE, RUN_LENGTH, type BossDef, type EnemyRole, type SpawnEntry }
 import { TAU, dist2 } from '../engine/math.ts';
 import { makeProjectile, rawDamageEnemy } from './combat.ts';
 import { megaOnKill } from './mega.ts';
+import { RAID_MOVES, alphaNextMove, castRaid, eliteMove, markCharge, spawnHazard, type RaidMove } from './hazards.ts';
 import type { Sim } from './sim.ts';
 import { MAX_ENEMIES } from './sim.ts';
 import type { Enemy, Player } from './types.ts';
@@ -300,8 +301,8 @@ export function updateEnemies(sim: Sim, dt: number) {
       st.dotTick -= dt;
       if (st.dotTick <= 0) {
         st.dotTick = 0.5;
-        if (st.burn > 0) rawDamageEnemy(sim, e, st.burnDmg, 'fire', st.dotOwner);
-        if (st.poison > 0 && e.alive) rawDamageEnemy(sim, e, st.poisonDmg * st.poisonStacks, 'poison', st.dotOwner);
+        if (st.burn > 0) rawDamageEnemy(sim, e, st.burnDmg, 'fire', st.dotOwner, 'burn');
+        if (st.poison > 0 && e.alive) rawDamageEnemy(sim, e, st.poisonDmg * st.poisonStacks, 'poison', st.dotOwner, 'poison');
         if (!e.alive) continue;
       }
     }
@@ -320,7 +321,7 @@ export function updateEnemies(sim: Sim, dt: number) {
         const r = bossAI(sim, e, target, d, dt);
         mx = r.x; my = r.y; mult *= r.speed;
       } else if (e.alpha) {
-        const r = alphaAI(sim, e, d, dx, dy, dt);
+        const r = alphaAI(sim, e, target, d, dx, dy, dt);
         if (!e.alive) continue;
         mx = r.x; my = r.y; mult *= r.speed;
       } else if (e.aiState === 9) {
@@ -328,10 +329,12 @@ export function updateEnemies(sim: Sim, dt: number) {
         mx = e.aiX; my = e.aiY;
         e.ai -= dt;
         if (e.ai <= 0) { e.alive = false; continue; }
+      } else if (e.elite && eliteRaid(sim, e, target, d, dt)) {
+        mult = 0;
       } else {
         switch (e.role) {
           case 'ranged': {
-            if (d < 140) { mx = -mx; my = -my; } else if (d < 200) { mx = -my * 0.6; my = mx * 0.6; }
+            if (d < 140) { mx = -mx; my = -my; } else if (d < 200) { [mx, my] = [-my * 0.6, mx * 0.6]; }
             e.ai -= dt;
             if (e.ai <= 0 && d < 320 && mult > 0) {
               e.ai = sim.rng.range(2.4, 3.6);
@@ -419,14 +422,14 @@ function separate(sim: Sim) {
 }
 
 function onPlayerContact(sim: Sim, p: Player, e: Enemy) {
-  if (p.stats.thorns) rawDamageEnemy(sim, e, p.stats.thorns, 'rock', p.id);
+  if (p.stats.thorns) rawDamageEnemy(sim, e, p.stats.thorns, 'rock', p.id, 'thorns');
   if (p.ability === 'static' && sim.rng.chance(0.4)) {
     e.st.paralyze = e.boss ? 0.6 : 2.5;
-    rawDamageEnemy(sim, e, 10 * p.stats.spa * (1 + sim.level * 0.04), 'electric', p.id);
+    rawDamageEnemy(sim, e, 10 * p.stats.spa * (1 + sim.level * 0.04), 'electric', p.id, 'static');
   }
   if (p.ability === 'synchronize') {
     e.st.confuse = e.boss ? 0.4 : 2;
-    rawDamageEnemy(sim, e, 14 * p.stats.spa * (1 + sim.level * 0.04), 'psychic', p.id);
+    rawDamageEnemy(sim, e, 14 * p.stats.spa * (1 + sim.level * 0.04), 'psychic', p.id, 'synchronize');
   }
 }
 
@@ -445,7 +448,7 @@ function explode(sim: Sim, e: Enemy) {
   }
   // Self-Destruct also hurts nearby wild Pokémon.
   sim.grid.query(e.x, e.y, 56, (o) => {
-    if (o !== e && o.alive && !o.boss && dist2(o.x, o.y, e.x, e.y) < 56 * 56) rawDamageEnemy(sim, o, e.maxHp * 3, 'normal', e.lastHitBy);
+    if (o !== e && o.alive && !o.boss && dist2(o.x, o.y, e.x, e.y) < 56 * 56) rawDamageEnemy(sim, o, e.maxHp * 3, 'normal', e.lastHitBy, 'explosion');
   });
   e.alive = false;
 }
@@ -456,13 +459,21 @@ function bossAI(sim: Sim, e: Enemy, target: Player, d: number, dt: number): { x:
   const dx = (target.x - e.x) / d, dy = (target.y - e.y) / d;
   e.ai -= dt;
   const pattern = e.patterns[e.patternIdx % e.patterns.length];
+  const raid = RAID_MOVES.has(pattern);
   // aiState: 0 = walking, 1 = telegraph, 2 = executing
   if (e.aiState === 0) {
     if (e.ai <= 0) {
       e.aiState = 1;
-      e.ai = pattern === 'charge' || pattern === 'slam' ? 0.8 : 0.5;
       e.aiX = target.x; e.aiY = target.y;
-      if (pattern === 'slam') makeProjectile(sim, { owner: -1, hostile: false, behavior: 'enemy', moveId: 'telegraph', fx: 'ring', type: e.types[0], shape: 'circle', x: target.x, y: target.y, r: 70, life: 0.8, dmg: 0 });
+      if (raid) e.ai = castRaid(sim, e, pattern as RaidMove, target, e.final ? 'final' : 'boss');
+      else e.ai = pattern === 'charge' || pattern === 'slam' ? 0.8 : 0.5;
+      if (pattern === 'slam') spawnHazard(sim, { shape: 'circle', x: target.x, y: target.y, r: 70, delay: e.ai, dmg: e.dmg * 1.5, type: e.types[0] });
+      if (pattern === 'charge') {
+        // Aim a little past the partner so the dash carries through where they stood.
+        const over = 60 / d;
+        e.aiX = target.x + (target.x - e.x) * over; e.aiY = target.y + (target.y - e.y) * over;
+        markCharge(sim, e, e.aiX, e.aiY, e.ai);
+      }
     }
     return { x: dx, y: dy, speed: 1 };
   }
@@ -470,8 +481,8 @@ function bossAI(sim: Sim, e: Enemy, target: Player, d: number, dt: number): { x:
     e.flash = e.ai % 0.2 < 0.1 ? 0.06 : 0;
     if (e.ai <= 0) {
       e.aiState = 2;
-      e.ai = pattern === 'charge' ? 0.9 : pattern === 'spiral' ? 2.2 : pattern === 'aimed' ? 1.2 : 0.1;
-      e.aiY = 0;
+      e.ai = raid ? 0.35 : pattern === 'charge' ? 0.9 : pattern === 'spiral' ? 2.2 : pattern === 'aimed' ? 1.2 : 0.1;
+      e.aiY = pattern === 'charge' ? e.aiY : 0;
       if (pattern === 'radial') ringShots(sim, e, 14 + Math.floor(sim.time / 120), 0, 110);
       if (pattern === 'summon') {
         for (let i = 0; i < 6; i++) {
@@ -479,11 +490,8 @@ function bossAI(sim: Sim, e: Enemy, target: Player, d: number, dt: number): { x:
           spawnEnemy(sim, sim.rng.pick(e.minions.length ? e.minions : [e.speciesId]), e.x + Math.cos(a) * 50, e.y + Math.sin(a) * 50);
         }
       }
-      if (pattern === 'slam') {
-        sim.emit({ e: 'boom', x: e.aiX, y: e.aiY, r: 70, type: e.types[0] });
-        for (const p of sim.players) if (!p.fainted && dist2(p.x, p.y, e.aiX, e.aiY) < 70 * 70) sim.hurtPlayer(p, e.dmg * 1.5, e.types[0], false);
-        e.x = e.aiX; e.y = e.aiY;
-      }
+      // Slam: the boss lands where it marked (the hazard deals the damage).
+      if (pattern === 'slam') { e.x = e.aiX; e.y = e.aiY; }
     }
     return { x: 0, y: 0, speed: 0 };
   }
@@ -516,6 +524,24 @@ function bossAI(sim: Sim, e: Enemy, target: Player, d: number, dt: number): { x:
   return res;
 }
 
+/**
+ * Elites now and then plant themselves and wind up one small telegraphed ground attack when a
+ * partner is close. Returns true while they are casting (standing still).
+ */
+function eliteRaid(sim: Sim, e: Enemy, target: Player, d: number, dt: number): boolean {
+  if (e.casting! > 0) {
+    e.casting! -= dt;
+    e.flash = e.casting! % 0.2 < 0.1 ? 0.06 : 0;
+    return true;
+  }
+  if (e.role === 'bomber') return false;
+  e.raidCd = (e.raidCd ?? sim.rng.range(2, 5)) - dt;
+  if (e.raidCd > 0 || d > (e.role === 'ranged' ? 260 : 170) || e.st.freeze > 0 || e.st.flinch > 0) return false;
+  e.raidCd = sim.rng.range(5, 8);
+  e.casting = castRaid(sim, e, eliteMove(e), target, 'elite');
+  return true;
+}
+
 function ringShots(sim: Sim, e: Enemy, n: number, offset: number, speed: number) {
   for (let i = 0; i < n; i++) enemyShot(sim, e, offset + (i / n) * TAU, speed, e.dmg * 0.8);
 }
@@ -523,7 +549,7 @@ function ringShots(sim: Sim, e: Enemy, n: number, offset: number, speed: number)
 // ─────────────────────────── death & loot ───────────────────────────
 
 /** Alphas idle around their territory until provoked, then hunt with shockwave stomps; leashed to home. */
-function alphaAI(sim: Sim, e: Enemy, d: number, dx: number, dy: number, dt: number): { x: number; y: number; speed: number } {
+function alphaAI(sim: Sim, e: Enemy, target: Player, d: number, dx: number, dy: number, dt: number): { x: number; y: number; speed: number } {
   const hx = e.homeX - e.x, hy = e.homeY - e.y;
   const hd = Math.hypot(hx, hy) || 1;
   e.ai -= dt;
@@ -547,11 +573,20 @@ function alphaAI(sim: Sim, e: Enemy, d: number, dx: number, dy: number, dt: numb
     e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.3);
     return { x: hx / hd, y: hy / hd, speed: 1 };
   }
+  if (e.casting! > 0) {
+    // Planted while a ground attack winds up.
+    e.casting! -= dt;
+    e.flash = e.casting! % 0.2 < 0.1 ? 0.06 : 0;
+    return { x: 0, y: 0, speed: 0 };
+  }
   if (e.ai <= 0 && d < 320) {
     e.ai = sim.rng.range(2.6, 3.6);
-    const n = 10;
-    const off = sim.rng.range(0, TAU);
-    for (let i = 0; i < n; i++) enemyShot(sim, e, off + (i / n) * TAU, 110, e.dmg * 0.7);
+    const move = alphaNextMove(e);
+    if (move === 'shots') {
+      const n = 10;
+      const off = sim.rng.range(0, TAU);
+      for (let i = 0; i < n; i++) enemyShot(sim, e, off + (i / n) * TAU, 110, e.dmg * 0.7);
+    } else e.casting = castRaid(sim, e, move, target, 'alpha');
   }
   return { x: dx / d, y: dy / d, speed: 1 };
 }

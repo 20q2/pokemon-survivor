@@ -82,7 +82,9 @@ export class LocalSession implements RunSession {
       if (this.firstHit === Infinity && me.dmgTaken > 0) this.firstHit = this.sim.time;
       this.onTick?.();
     }
-    this.sim.alpha = this.acc / DT;
+    // Only interpolate while the world is actually moving. During level-ups and cinematics the
+    // sim stands still, and blending toward a stale previous position made the camera shake.
+    this.sim.alpha = this.sim.phase === 'play' ? this.acc / DT : 1;
   }
 
   drainEvents() {

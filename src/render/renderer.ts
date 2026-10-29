@@ -7,6 +7,7 @@ import { CHEST_BALL, CHEST_COLOR, type ChestTier, type Enemy, type GameEvent, ty
 import { assets, type Anim } from './assets.ts';
 import { Background, DECOR_CELL, type DecorSprite } from './background.ts';
 import { DamageNumbers, Particles } from './fx.ts';
+import { HAZARD, HAZARD_IMPACT } from '../game/hazards.ts';
 
 /** What the renderer needs from a world — satisfied by Sim (host/solo) and the network replica (client). */
 export interface WorldView {
@@ -37,6 +38,9 @@ export class Renderer {
   private fx = document.createElement('canvas');
   private fxg = this.fx.getContext('2d')!;
   zoom = 2;
+  /** Zoom from screen size alone; `zoom` adds the evolution pull-back on top. */
+  private baseZoom = 2;
+  private evoZoom = 1;
   viewW = 960;
   viewH = 540;
   camX = 0;
@@ -80,13 +84,21 @@ export class Renderer {
     this.canvas.style.width = `${w / dpr}px`;
     this.canvas.style.height = `${h / dpr}px`;
     // Half-step integer zoom keeps pixel art crisp while showing ~450-540 world px vertically.
-    this.zoom = Math.max(1, Math.floor((h / 450) * 2) / 2);
-    this.viewW = w / this.zoom;
-    this.viewH = h / this.zoom;
+    this.baseZoom = Math.max(1, Math.floor((h / 450) * 2) / 2);
+    this.applyZoom();
     this.vignette = null;
   }
 
+  /** The view (and so the sim's spawn ring, which reads viewW/viewH) widens as the partner evolves. */
+  private applyZoom() {
+    this.zoom = Math.max(1, this.baseZoom * this.evoZoom);
+    this.viewW = this.canvas.width / this.zoom;
+    this.viewH = this.canvas.height / this.zoom;
+  }
+
   reset() {
+    this.evoZoom = 1;
+    this.applyZoom();
     this.particles.n = 0;
     this.chains = [];
     this.booms = [];
@@ -133,6 +145,9 @@ export class Renderer {
         break;
       case 'chain':
         this.chains.push({ pts: ev.pts, color: TYPE_COLORS[ev.type], t: 0 });
+        break;
+      case 'raid':
+        this.numbers.label(ev.x, ev.y - (ev.big ? 58 : 34), `${ev.name}!`, ev.big ? '#ffb0a0' : '#ffd0c0', 1.5, ev.big ? 8 : 6);
         break;
       case 'hurt':
         if (ev.player === this.localId) {
@@ -187,6 +202,15 @@ export class Renderer {
     }
     this.interpolate(world);
     const me = world.players[this.localId] ?? world.players[0];
+    if (me) {
+      // Pull back as the partner evolves (eased over ~2s), so it feels bigger relative to the world.
+      const target = EVO_ZOOM[Math.min(me.stage, EVO_ZOOM.length - 1)];
+      if (this.evoZoom !== target) {
+        this.evoZoom += (target - this.evoZoom) * (1 - Math.pow(0.1, dt));
+        if (Math.abs(target - this.evoZoom) < 0.002) this.evoZoom = target;
+        this.applyZoom();
+      }
+    }
     const z = this.zoom;
     if (me) {
       // The camera is locked to the (interpolated) partner; only the look-ahead eases. Snapping the
@@ -235,7 +259,7 @@ export class Renderer {
     g.fillStyle = 'rgba(0,0,0,0.28)';
     for (const d of list) {
       if (d.k === 0) shadow(g, d.e.x, d.e.y, 8 * d.e.scale);
-      else if (d.k === 1) shadow(g, d.p.x, d.p.y, 9);
+      else if (d.k === 1) shadow(g, d.p.x, d.p.y, 9 * growth(d.p));
     }
     for (const d of list) {
       if (d.k === 0) this.drawEnemy(d.e, world.time);
@@ -444,8 +468,9 @@ export class Renderer {
       g.globalAlpha = 1;
       g.globalCompositeOperation = 'source-over';
     }
+    const grow = growth(p);
     if (p.fainted) {
-      this.drawAnim(set.idle, p.x, p.y, 0, 0, 1, 0, 0.45);
+      this.drawAnim(set.idle, p.x, p.y, 0, 0, grow, 0, 0.45);
       g.strokeStyle = '#ff9de2';
       g.lineWidth = 2;
       g.beginPath();
@@ -456,12 +481,12 @@ export class Renderer {
     const anim = p.moving ? set.walk : set.idle;
     const blink = p.hurtT > 0 ? (Math.floor(p.hurtT * 30) % 2) * 0.8 : 0;
     // Forms without a Mega sprite grow and glow instead.
-    const scale = mega && !mega.sprite ? 1.25 : 1;
+    const scale = grow * (mega && !mega.sprite ? 1.25 : 1);
     this.drawAnim(anim, p.x, p.y, time * (p.moving ? 1.2 : 1), dirRow(p.fx, p.fy), scale, blink);
     if (p.shiny && Math.random() < 0.12) this.particles.spawn(p.x + (Math.random() - 0.5) * 22, p.y - 6 - Math.random() * 22, 0, -24, 0.6, 2, '#fff6a8', 0, true);
     for (const b of p.buffs) {
-      if (b.kind === 'shield') { g.strokeStyle = 'rgba(160,220,255,0.6)'; g.lineWidth = 1.5; g.beginPath(); g.arc(p.x, p.y - 12, 18, 0, TAU); g.stroke(); }
-      if (b.kind === 'dodge' && Math.floor(time * 10) % 2 === 0) this.drawAnim(anim, p.x + 8, p.y, time, dirRow(p.fx, p.fy), 1, 0, 0.3);
+      if (b.kind === 'shield') { g.strokeStyle = 'rgba(160,220,255,0.6)'; g.lineWidth = 1.5; g.beginPath(); g.arc(p.x, p.y - 12 * grow, 18 * grow, 0, TAU); g.stroke(); }
+      if (b.kind === 'dodge' && Math.floor(time * 10) % 2 === 0) this.drawAnim(anim, p.x + 8 * grow, p.y, time, dirRow(p.fx, p.fy), scale, 0, 0.3);
     }
   }
 
@@ -503,9 +528,10 @@ export class Renderer {
       g.font = '6px "Press Start 2P", monospace';
       g.textAlign = 'center';
       g.fillStyle = '#000';
-      g.fillText(p.name, p.x + 0.5, p.y - 33.5);
+      const ny = p.y - 34 * growth(p);
+      g.fillText(p.name, p.x + 0.5, ny + 0.5);
       g.fillStyle = SLOT_COLORS[p.slot];
-      g.fillText(p.name, p.x, p.y - 34);
+      g.fillText(p.name, p.x, ny);
     }
   }
 
@@ -576,6 +602,7 @@ export class Renderer {
   // ─────────────────────────── projectiles ───────────────────────────
 
   private drawGroundFx(pr: Projectile, world: WorldView) {
+    if (pr.moveId === HAZARD) return this.drawHazard(pr, world.time);
     const g = this.g;
     const col = TYPE_COLORS[pr.type];
     const k = pr.t / pr.life;
@@ -619,18 +646,85 @@ export class Renderer {
     }
   }
 
-  private drawProjectile(pr: Projectile, world: WorldView) {
+  /**
+   * Raid-style ground marker: the whole area is tinted, a brighter fill grows to its edge as the
+   * attack winds up, the rim blinks white just before it lands, then the area flashes in the
+   * attack's type colour. Shapes are drawn exactly as they hit (no ground squash).
+   */
+  private drawHazard(pr: Projectile, time: number) {
     const g = this.g;
-    const col = TYPE_COLORS[pr.type];
-    if (pr.moveId === 'telegraph') {
-      const k = pr.t / pr.life;
-      g.strokeStyle = '#ff3b3b'; g.lineWidth = 2; g.globalAlpha = 0.8;
-      g.beginPath(); g.ellipse(pr.x, pr.y, pr.r, pr.r * 0.6, 0, 0, TAU); g.stroke();
-      g.fillStyle = 'rgba(255,40,40,0.25)';
-      g.beginPath(); g.ellipse(pr.x, pr.y, pr.r * k, pr.r * 0.6 * k, 0, 0, TAU); g.fill();
+    const warnOnly = pr.dmg <= 0;
+    if (pr.t >= pr.delay) {
+      if (warnOnly) return;
+      const a = 1 - (pr.t - pr.delay) / HAZARD_IMPACT;
+      g.globalAlpha = Math.max(0, a) * 0.75;
+      g.fillStyle = TYPE_COLORS[pr.type];
+      this.hazardPath(pr, 1);
+      g.fill('evenodd');
+      g.globalAlpha = Math.max(0, a);
+      g.fillStyle = '#ffffff';
+      this.hazardPath(pr, 1);
+      g.lineWidth = 2;
+      g.strokeStyle = '#ffffff';
+      g.stroke();
       g.globalAlpha = 1;
       return;
     }
+    const k = pr.t / pr.delay;
+    const left = pr.delay - pr.t;
+    const blink = left < 0.3 && Math.floor(time * 16) % 2 === 0;
+    const pulse = 0.5 + 0.5 * Math.sin(time * 12);
+    g.fillStyle = warnOnly ? 'rgba(255,214,110,0.12)' : `rgba(255,60,30,${0.14 + pulse * 0.05})`;
+    this.hazardPath(pr, 1);
+    g.fill('evenodd');
+    g.fillStyle = warnOnly ? 'rgba(255,214,110,0.16)' : 'rgba(255,110,50,0.34)';
+    this.hazardPath(pr, k);
+    g.fill('evenodd');
+    g.strokeStyle = blink ? '#ffffff' : warnOnly ? '#ffd36b' : '#ff3d24';
+    g.lineWidth = blink ? 2 : 1;
+    this.hazardPath(pr, 1);
+    g.stroke();
+  }
+
+  /** Path of a hazard's area; `k` < 1 gives the part filled so far (from the caster/centre outward). */
+  private hazardPath(pr: Projectile, k: number) {
+    const g = this.g;
+    g.beginPath();
+    switch (pr.shape) {
+      case 'circle':
+        g.arc(pr.x, pr.y, Math.max(0.5, pr.r * k), 0, TAU);
+        break;
+      case 'ring': {
+        // Fills from the safe middle outward; evenodd keeps the middle clear.
+        const outer = pr.len + (pr.r - pr.len) * k;
+        g.arc(pr.x, pr.y, Math.max(pr.len + 0.5, outer), 0, TAU);
+        g.moveTo(pr.x + pr.len, pr.y);
+        g.arc(pr.x, pr.y, pr.len, 0, TAU);
+        break;
+      }
+      case 'line': {
+        const c = Math.cos(pr.angle), s = Math.sin(pr.angle);
+        const L = pr.len * k;
+        g.moveTo(pr.x - s * pr.r, pr.y + c * pr.r);
+        g.lineTo(pr.x - s * pr.r + c * L, pr.y + c * pr.r + s * L);
+        g.lineTo(pr.x + s * pr.r + c * L, pr.y - c * pr.r + s * L);
+        g.lineTo(pr.x + s * pr.r, pr.y - c * pr.r);
+        g.closePath();
+        break;
+      }
+      case 'cone': {
+        const half = Math.atan2(pr.r, pr.len);
+        g.moveTo(pr.x, pr.y);
+        g.arc(pr.x, pr.y, Math.max(0.5, pr.len * k), pr.angle - half, pr.angle + half);
+        g.closePath();
+        break;
+      }
+    }
+  }
+
+  private drawProjectile(pr: Projectile, world: WorldView) {
+    const g = this.g;
+    const col = TYPE_COLORS[pr.type];
     if (pr.hostile) {
       const r = pr.r + 1;
       g.globalCompositeOperation = 'lighter';
@@ -929,13 +1023,15 @@ export class Renderer {
   private drawIndicators(world: WorldView, left: number, top: number) {
     const g = this.g;
     const z = this.zoom;
+    // Marker sizes follow the screen, not the evolution pull-back.
+    const u = Math.min(2, this.baseZoom / 2);
     const W = this.canvas.width, H = this.canvas.height;
     const mark = (x: number, y: number, color: string, size: number) => {
       const sx = (x - left) * z, sy = (y - top) * z;
       if (sx > 0 && sx < W && sy > 0 && sy < H) return;
       const cx = W / 2, cy = H / 2;
       const a = Math.atan2(sy - cy, sx - cx);
-      const m = 28 * Math.min(2, z / 2 + 0.5);
+      const m = 28 * Math.min(2, this.baseZoom / 2 + 0.5);
       const k = Math.min((W / 2 - m) / Math.abs(Math.cos(a) || 1e-6), (H / 2 - m) / Math.abs(Math.sin(a) || 1e-6));
       const px = cx + Math.cos(a) * k, py = cy + Math.sin(a) * k;
       g.save();
@@ -948,10 +1044,10 @@ export class Renderer {
       g.fill(); g.stroke();
       g.restore();
     };
-    for (const e of world.enemies) if (e.boss && e.alive) mark(e.x, e.y, '#ff4b4b', 14 * Math.min(2, z / 2));
-    for (const pk of world.pickups) if (pk.kind === 'chest') mark(pk.x, pk.y, CHEST_COLOR[chestTier(pk.value)], (9 + chestTier(pk.value)) * Math.min(2, z / 2));
-    for (const pk of world.pickups) if (pk.kind === 'mega-stone') mark(pk.x, pk.y, `hsl(${Math.floor((world.time * 120) % 360)},100%,65%)`, 12 * Math.min(2, z / 2));
-    for (const p of world.players) if (p.id !== this.localId && p.connected) mark(p.x, p.y, SLOT_COLORS[p.slot], 10 * Math.min(2, z / 2));
+    for (const e of world.enemies) if (e.boss && e.alive) mark(e.x, e.y, '#ff4b4b', 14 * u);
+    for (const pk of world.pickups) if (pk.kind === 'chest') mark(pk.x, pk.y, CHEST_COLOR[chestTier(pk.value)], (9 + chestTier(pk.value)) * u);
+    for (const pk of world.pickups) if (pk.kind === 'mega-stone') mark(pk.x, pk.y, `hsl(${Math.floor((world.time * 120) % 360)},100%,65%)`, 12 * u);
+    for (const p of world.players) if (p.id !== this.localId && p.connected) mark(p.x, p.y, SLOT_COLORS[p.slot], 10 * u);
   }
 
   /** Mega Evolution: the partner is wrapped in a rainbow sphere that shatters into the Mega form. */
@@ -1056,12 +1152,18 @@ export const SLOT_COLORS = ['#ff6b6b', '#4dabf7', '#69db7c', '#ffd43b'];
 export const chestTier = (v: number) => Math.max(1, Math.min(4, Math.round(v))) as ChestTier;
 
 function isGroundFx(pr: Projectile) {
-  return !pr.hostile && (pr.behavior === 'zone' || pr.behavior === 'trail' || pr.behavior === 'aura');
+  return pr.moveId === HAZARD || (!pr.hostile && (pr.behavior === 'zone' || pr.behavior === 'trail' || pr.behavior === 'aura'));
 }
 
 function inView(x: number, y: number, L: number, T: number, W: number, H: number, m: number) {
   return x > L - m && x < L + W + m && y > T - m && y < T + H + m;
 }
+
+/** Camera zoom multiplier per evolution stage of the local partner. */
+const EVO_ZOOM = [1, 0.9, 0.8];
+/** Partners draw larger as they evolve (cosmetic; hitboxes are unchanged). With EVO_ZOOM the
+ * partner keeps roughly its on-screen size while the world around it shrinks. */
+const growth = (p: Player) => [1, 1.15, 1.3][Math.min(p.stage, 2)];
 
 function shadow(g: CanvasRenderingContext2D, x: number, y: number, r: number) {
   g.beginPath();

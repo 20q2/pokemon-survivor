@@ -11,6 +11,7 @@ import { applyOffer, generateOffers, masteryCandidates, randomFiller, evolutionM
 import { fireMoves, updateProjectiles, damagePlayer } from './combat.ts';
 import { activateMega, updateMega } from './mega.ts';
 import { Spawner, updateEnemies, killEnemy } from './enemies.ts';
+import { heal, newLedger } from './ledger.ts';
 import type {
   ChestReward, ChestTier, Enemy, GameEvent, Pickup, PickupKind, Player, Projectile, UpgradeOffer,
 } from './types.ts';
@@ -157,7 +158,7 @@ export class Sim {
       rerolls: pi.meta.rerolls, skips: pi.meta.skips, banishes: pi.meta.banishes, banished: new Set(),
       revives: pi.meta.revives, fainted: false, reviveProgress: 0, hurtT: 0, lastHit: -99,
       pendingLevels: 0, kills: 0, dmgDealt: 0, dmgTaken: 0, bossKills: 0, superEff: 0, shinyKills: 0,
-      vitamins: {}, evolutions: 0, masteries: 0, connected: true, viewW: 960, viewH: 540, mega: 0, megaT: 0, megas: 0,
+      vitamins: {}, ledger: newLedger(), evolutions: 0, masteries: 0, connected: true, viewW: 960, viewH: 540, mega: 0, megaT: 0, megas: 0,
     };
     this.tms.set(p.id, pi.tms);
     this.players.push(p);
@@ -213,7 +214,8 @@ export class Sim {
         if (p.reviveProgress >= 3) {
           p.fainted = false;
           p.reviveProgress = 0;
-          p.hp = p.stats.maxHp * 0.5;
+          p.hp = 0;
+          heal(p, p.stats.maxHp * 0.5, 'revive', helper ?? p);
           this.emit({ e: 'revive', player: p.id });
         }
         continue;
@@ -231,12 +233,12 @@ export class Sim {
       // buffs
       for (let i = p.buffs.length - 1; i >= 0; i--) {
         const b = p.buffs[i];
-        if (b.kind === 'heal') p.hp = Math.min(p.stats.maxHp, p.hp + p.stats.maxHp * b.amount * dt);
+        if (b.kind === 'heal') heal(p, p.stats.maxHp * b.amount * dt, b.src ?? 'buff');
         b.t -= dt;
         if (b.t <= 0) p.buffs.splice(i, 1);
       }
       updateMega(this, p, dt);
-      if (p.stats.regen) p.hp = Math.min(p.stats.maxHp, p.hp + p.stats.maxHp * p.stats.regen * dt);
+      if (p.stats.regen) heal(p, p.stats.maxHp * p.stats.regen * dt, 'regen');
       if (p.stats.lifeOrb && p.ability !== 'magic-guard')
         p.hp = Math.max(1, p.hp - p.stats.maxHp * 0.004 * dt * (p.stats.lifeOrb / 0.08));
     }
@@ -312,10 +314,8 @@ export class Sim {
         this.money += pk.value;
         break;
       case 'oran':
-        p.hp = Math.min(p.stats.maxHp, p.hp + p.stats.maxHp * (p.ability === 'multiscale' ? 0.5 : 0.25));
-        break;
       case 'sitrus':
-        for (const o of this.players) if (!o.fainted) o.hp = Math.min(o.stats.maxHp, o.hp + o.stats.maxHp * 0.5);
+        this.eatBerry(p, pk.kind);
         break;
       case 'magnet':
         for (const c of this.pickups) if (!c.dead && (c.kind === 'candy' || c.kind === 'coin')) { c.vacuum = p.id + 1; c.t = 0; }
@@ -397,7 +397,7 @@ export class Sim {
     p.types = [...sp.types];
     p.evolutions++;
     this.refreshStats();
-    p.hp = p.stats.maxHp;
+    heal(p, p.stats.maxHp, 'evolve');
     // Evolving teaches a new move; with four moves already, the player picks one to forget.
     const learn = evolutionMove(p);
     if (!learn) return;
@@ -472,7 +472,7 @@ export class Sim {
     const p = this.players[playerId];
     if (!p || p.skips <= 0 || !this.offers.has(playerId) || p.pendingLearn) return;
     p.skips--;
-    p.hp = Math.min(p.stats.maxHp, p.hp + p.stats.maxHp * 0.1);
+    heal(p, p.stats.maxHp * 0.1, 'skip');
     this.afterChoice(p);
   }
 
@@ -524,12 +524,28 @@ export class Sim {
     const roll = this.rng.next();
     let n = tier === 1 ? (roll < 0.1 ? 2 : 1) : tier === 2 ? (roll < 0.15 ? 3 : 2) : tier === 3 ? (roll < 0.2 ? 5 : 3) : 5;
     if (mastered && tier <= 2) n = 0;
+    let healed = false;
     for (let i = 0; i < n; i++) {
       let ups = ownedUpgrades(p);
       // Nothing to level? Grant something new instead.
       if (!ups.length) ups = generateOffers(p, this.rng, 3, this.tms.get(p.id) ?? []).filter((o) => o.kind === 'newMove' || o.kind === 'newItem');
-      // A complete build still gets something: limit breaks and vitamins.
-      if (!ups.length) ups = [randomFiller(p, this.rng)];
+      // A complete build still gets something: a berry when hurt, a little gold, or a limit break / vitamin.
+      if (!ups.length) {
+        if (!healed && p.hp < p.stats.maxHp * 0.7) {
+          healed = true;
+          const berry = tier >= 3 ? 'sitrus' : 'oran';
+          this.eatBerry(p, berry);
+          rewards.push({ kind: 'heal', id: `${berry}-berry` });
+          continue;
+        }
+        if (this.rng.chance(0.35)) {
+          const amount = 5 + tier * 5;
+          this.money += amount;
+          rewards.push({ kind: 'gold', id: 'nugget', level: amount });
+          continue;
+        }
+        ups = [randomFiller(p, this.rng)];
+      }
       const o = this.rng.pick(ups);
       applyOffer(p, o);
       const lvl = o.kind === 'newMove' || o.kind === 'newItem' ? 1 : o.level;
@@ -546,6 +562,12 @@ export class Sim {
     const timing = chestTiming(rewards.length);
     const dur = this.players.length > 1 ? timing.reveal + 2 : timing.autoClose;
     this.queueCine({ kind: 'chest', t: 0, dur, player: p.id, rewards, tier: shown });
+  }
+
+  /** Oran heals the eater; Sitrus heals the whole party. */
+  private eatBerry(p: Player, kind: 'oran' | 'sitrus') {
+    if (kind === 'oran') heal(p, p.stats.maxHp * (p.ability === 'multiscale' ? 0.5 : 0.25), 'oran');
+    else for (const o of this.players) heal(o, o.stats.maxHp * 0.5, 'sitrus', p);
   }
 
 

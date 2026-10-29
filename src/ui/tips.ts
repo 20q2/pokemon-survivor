@@ -6,8 +6,8 @@ import type { Player } from '../game/types.ts';
 import { catBadge, h, img, typeBadge, uiIcon } from './dom.ts';
 
 /**
- * Hover tooltips for moves, items and vitamins, shared by the HUD and the level-up screen's
- * build panel. One floating PMD-style window, positioned beside whatever is hovered.
+ * Hover tooltips for moves, items, vitamins and stats in the HUD (which stays live above the
+ * level-up screen). One floating PMD-style window, positioned beside whatever is hovered.
  */
 
 export const BEHAVIOR_TEXT: Record<string, string> = {
@@ -42,7 +42,9 @@ function show() {
   t.style.top = `${Math.round(y)}px`;
 }
 
-export function hideTip() {
+/** Hide the tooltip; with `within`, only if it belongs to something inside that element. */
+export function hideTip(within?: Node | null) {
+  if (within !== undefined && !(current && within?.contains(current.anchor))) return;
   current = null;
   tipEl?.classList.add('hidden');
 }
@@ -87,33 +89,15 @@ export function vitaminTip(id: string, n: number): HTMLElement {
 }
 
 /** A move slot: type symbol on a tinted tile, abbreviated name and level. */
-export function moveSlot(me: Player, id: string, level: number, cls = 'slot move'): HTMLElement {
+export function moveSlot(me: Player, id: string, level: number): HTMLElement {
   const def = MOVES[id];
   const lvText = def.mastery ? '★' : level > MAX_MOVE_LEVEL ? `★${level - MAX_MOVE_LEVEL}` : String(level);
-  return tipped(h('div', { class: `${cls}${def.mastery ? ' mastered' : ''}`, style: `--tc:${TYPE_COLORS[def.type]}` },
+  return tipped(h('div', { class: `slot move${def.mastery ? ' mastered' : ''}`, style: `--tc:${TYPE_COLORS[def.type]}` },
     img(uiIcon(`logo/${def.type}`), 'logo'), h('div', { class: 'ab' }, moveAbbr(def.name)), h('div', { class: 'lv' }, lvText)), () => moveTip(me, id));
 }
 
-export function itemSlot(me: Player, id: string, level: number, cls = 'slot item'): HTMLElement {
-  return tipped(h('div', { class: cls }, img(assets.itemUrl(id)), h('div', { class: 'lv' }, level)), () => itemTip(me, id));
+export function itemSlot(me: Player, id: string, level: number): HTMLElement {
+  return tipped(h('div', { class: 'slot item' }, img(assets.itemUrl(id)), h('div', { class: 'lv' }, level)), () => itemTip(me, id));
 }
 
 export const moveAbbr = (name: string) => name.split(/[\s-]/).map((w) => w.slice(0, 3)).join(' ').slice(0, 7).toUpperCase();
-
-/** The current build: moves, held items and vitamins, each hoverable. Used on the level-up screen. */
-export function buildPanel(me: Player): HTMLElement {
-  const moves = h('div', { class: 'bp-row' }, ...Array.from({ length: me.moveSlots }, (_, i) => {
-    const m = me.moves[i];
-    return m ? moveSlot(me, m.id, m.level, 'slot move big') : h('div', { class: 'slot empty big' });
-  }));
-  const items = h('div', { class: 'bp-row' }, ...Array.from({ length: me.itemSlots }, (_, i) => {
-    const it = me.items[i];
-    return it ? itemSlot(me, it.id, it.level, 'slot item big') : h('div', { class: 'slot empty big' });
-  }));
-  const vits = Object.entries(me.vitamins).filter(([, n]) => n > 0);
-  return h('div', { class: 'panel build-panel' },
-    h('div', { class: 'bp-title' }, 'Moves'), moves,
-    h('div', { class: 'bp-title' }, 'Held items'), items,
-    vits.length ? h('div', { class: 'bp-row vits' }, ...vits.map(([id, n]) => tipped(h('div', { class: 'vit' }, img(assets.itemUrl(id)), h('span', null, `×${n}`)), () => vitaminTip(id, n)))) : null,
-  );
-}

@@ -3,6 +3,7 @@ import type { Behavior, BuffKind, Category, Fx, StatusKind } from '../data/moves
 import type { AbilityId } from '../data/pokedex.ts';
 import type { EnemyRole, BossPattern } from '../data/stages.ts';
 import type { MetaBonuses } from '../meta/shop.ts';
+import type { Ledger } from './ledger.ts';
 
 export interface OwnedMove {
   id: string;
@@ -14,7 +15,7 @@ export interface OwnedMove {
 
 export interface OwnedItem { id: string; level: number }
 
-export interface Buff { kind: BuffKind; amount: number; t: number }
+export interface Buff { kind: BuffKind; amount: number; t: number; src?: string }
 
 export interface DerivedStats {
   maxHp: number;
@@ -94,6 +95,8 @@ export interface Player {
   viewW: number;
   viewH: number;
   sandT?: number;
+  /** Damage/healing by source, for the damage tracker. */
+  ledger: Ledger;
   /** Mega Evolution: meter 0..1 (fills once fully evolved and the team holds the Mega Stone). */
   mega: number;
   /** Seconds of Mega Evolution left (0 = not mega). */
@@ -146,6 +149,10 @@ export interface Enemy {
   scale: number;
   lastHitBy: number;        // player id
   animOffset: number;
+  /** Elites & alphas: seconds until their next telegraphed ground attack. */
+  raidCd?: number;
+  /** Seconds left standing still while winding up a ground attack. */
+  casting?: number;
 }
 
 export type Shape = 'circle' | 'ring' | 'line' | 'box' | 'cone';
@@ -229,7 +236,9 @@ export type GameEvent =
   | { e: 'shiny'; x: number; y: number }
   | { e: 'repel' }
   | { e: 'learn'; player: number; move: string }
-  | { e: 'enemyShot'; x: number; y: number };
+  | { e: 'enemyShot'; x: number; y: number }
+  /** A boss, alpha or elite starts a telegraphed ground attack (named move callout). */
+  | { e: 'raid'; x: number; y: number; name: string; big: boolean };
 
 /** Treasure rarity, shown by the Poké Ball it comes in. Stored as a chest pickup's `value`. */
 export type ChestTier = 1 | 2 | 3 | 4;
@@ -237,7 +246,8 @@ export const CHEST_BALL: Record<ChestTier, string> = { 1: 'poke-ball', 2: 'great
 export const CHEST_COLOR: Record<ChestTier, string> = { 1: '#fff3b0', 2: '#7fb8ff', 3: '#ffd84a', 4: '#d38bff' };
 export const CHEST_NAME: Record<ChestTier, string> = { 1: 'Poké Ball', 2: 'Great Ball', 3: 'Ultra Ball', 4: 'Master Ball' };
 
-export interface ChestReward { kind: 'mastery' | 'move' | 'item' | 'vitamin'; id: string; level?: number; from?: string }
+/** `gold`: id is the icon, level the ₽ amount. `heal`: id is the berry eaten. */
+export interface ChestReward { kind: 'mastery' | 'move' | 'item' | 'vitamin' | 'gold' | 'heal'; id: string; level?: number; from?: string }
 
 export interface UpgradeOffer {
   /** forget: learn `id` in place of move slot `level`; keep: don't learn `id`. */

@@ -3,6 +3,7 @@ import { MOVES, MASTERY_OF, MAX_MOVE_LEVEL } from '../data/moves.ts';
 import { ITEMS, ITEM_LIST, MAX_ITEM_LEVEL, VITAMIN, VITAMINS } from '../data/items.ts';
 import type { Rng } from '../engine/math.ts';
 import { effectiveness, type PType } from '../data/types.ts';
+import { heal } from './ledger.ts';
 import type { Player, UpgradeOffer } from './types.ts';
 
 /** Move ids already represented (mastered moves also block their base move). */
@@ -165,7 +166,7 @@ export function applyOffer(p: Player, o: UpgradeOffer) {
       break;
     case 'moveUp': {
       const m = p.moves.find((x) => x.id === o.id);
-      if (m) m.level = Math.max(m.level, Math.min(MAX_MOVE_LEVEL, m.level) + 1);
+      if (m) m.level++;
       break;
     }
     case 'newItem':
@@ -177,7 +178,7 @@ export function applyOffer(p: Player, o: UpgradeOffer) {
       break;
     }
     case 'heal':
-      p.hp = Math.min(p.stats.maxHp, p.hp + p.stats.maxHp * 0.3);
+      heal(p, p.stats.maxHp * 0.3, 'oran');
       break;
     case 'forget': {
       // The new move takes the old one's place and keeps its level, so nothing is lost.
@@ -191,7 +192,7 @@ export function applyOffer(p: Player, o: UpgradeOffer) {
       break;
     case 'vitamin':
       p.vitamins[o.id] = (p.vitamins[o.id] ?? 0) + 1;
-      if (o.id === 'hp-up') p.hp = Math.min(p.stats.maxHp * 1.06, p.hp + p.stats.maxHp * 0.25);
+      if (o.id === 'hp-up') heal(p, p.stats.maxHp * 0.25, 'hp-up');
       break;
   }
 }

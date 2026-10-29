@@ -5,6 +5,8 @@ import { baseDamage, incomingDamage, resolveHit } from './damage.ts';
 import { killEnemy } from './enemies.ts';
 import type { Sim } from './sim.ts';
 import { megaOnHurt } from './mega.ts';
+import { creditDamage, heal } from './ledger.ts';
+import { HAZARD, updateHazard } from './hazards.ts';
 import type { Enemy, Player, Projectile, Shape } from './types.ts';
 
 const HIGH_CRIT = new Set(['razor-leaf', 'karate-chop', 'leaf-blade', 'night-slash', 'blaze-kick', 'cross-chop', 'air-slash', 'stone-edge', 'crunch']);
@@ -89,7 +91,7 @@ export function fireMoves(sim: Sim, dt: number) {
         p.sandT = 0.7;
         const def = MOVES.sandstorm;
         const s = { ...moveStatsAt(def, 1), power: 8, area: 80 * p.stats.area };
-        spawnAura(sim, p, def, s, 'ability');
+        spawnAura(sim, p, def, s, 'sand-stream');
       }
     }
   }
@@ -333,7 +335,7 @@ function fire(sim: Sim, p: Player, def: MoveDef, s: MoveStats) {
       const dur = s.duration * p.stats.duration;
       const existing = p.buffs.find((x) => x.kind === b.kind);
       if (existing) existing.t = Math.max(existing.t, dur);
-      else p.buffs.push({ kind: b.kind, amount: b.amount, t: dur });
+      else p.buffs.push({ kind: b.kind, amount: b.amount, t: dur, src: def.id });
       makeProjectile(sim, { ...c, shape: 'circle', x: p.x, y: p.y, r: 26, life: 0.6, attach: true, dmg: 0, pierce: 0 });
       break;
     }
@@ -449,6 +451,7 @@ export function updateProjectiles(sim: Sim, dt: number) {
     stepProjectileMotion(sim, pr, dt, find);
     if (pr.dead) continue;
     if (pr.hostile) {
+      if (pr.moveId === HAZARD) { updateHazard(sim, pr, dt); continue; }
       for (const p of sim.players) {
         if (p.fainted) continue;
         if (overlaps(pr, p.x, p.y, p.radius)) {
@@ -494,12 +497,12 @@ export function hitEnemy(sim: Sim, pr: Projectile, e: Enemy) {
     e.vx += (kx / l) * k;
     e.vy += (ky / l) * k;
   }
-  owner.dmgDealt += res.dmg;
+  creditDamage(owner, pr.moveId || 'other', res.dmg, e.boss);
   const owned = owner.moves.find((m) => m.id === pr.moveId);
   if (owned) owned.dmgDealt += res.dmg;
   if (res.eff > 1) owner.superEff++;
-  if (owner.stats.lifesteal) owner.hp = Math.min(owner.stats.maxHp, owner.hp + res.dmg * owner.stats.lifesteal);
-  if (pr.effect && sim.rng.next() < pr.chance) applyStatus(sim, e, pr.effect, res.dmg, owner);
+  if (owner.stats.lifesteal) heal(owner, res.dmg * owner.stats.lifesteal, 'lifesteal');
+  if (pr.effect && sim.rng.next() < pr.chance) applyStatus(sim, e, pr.effect, res.dmg, owner, pr.moveId);
   if (owner.stats.flinch && sim.rng.next() < owner.stats.flinch) applyStatus(sim, e, 'flinch', 0, owner);
   sim.emit({ e: 'hit', x: e.x, y: e.y - e.radius, dmg: res.dmg, eff: res.eff, crit: res.crit, type: pr.type });
   if (e.hp <= 0) {
@@ -508,7 +511,7 @@ export function hitEnemy(sim: Sim, pr: Projectile, e: Enemy) {
   }
 }
 
-export function applyStatus(sim: Sim, e: Enemy, kind: StatusKind, dmg: number, owner: Player) {
+export function applyStatus(sim: Sim, e: Enemy, kind: StatusKind, dmg: number, owner: Player, src = 'drain') {
   const k = e.boss ? 0.3 : e.elite ? 0.6 : 1;
   const st = e.st;
   switch (kind) {
@@ -521,19 +524,19 @@ export function applyStatus(sim: Sim, e: Enemy, kind: StatusKind, dmg: number, o
     case 'slow': st.slow = 2 * k; break;
     case 'confuse': st.confuse = 1.6 * k; break;
     case 'flinch': st.flinch = 0.35 * k; break;
-    case 'drain': owner.hp = Math.min(owner.stats.maxHp, owner.hp + Math.max(1, dmg * 0.25)); break;
+    case 'drain': heal(owner, Math.max(1, dmg * 0.25), src); break;
     case 'coin': st.coin = 1; break;
   }
   void sim;
 }
 
 /** Damage to an enemy that doesn't come from a projectile (DoTs, thorns, abilities). */
-export function rawDamageEnemy(sim: Sim, e: Enemy, dmg: number, type: PType, ownerId: number) {
+export function rawDamageEnemy(sim: Sim, e: Enemy, dmg: number, type: PType, ownerId: number, src: string) {
   if (!e.alive) return;
   e.hp -= dmg;
   e.flash = Math.max(e.flash, 0.05);
   const owner = sim.players[ownerId];
-  if (owner) owner.dmgDealt += dmg;
+  if (owner) creditDamage(owner, src, dmg, e.boss);
   sim.emit({ e: 'hit', x: e.x, y: e.y - e.radius, dmg: Math.round(dmg), eff: 1, crit: false, type });
   if (e.hp <= 0) killEnemy(sim, e, ownerId);
 }
@@ -554,7 +557,8 @@ export function damagePlayer(sim: Sim, p: Player, raw: number, type: PType, spec
   if (sim.rng.next() < p.stats.focus) { p.hp = 1; return; }
   if (p.revives > 0) {
     p.revives--;
-    p.hp = p.stats.maxHp * 0.5;
+    p.hp = 0;
+    heal(p, p.stats.maxHp * 0.5, 'revive');
     sim.emit({ e: 'revive', player: p.id });
     for (const e of sim.enemies) {
       const dx = e.x - p.x, dy = e.y - p.y;

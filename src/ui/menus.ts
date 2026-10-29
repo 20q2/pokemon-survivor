@@ -9,7 +9,7 @@ import { ACHIEVEMENTS, rewardText, stageUnlocked } from '../meta/achievements.ts
 import { checkAchievements, type RunRewards } from '../meta/progression.ts';
 import type { RunSummary } from '../meta/achievements.ts';
 import { exportSave, freshSave, importSave } from '../meta/save.ts';
-import { FRIENDSHIP_MAX, FRIENDSHIP_PERKS, SHOP, TM_COST, TM_LIST, upgradeCost } from '../meta/shop.ts';
+import { FRIENDSHIP_MAX, FRIENDSHIP_PERKS, SHOP, SHOP_CATS, TM_COST, TM_LIST, upgradeCost, type ShopCat } from '../meta/shop.ts';
 import { assets, ASSET_BASE } from '../render/assets.ts';
 import { stageThumbnail } from '../render/background.ts';
 import { dirRow } from '../engine/math.ts';
@@ -238,58 +238,90 @@ export function stageScreen(app: App, lineId: string, onStart: (stageId: string)
 
 // ─────────────────────────── shop ───────────────────────────
 
+type MartTab = ShopCat | 'tms';
+/** Remembered across visits so returning to the Mart lands on the aisle you were browsing. */
+let martTab: MartTab = 'stats';
+
 export function shopScreen(app: App) {
   const root = screen('');
-  const render = () => {
+  const render = (focusSel?: string) => {
     const s = app.save;
     root.innerHTML = '';
+
+    const tabBtn = (id: MartTab, icon: string, name: string, have: number, total: number, buyable: boolean) =>
+      btn([img(assets.itemUrl(icon)), name, h('span', { class: `tab-count${buyable ? ' buyable' : ''}` }, `${have}/${total}`)],
+        () => { if (martTab !== id) { martTab = id; render(`[data-tab="${id}"]`); } },
+        `small mart-tab${martTab === id ? ' primary' : ''}`, { 'data-tab': id });
+    const tabs = h('div', { class: 'mart-tabs' },
+      SHOP_CATS.map((c) => {
+        const ups = SHOP.filter((u) => u.cat === c.id);
+        const have = ups.reduce((n, u) => n + (s.shop[u.id] ?? 0), 0);
+        const total = ups.reduce((n, u) => n + u.maxRank, 0);
+        const buyable = ups.some((u) => (s.shop[u.id] ?? 0) < u.maxRank && s.money >= upgradeCost(u, s.shop[u.id] ?? 0));
+        return tabBtn(c.id, c.icon, c.name, have, total, buyable);
+      }),
+      tabBtn('tms', 'tm-normal', 'TM Case', s.tms.length, TM_LIST.length, TM_LIST.some((m) => !s.tms.includes(m.id)) && s.money >= TM_COST),
+    );
+
     const grid = h('div', { class: 'shop-grid' });
-    for (const u of SHOP) {
-      const rank = s.shop[u.id] ?? 0;
-      const max = rank >= u.maxRank;
-      const cost = upgradeCost(u, rank);
-      grid.append(h('div', { class: 'panel upg' },
-        img(assets.itemUrl(u.icon)),
-        h('div', { class: 'nm' }, u.name),
-        h('div', { class: 'pips' }, Array.from({ length: u.maxRank }, (_, i) => h('i', { class: i < rank ? 'on' : '' }))),
-        h('div', { class: 'ds' }, rank ? u.desc(rank) : `Next: ${u.desc(1)}`, !max && rank ? h('div', null, `Next: ${u.desc(rank + 1)}`) : null),
-        btn(max ? 'MAXED' : `₽${cost.toLocaleString()}`, () => {
-          if (max || s.money < cost) { audio.sfx('error'); return; }
-          s.money -= cost;
-          s.shop[u.id] = rank + 1;
-          audio.sfx('buy');
-          app.announce(checkAchievements(s));
-          app.persist();
-          render();
-          (root.querySelector(`[data-id="${u.id}"]`) as HTMLElement | null)?.focus();
-        }, 'small', { disabled: max || s.money < cost, 'data-id': u.id }),
-      ));
+    let blurb: string;
+    if (martTab === 'tms') {
+      blurb = 'Owned TMs that are switched ON can appear as level-up moves for every Pokémon.';
+      for (const m of TM_LIST) {
+        const owned = s.tms.includes(m.id);
+        const off = s.tmsOff.includes(m.id);
+        grid.append(h('div', { class: `panel upg${owned && off ? ' off' : ''}` },
+          img(assets.itemUrl(`tm-${m.type}`)),
+          h('div', { class: 'nm' }, `TM ${m.name}`),
+          h('div', null, typeBadge(m.type), ' ', catBadge(m.cat)),
+          h('div', { class: 'ds' }, m.desc),
+          owned
+            ? btn(off ? 'OFF — click to enable' : 'ON — click to disable', () => {
+              s.tmsOff = off ? s.tmsOff.filter((x) => x !== m.id) : [...s.tmsOff, m.id];
+              audio.sfx('click');
+              app.persist();
+              render(`[data-id="${m.id}"]`);
+            }, 'small', { 'data-id': m.id })
+            : btn(`₽${TM_COST}`, () => {
+              if (s.money < TM_COST) { audio.sfx('error'); return; }
+              s.money -= TM_COST;
+              s.tms.push(m.id);
+              audio.sfx('buy');
+              app.persist();
+              render(`[data-id="${m.id}"]`);
+            }, 'small', { disabled: s.money < TM_COST, 'data-id': m.id }),
+        ));
+      }
+    } else {
+      blurb = SHOP_CATS.find((c) => c.id === martTab)!.blurb;
+      for (const u of SHOP.filter((x) => x.cat === martTab)) {
+        const rank = s.shop[u.id] ?? 0;
+        const max = rank >= u.maxRank;
+        const cost = upgradeCost(u, rank);
+        grid.append(h('div', { class: 'panel upg' },
+          img(assets.itemUrl(u.icon)),
+          h('div', { class: 'nm' }, u.name),
+          h('div', { class: 'pips' }, Array.from({ length: u.maxRank }, (_, i) => h('i', { class: i < rank ? 'on' : '' }))),
+          h('div', { class: 'ds' }, rank ? u.desc(rank) : `Next: ${u.desc(1)}`, !max && rank ? h('div', null, `Next: ${u.desc(rank + 1)}`) : null),
+          btn(max ? 'MAXED' : `₽${cost.toLocaleString()}`, () => {
+            if (max || s.money < cost) { audio.sfx('error'); return; }
+            s.money -= cost;
+            s.shop[u.id] = rank + 1;
+            audio.sfx('buy');
+            app.announce(checkAchievements(s));
+            app.persist();
+            render(`[data-id="${u.id}"]`);
+          }, 'small', { disabled: max || s.money < cost, 'data-id': u.id }),
+        ));
+      }
     }
-    const tms = h('div', { class: 'shop-grid' });
-    for (const m of TM_LIST) {
-      const owned = s.tms.includes(m.id);
-      tms.append(h('div', { class: 'panel upg' },
-        img(assets.itemUrl(`tm-${m.type}`)),
-        h('div', { class: 'nm' }, `TM ${m.name}`),
-        h('div', null, typeBadge(m.type), ' ', catBadge(m.cat)),
-        h('div', { class: 'ds' }, m.desc),
-        btn(owned ? 'OWNED' : `₽${TM_COST}`, () => {
-          if (owned || s.money < TM_COST) { audio.sfx('error'); return; }
-          s.money -= TM_COST;
-          s.tms.push(m.id);
-          audio.sfx('buy');
-          app.persist();
-          render();
-        }, 'small', { disabled: owned || s.money < TM_COST }),
-      ));
-    }
+
     const spent = SHOP.reduce((acc, u) => { let t = 0; for (let r = 0; r < (s.shop[u.id] ?? 0); r++) t += upgradeCost(u, r); return acc + t; }, 0);
     root.append(
       topbar('Poké Mart', () => app.goTitle(), moneyChip(app)),
-      h('div', { class: 'hint', style: 'color:#ddd;width:min(1100px,100%);margin-bottom:10px' }, 'Permanent upgrades for every Pokémon. Earn Poké Dollars by collecting coins and surviving.'),
+      tabs,
+      h('div', { class: 'hint mart-blurb' }, blurb),
       grid,
-      h('div', { class: 'section-title' }, 'TM Case — owned TMs can appear as level-up moves for every Pokémon'),
-      tms,
       h('div', { class: 'mt' }, btn(`Refund all upgrades (₽${spent.toLocaleString()})`, () => {
         if (!spent) return;
         s.money += spent;
@@ -298,8 +330,15 @@ export function shopScreen(app: App) {
         render();
       }, 'small')),
     );
+    // Keep keyboard/gamepad focus in place across re-renders. A button that just became
+    // disabled (maxed, or now unaffordable) can't take focus, so fall back to the active tab.
+    if (focusSel) {
+      const el = root.querySelector(focusSel) as HTMLButtonElement | null;
+      (el && !el.disabled ? el : root.querySelector(`[data-tab="${martTab}"]`) as HTMLElement | null)?.focus();
+    }
   };
   render();
+  root.querySelector<HTMLElement>(`[data-tab="${martTab}"]`)?.setAttribute('data-autofocus', '');
   return root;
 }
 
@@ -383,6 +422,7 @@ export function optionsScreen(app: App, onBack: () => void) {
       check('Screen shake', o.shake, (v) => (o.shake = v)),
       check('Damage numbers', o.damageNumbers, (v) => (o.damageNumbers = v)),
       check('Auto-pick upgrades', o.autoPick, (v) => (o.autoPick = v)),
+      check('Damage tracker (T)', o.damageMeter, (v) => (o.damageMeter = v)),
       check('Show FPS', o.showFps, (v) => (o.showFps = v)),
       h('div', { class: 'mt' }, h('b', null, 'Save data')),
       h('div', { class: 'row mt', style: 'flex-wrap:wrap' },

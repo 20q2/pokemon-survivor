@@ -7,6 +7,8 @@ export interface Options {
   damageNumbers: boolean;
   showFps: boolean;
   autoPick: boolean;
+  damageMeter: boolean;
+  meterTab: 'dmg' | 'boss' | 'heal';
   name: string;
 }
 
@@ -31,6 +33,8 @@ export interface SaveData {
   money: number;
   shop: Record<string, number>;
   tms: string[];
+  /** Owned TMs switched off in the Poké Mart: kept, but not offered in runs. */
+  tmsOff: string[];
   lines: string[];
   cleared: Record<string, number>; // stageId -> best clear count
   achievements: Record<string, number>; // id -> unlocked timestamp
@@ -53,13 +57,13 @@ const KEY = 'pokesurvivors.save.v1';
 
 export function freshSave(): SaveData {
   return {
-    v: 1, money: 0, shop: {}, tms: [], lines: [...STARTER_LINES], cleared: {}, achievements: {},
+    v: 1, money: 0, shop: {}, tms: [], tmsOff: [], lines: [...STARTER_LINES], cleared: {}, achievements: {},
     friendship: {}, shinyUnlocked: [], shinyOn: [], seen: {}, defeated: {},
     stats: {
       runs: 0, kills: 0, bosses: 0, clears: 0, evolutions: 0, masteries: 0, timePlayed: 0,
       moneyEarned: 0, shiniesDefeated: 0, superEffective: 0, coopRuns: 0, maxLevel: 0, revives: 0,
     },
-    options: { music: 0.5, sfx: 0.6, shake: true, damageNumbers: true, showFps: false, autoPick: false, name: 'Trainer' },
+    options: { music: 0.5, sfx: 0.6, shake: true, damageNumbers: true, showFps: false, autoPick: false, damageMeter: false, meterTab: 'dmg', name: 'Trainer' },
     lastLine: 'charmander', lastStage: 'viridian', flags: {}, bestTimes: {}, movesSeen: {},
   };
 }

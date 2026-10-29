@@ -28,6 +28,7 @@ const EXTRA_ITEMS = [
   'poke-ball', 'great-ball', 'ultra-ball', 'master-ball', 'protein', 'calcium', 'hp-up', 'iron', 'zinc',
   'carbos', 'pp-up', 'pp-max', 'exp-share', 'max-repel', 'revive', 'max-revive', 'lucky-punch', 'nugget',
   'big-nugget', 'shiny-charm', 'soothe-bell', 'moon-stone', 'escape-rope', 'x-attack', 'x-sp-atk', 'x-speed',
+  'x-defense', 'x-sp-def', 'dire-hit', 'bright-powder',
   'choice-band', 'choice-specs', 'zoom-lens', 'magnet', 'key-stone', 'venusaurite', 'charizardite-x', 'blastoisinite',
   'gengarite', 'alakazite', 'sceptilite', 'blazikenite', 'swampertite', 'tyranitarite', 'gardevoirite', 'mega-ring',
   'dowsing-machine', 'star-piece', 'pearl', 'big-pearl', 'stardust', 'comet-shard',

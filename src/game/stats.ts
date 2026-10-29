@@ -95,6 +95,7 @@ export function derivePlayerStats(p: Player, level: number, time: number): Deriv
     switch (b.kind) {
       case 'atk': s.atk *= 1 + b.amount; s.speed *= 1.1; break;
       case 'spa': s.spa *= 1 + b.amount; break;
+      case 'speed': s.speed *= 1 + b.amount; break;
       case 'haste': haste += b.amount; break;
       case 'crit': s.crit += b.amount; break;
       case 'shield': s.contactTaken *= 1 - b.amount; s.projTaken *= 1 - b.amount; break;

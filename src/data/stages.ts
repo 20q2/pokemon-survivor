@@ -1,7 +1,12 @@
 import type { PType } from './types.ts';
 
 export type EnemyRole = 'chaser' | 'fast' | 'tank' | 'ranged' | 'bomber' | 'treasure';
-export type BossPattern = 'charge' | 'radial' | 'aimed' | 'summon' | 'slam' | 'spiral';
+/**
+ * Boss attacks. The first six are the classic bullet/charge patterns; the rest are raid-style
+ * telegraphed ground attacks (see game/hazards.ts): quake = get away from the boss, donut = get
+ * close to it, meteor = circles rain on everyone, beam/cone = aimed at a partner, cross = a plus/X.
+ */
+export type BossPattern = 'charge' | 'radial' | 'aimed' | 'summon' | 'slam' | 'spiral' | 'quake' | 'donut' | 'meteor' | 'beam' | 'cone' | 'cross';
 
 export interface SpawnEntry { species: string; w: number }
 export interface BossDef { species: string; at: number; patterns: BossPattern[]; final?: boolean; minions?: string[] }

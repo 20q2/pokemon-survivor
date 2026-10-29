@@ -1,4 +1,4 @@
-// Screenshots: treasure opening (wobble, burst, landed), level-up build panel with a tooltip,
+// Screenshots: treasure opening (wobble, burst, landed), level-up with a HUD move tooltip,
 // and the "wants to learn" prompt after evolving with four moves.
 import { chromium } from 'playwright-core';
 const out = process.argv[2] ?? '.';
@@ -30,7 +30,7 @@ await page.evaluate(() => {
   s.refreshStats(); s.xp = s.xpNext;
 });
 await page.waitForTimeout(700);
-await page.locator('.build-panel .slot.move').first().hover();
+await page.locator('.hud-left .slot.move').first().hover();
 await page.waitForTimeout(300);
 await page.screenshot({ path: `${out}/t4-levelup-build.png` });
 await page.keyboard.press('Digit1');

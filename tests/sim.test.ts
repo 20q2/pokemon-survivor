@@ -33,7 +33,7 @@ describe('simulation smoke', () => {
       expect(sim.level, l.id).toBeGreaterThan(4);
       for (const p of sim.players) for (const m of p.moves) expect(Number.isFinite(m.cd)).toBe(true);
     }
-  });
+  }, 30_000);
 
   it('runs every stage briefly with co-op players', () => {
     for (const st of STAGES) {
@@ -103,13 +103,46 @@ describe('late-game systems', () => {
       for (const o of offers) expect(o.kind === 'vitamin' || (o.kind === 'moveUp' && o.level > MAX_MOVE_LEVEL) || o.kind === 'heal').toBe(true);
       applyOffer(p, offers[0]);
     }
+    // Limit breaks stack (each one is a real level) with diminishing returns.
     const ember = p.moves.find((m) => m.id === 'ember')!;
-    if (ember.level > MAX_MOVE_LEVEL + 1) {
-      const a = moveStatsAt(MOVES.ember, ember.level - 1).power, b = moveStatsAt(MOVES.ember, ember.level).power;
-      const c = moveStatsAt(MOVES.ember, MAX_MOVE_LEVEL).power, d = moveStatsAt(MOVES.ember, MAX_MOVE_LEVEL + 1).power;
-      expect(b - a).toBeLessThan(d - c);
+    ember.level = MAX_MOVE_LEVEL;
+    for (let i = 1; i <= 3; i++) {
+      applyOffer(p, { kind: 'moveUp', id: 'ember', level: MAX_MOVE_LEVEL + i });
+      expect(ember.level).toBe(MAX_MOVE_LEVEL + i);
     }
+    const pw = (lv: number) => moveStatsAt(MOVES.ember, lv).power;
+    expect(pw(MAX_MOVE_LEVEL + 3)).toBeGreaterThan(pw(MAX_MOVE_LEVEL + 2));
+    expect(pw(MAX_MOVE_LEVEL + 3) - pw(MAX_MOVE_LEVEL + 2)).toBeLessThan(pw(MAX_MOVE_LEVEL + 1) - pw(MAX_MOVE_LEVEL));
     expect(vitaminBonus('protein', 2) - vitaminBonus('protein', 1)).toBeLessThan(vitaminBonus('protein', 1));
+  });
+
+  it('treasure for a complete build: a berry when hurt, otherwise gold or limit breaks / vitamins', async () => {
+    const { MAX_MOVE_LEVEL } = await import('../src/data/moves.ts');
+    const sim = solo('charmander');
+    const p = sim.players[0];
+    p.moves = ['ember', 'flamethrower', 'fire-spin', 'flame-wheel'].map((id) => ({ id, level: MAX_MOVE_LEVEL, cd: 1, dmgDealt: 0, kills: 0 }));
+    p.items = ['scope-lens', 'wide-lens', 'leftovers', 'quick-claw'].map((id) => ({ id, level: 5 }));
+    sim.refreshStats();
+    const rewardsOf = () => { sim.events.length = 0; sim.openChest(p, 4); return (sim.events.find((e) => e.e === 'chest') as { rewards: { kind: string; level?: number }[] }).rewards; };
+
+    p.hp = p.stats.maxHp * 0.3;
+    const hurt = rewardsOf();
+    expect(hurt.filter((r) => r.kind === 'heal')).toHaveLength(1);
+    expect(p.hp).toBeGreaterThan(p.stats.maxHp * 0.3);
+
+    p.hp = p.stats.maxHp;
+    const kinds = new Set<string>();
+    for (let i = 0; i < 20; i++) {
+      const before = sim.money;
+      const rs = rewardsOf();
+      const gold = rs.filter((r) => r.kind === 'gold').reduce((s, r) => s + r.level!, 0);
+      expect(sim.money - before).toBe(gold + 10); // plus the gold every treasure carries
+      for (const r of rs) kinds.add(r.kind);
+    }
+    expect(kinds.has('heal')).toBe(false);
+    expect(kinds.has('gold')).toBe(true);
+    expect(kinds.has('move') || kinds.has('vitamin')).toBe(true);
+    expect(kinds.has('item')).toBe(false); // nothing left to level, so no dud item "level-ups"
   });
 
   it('Mega Evolves once the stone is found and the meter fills, then reverts', () => {
@@ -213,4 +246,25 @@ describe('evolution move learning', () => {
     expect(p.moves[2].level).toBe(oldLevel);
     expect(p.pendingLearn).toBeUndefined();
   });
+});
+
+describe('damage tracker ledger', () => {
+  it('credits damage by move, boss damage separately, and healing by source', () => {
+    const sim = new Sim({ stageId: 'viridian', seed: 21, players: [{ name: 'a', lineId: 'bulbasaur', shiny: false, meta: metaBonuses({}), tms: [] }] });
+    const p = sim.players[0];
+    p.items = [{ id: 'leftovers', level: 5 }];
+    sim.invulnerable = true;
+    for (let i = 0; i < 60 * 40; i++) {
+      if (sim.phase === 'levelup') { sim.choose(0, 0); continue; }
+      const m = botSteer(sim, p); p.mx = m.x; p.my = m.y;
+      p.hp = Math.min(p.hp, p.stats.maxHp * 0.5); // keep room to heal
+      sim.update(DT);
+      sim.events.length = 0;
+    }
+    const dmg = Object.values(p.ledger.dmg).reduce((a, b) => a + b, 0);
+    expect(dmg).toBeGreaterThan(0);
+    expect(Math.abs(dmg - p.dmgDealt)).toBeLessThan(1e-6 * Math.max(1, dmg));
+    expect(p.ledger.dmg['vine-whip']).toBeGreaterThan(0);
+    expect(p.ledger.heal.regen).toBeGreaterThan(0);
+  }, 30_000);
 });

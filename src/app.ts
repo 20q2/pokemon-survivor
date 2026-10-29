@@ -66,6 +66,8 @@ export class App {
     this.levelUp = new LevelUpUI(this.ui);
     this.applyOptions();
     this.hud.onPause = () => this.togglePause();
+    this.hud.onMeterToggle = () => this.toggleMeter();
+    this.hud.meter.onTab = (t) => { if (this.save.options.meterTab !== t) { this.save.options.meterTab = t; this.persist(); } };
     const unlock = () => audio.unlock();
     window.addEventListener('pointerdown', unlock);
     window.addEventListener('keydown', unlock);
@@ -84,6 +86,15 @@ export class App {
     this.renderer.shakeEnabled = o.shake;
     this.renderer.showNumbers = o.damageNumbers;
     this.hud.showFps = o.showFps;
+    this.hud.meter.show(o.damageMeter);
+    if (this.hud.meter.tab !== o.meterTab) this.hud.meter.setTab(o.meterTab);
+  }
+
+  /** Show/hide the damage tracker (T key or the DMG button); remembered in the options. */
+  toggleMeter() {
+    this.save.options.damageMeter = !this.save.options.damageMeter;
+    this.applyOptions();
+    this.persist();
   }
 
   /** Replace all menu screens with one element. */
@@ -144,7 +155,7 @@ export class App {
       lineId,
       shiny: this.save.shinyOn.includes(lineId),
       meta: metaBonuses(this.save.shop, this.save.friendship[lineId] ?? 0),
-      tms: [...this.save.tms],
+      tms: this.save.tms.filter((t) => !this.save.tmsOff.includes(t)),
     };
   }
 
@@ -337,6 +348,9 @@ export class App {
       case 'boom':
         audio.sfx('boom');
         break;
+      case 'raid':
+        audio.sfx('raid', ev.big ? 1 : 0);
+        break;
       case 'mega': {
         audio.sfx('mega');
         const p = s.world.players[ev.player];
@@ -385,6 +399,7 @@ export class App {
     this.nav.pollPads(dt);
     const s = this.session;
     if (s) {
+      if (this.input.consume('KeyT')) this.toggleMeter();
       if ((this.input.consume('Escape') || this.input.consume('PadStart') || this.input.consume('KeyP')) && s.phase() !== 'levelup') this.togglePause();
       const m = s.paused || this.ended ? { x: 0, y: 0 } : this.input.move();
       s.step(dt, m.x, m.y, this.renderer.viewW, this.renderer.viewH);

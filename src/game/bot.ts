@@ -1,6 +1,7 @@
 import type { Sim } from './sim.ts';
 import type { Player, UpgradeOffer } from './types.ts';
 import { MOVES, MASTERY_OF } from '../data/moves.ts';
+import { HAZARD, hazardEscape } from './hazards.ts';
 
 /** Simple kiting AI used for headless balance runs and attract-mode demos. */
 export function botSteer(sim: Sim, p: Player): { x: number; y: number } {
@@ -18,11 +19,22 @@ export function botSteer(sim: Sim, p: Player): { x: number; y: number } {
       cx += e.x; cy += e.y; cn++;
     }
   });
+  let flee: { x: number; y: number } | null = null;
   for (const pr of sim.projectiles) {
     if (!pr.hostile) continue;
+    if (pr.moveId === HAZARD) {
+      // Standing in a marked area: getting out beats everything else.
+      const out = hazardEscape(pr, p.x, p.y, p.radius);
+      if (out) flee = flee ? { x: flee.x + out.x, y: flee.y + out.y } : out;
+      continue;
+    }
     const dx = p.x - pr.x, dy = p.y - pr.y;
     const d2 = dx * dx + dy * dy + 1;
     if (d2 < 100 * 100) { ax += (dx / d2) * 4; ay += (dy / d2) * 4; threat += 4 / d2; }
+  }
+  if (flee) {
+    const l = Math.hypot(flee.x, flee.y);
+    if (l > 1e-6) return { x: flee.x / l, y: flee.y / l };
   }
   const hpFrac = p.hp / p.stats.maxHp;
   let gx = 0, gy = 0;

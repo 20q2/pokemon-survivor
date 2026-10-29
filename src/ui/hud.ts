@@ -5,8 +5,10 @@ import type { RunSession } from '../game/session.ts';
 import type { Player } from '../game/types.ts';
 import { RUN_LENGTH } from '../data/stages.ts';
 import { fmtTime, h, img, uiIcon } from './dom.ts';
-import { itemSlot, moveSlot, tipped, vitaminTip } from './tips.ts';
+import { hideTip, itemSlot, moveSlot, tipped, vitaminTip } from './tips.ts';
 import { Minimap } from './minimap.ts';
+import { DamageMeter } from './meter.ts';
+import { EffectRow, StatSheet } from './charsheet.ts';
 import { MEGA_DURATION } from '../game/mega.ts';
 
 export class Hud {
@@ -22,6 +24,11 @@ export class Hud {
   private megaFill!: HTMLDivElement;
   private megaLabel!: HTMLDivElement;
   private minimap = new Minimap();
+  private effects = new EffectRow();
+  private sheet = new StatSheet();
+  readonly meter = new DamageMeter();
+  private meterT = 0;
+  onMeterToggle: (() => void) | null = null;
   private textT = 0;
   private sig = '';
   private hpBars = new Map<number, HTMLDivElement>();
@@ -45,7 +52,8 @@ export class Hud {
     this.boss = h('div', { class: 'bossbar hidden' });
     this.fps = h('div', { class: 'fps' });
     const pause = h('button', { class: 'btn small pause-btn', onclick: () => this.onPause?.(), 'aria-label': 'Pause' }, 'II');
-    this.el.append(h('div', { class: 'xpbar' }, this.xpFill, this.lv), this.timer, pause, h('div', { class: 'hud-right' }, this.stats, this.minimap.el), this.left, this.boss, this.fps);
+    const meterBtn = h('button', { class: 'btn small meter-btn', onclick: () => this.onMeterToggle?.(), title: 'Damage tracker (T)', 'aria-label': 'Damage tracker' }, 'DMG');
+    this.el.append(h('div', { class: 'xpbar' }, this.xpFill, this.lv), this.timer, pause, meterBtn, h('div', { class: 'hud-right' }, this.stats, this.minimap.el, this.meter.el), this.left, this.boss, this.fps);
     this.el.classList.remove('hidden');
     this.sig = '';
   }
@@ -55,6 +63,7 @@ export class Hud {
   }
 
   private rebuildLeft(s: RunSession, me: Player) {
+    hideTip(this.left);
     this.left.innerHTML = '';
     this.hpBars.clear();
     this.cdEls = [];
@@ -72,6 +81,15 @@ export class Hud {
     this.mega = h('div', { class: 'mega-row hidden' }, img(uiIcon('mega'), 'mega-sigil'), h('div', { class: 'mega-meter' }, this.megaFill, this.megaLabel));
     const mine = card(me, false);
     mine.querySelector('.hp')!.after(this.mega);
+    // Click your card to drop down the stat sheet; buffs sit to the right of the name and HP.
+    mine.classList.add('me');
+    mine.classList.toggle('open', this.sheet.open);
+    mine.append(this.effects.el, h('div', { class: 'caret' }));
+    mine.addEventListener('click', () => {
+      this.sheet.open = !this.sheet.open;
+      mine.classList.toggle('open', this.sheet.open);
+      this.sheet.update(me, s.world.level, s.world.time);
+    });
     this.left.append(mine);
     const moves = h('div', { class: 'slots' });
     for (let i = 0; i < me.moveSlots; i++) {
@@ -94,6 +112,9 @@ export class Hud {
       this.left.append(h('div', { class: 'vits' }, ...vits.map(([id, n]) => tipped(
         h('div', { class: 'vit' }, img(assets.itemUrl(id)), h('span', null, `×${n}`)), () => vitaminTip(id, n)))));
     }
+    this.sheet.build(me);
+    this.sheet.update(me, s.world.level, s.world.time);
+    this.left.append(this.sheet.el);
     for (const p of s.world.players) if (p.id !== me.id && p.connected) this.left.append(card(p, true));
   }
 
@@ -102,6 +123,11 @@ export class Hud {
     const me = w.players[s.localId];
     if (!me) return;
     this.minimap.update(w, s.localId, dt);
+    this.meterT -= dt;
+    if (this.meter.visible && this.meterT <= 0) {
+      this.meterT = 0.25;
+      this.meter.update(me, w.time);
+    }
     if (this.mega) {
       const on = me.megaT > 0;
       this.mega.classList.toggle('hidden', !on && me.mega <= 0);
@@ -130,11 +156,23 @@ export class Hud {
       this.sig = sig;
       this.rebuildLeft(s, me);
     }
+    this.effects.update(me, w.time);
+    // On the level-up screen your card, build and stats stay sharp above the overlay so they can
+    // be hovered while choosing; the overlay pads itself clear of them via --hud-rx / --hud-ry.
+    const lifted = s.phase() === 'levelup';
+    this.el.classList.toggle('lifted', lifted);
+    if (lifted) {
+      const r = this.left.getBoundingClientRect();
+      const root = document.documentElement.style;
+      root.setProperty('--hud-rx', `${Math.ceil(r.right)}px`);
+      root.setProperty('--hud-ry', `${Math.ceil(r.bottom)}px`);
+    }
     this.frames++;
     this.fpsT += dt;
     this.textT -= dt;
     if (this.textT > 0) return;
     this.textT = 0.1;
+    this.sheet.update(me, w.level, w.time);
     this.lv.textContent = `Lv ${w.level}`;
     const remaining = RUN_LENGTH - w.time;
     this.timer.textContent = remaining > 0 ? fmtTime(w.time) : `${fmtTime(w.time)}`;

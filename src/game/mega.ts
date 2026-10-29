@@ -1,6 +1,7 @@
 import { MEGA, SPECIES, fullyEvolved } from '../data/pokedex.ts';
 import { makeProjectile } from './combat.ts';
 import type { Sim } from './sim.ts';
+import { heal } from './ledger.ts';
 import type { Player } from './types.ts';
 
 /** Seconds a Mega Evolution lasts. */
@@ -50,7 +51,7 @@ export function activateMega(sim: Sim, p: Player) {
   p.megas++;
   if (megaOf(p.speciesId)?.types) p.types = [...megaOf(p.speciesId)!.types!];
   sim.refreshStats();
-  p.hp = p.stats.maxHp;
+  heal(p, p.stats.maxHp, 'mega');
   // The transformation bursts outward: a huge shockwave of the partner's type.
   const atk = Math.max(p.stats.atk, p.stats.spa);
   makeProjectile(sim, {
