@@ -6,7 +6,7 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const logs = [];
 page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') logs.push(`[${m.type()}] ${m.text()}`); });
 page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}\n${e.stack}`));
-await page.goto('http://127.0.0.1:5391/', { waitUntil: 'networkidle' });
+await page.goto(`http://127.0.0.1:${process.env.PORT ?? 5391}/`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(1500);
 const line = process.argv[3] ?? 'charmander';
 const stage = process.argv[4] ?? 'viridian';

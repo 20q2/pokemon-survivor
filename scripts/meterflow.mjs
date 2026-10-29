@@ -6,7 +6,7 @@ const browser = await chromium.launch({ channel: 'msedge', headless: true });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const logs = [];
 page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
-await page.goto('http://127.0.0.1:5391/', { waitUntil: 'networkidle' });
+await page.goto(`http://127.0.0.1:${process.env.PORT ?? 5391}/`, { waitUntil: 'networkidle' });
 await page.waitForFunction(() => window.app);
 await page.evaluate(async () => { await window.app.startSolo('bulbasaur', 'viridian'); const s = window.app.session.sim; s.invulnerable = true; });
 await page.keyboard.down('KeyD');

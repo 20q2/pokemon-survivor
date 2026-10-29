@@ -2,7 +2,7 @@ import { chromium } from 'playwright-core';
 const browser = await chromium.launch({ channel: 'msedge', headless: process.argv[2] !== 'headed', args: ['--enable-gpu-rasterization', '--ignore-gpu-blocklist'] });
 const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
 page.on('pageerror', (e) => console.log(`[pageerror] ${e.message}`));
-await page.goto('http://127.0.0.1:5391/', { waitUntil: 'networkidle' });
+await page.goto(`http://127.0.0.1:${process.env.PORT ?? 5391}/`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(1000);
 await page.evaluate(async () => { await window.app.startSolo('charmander', 'viridian'); });
 await page.waitForTimeout(500);

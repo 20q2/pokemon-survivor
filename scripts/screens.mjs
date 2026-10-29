@@ -4,7 +4,7 @@ const browser = await chromium.launch({ channel: 'msedge', headless: true });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 page.on('pageerror', (e) => console.log(`[pageerror] ${e.message}`));
 page.on('console', (m) => { if (m.type() === 'error') console.log(`[console] ${m.text()}`); });
-await page.goto('http://127.0.0.1:5391/', { waitUntil: 'networkidle' });
+await page.goto(`http://127.0.0.1:${process.env.PORT ?? 5391}/`, { waitUntil: 'networkidle' });
 await page.waitForFunction(() => window.app);
 await page.evaluate(() => { const s = window.app.save; s.money = 4321; s.cleared.viridian = 1; s.achievements['first-run'] = 1; s.lines.push('eevee', 'gastly'); s.shinyUnlocked.push('charmander'); s.friendship.charmander = 650; s.movesSeen.charmander = ['scratch', 'dragon-rage', 'fire-spin', 'flamethrower']; window.app.persist(); window.app.goTitle(); });
 await page.waitForTimeout(1200);

@@ -4,7 +4,7 @@
 import { chromium } from 'playwright-core';
 const browser = await chromium.launch({ channel: 'msedge', headless: false, args: ['--window-position=-2400,0'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-await page.goto('http://127.0.0.1:5391/', { waitUntil: 'networkidle' });
+await page.goto(`http://127.0.0.1:${process.env.PORT ?? 5391}/`, { waitUntil: 'networkidle' });
 await page.waitForFunction(() => window.app);
 await page.evaluate(async () => { await window.app.startSolo('charmander', 'viridian'); window.app.session.sim.invulnerable = true; });
 await page.waitForTimeout(800);

@@ -4,7 +4,7 @@ const browser = await chromium.launch({ channel: 'msedge', headless: true });
 const ctx = await browser.newContext({ ...devices['Pixel 7'] });
 const page = await ctx.newPage();
 page.on('pageerror', (e) => console.log(`[pageerror] ${e.message}`));
-await page.goto('http://127.0.0.1:5391/', { waitUntil: 'networkidle' });
+await page.goto(`http://127.0.0.1:${process.env.PORT ?? 5391}/`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(1500);
 await page.screenshot({ path: `${out}/m1-title.png` });
 await page.getByRole('button', { name: 'Play' }).tap();

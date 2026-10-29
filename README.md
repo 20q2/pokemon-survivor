@@ -11,7 +11,8 @@ A free, non-commercial fan project. Pokémon is © Nintendo / Creatures / GAME F
 
 ```bash
 npm install
-npm run dev          # http://127.0.0.1:5391
+npm run dev          # http://127.0.0.1:5391 (PORT=5392 npm run dev for a second worktree;
+                     #  the scripts/*.mjs drivers read the same PORT)
 npm run build        # static site in dist/ (deploy anywhere; base path is relative)
 npm test             # data-integrity + headless simulation tests
 ```

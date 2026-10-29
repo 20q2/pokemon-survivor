@@ -7,7 +7,7 @@ const mk = async (name) => {
   const page = await ctx.newPage();
   page.on('console', (m) => { if (m.type() === 'error') console.log(`[${name}] ${m.text()}`); });
   page.on('pageerror', (e) => console.log(`[${name} pageerror] ${e.message}\n${e.stack}`));
-  await page.goto('http://127.0.0.1:5391/', { waitUntil: 'networkidle' });
+  await page.goto(`http://127.0.0.1:${process.env.PORT ?? 5391}/`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(1200);
   await page.evaluate((n) => { window.app.save.options.name = n; }, name);
   return page;

@@ -6,7 +6,7 @@ const out = process.argv[2];
 const secs = +(process.argv[3] ?? 40);
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 const page = await browser.newPage();
-await page.goto('http://127.0.0.1:5391/', { waitUntil: 'networkidle' });
+await page.goto(`http://127.0.0.1:${process.env.PORT ?? 5391}/`, { waitUntil: 'networkidle' });
 await page.waitForFunction(() => window.renderSong);
 const names = await page.evaluate(async () => Object.keys((await import('/src/audio/songs.ts')).SONGS));
 if (out) await mkdir(out, { recursive: true });
