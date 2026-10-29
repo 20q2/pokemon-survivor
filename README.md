@@ -77,8 +77,8 @@ their own upgrades, fainted teammates are revived by standing next to them.
 | `src/game/enemies.ts` | Wave director, enemy roles, boss patterns, loot |
 | `src/game/session.ts` | `RunSession` interface shared by solo/host/client |
 | `src/net/` | PeerJS host/client, binary snapshot protocol, client replica session |
-| `src/render/` | Canvas2D renderer, procedural backgrounds, particles, bitmap damage numbers |
-| `src/audio/` | MML score engine (`mml.ts`), 11 hand-composed songs (`songs.ts`), chip synth + SFX |
+| `src/render/` | Canvas2D renderer, tile-map world (`background.ts`, `biomes.ts`, `pixelart.ts`), pixel particles, bitmap damage numbers |
+| `src/audio/` | MML score engine (`mml.ts`), 11 hand-composed songs (`songs.ts`), SFX phrases (`sfx.ts`) on the same chip synth |
 | `src/game/mega.ts` | Mega Evolution meter and transformation |
 | `src/ui/minimap.ts` | PMD-style minimap |
 | `src/ui/` | DOM menus, HUD, level-up cards, lobby; keyboard/gamepad menu navigation |
@@ -86,6 +86,9 @@ their own upgrades, fainted teammates are revived by standing next to them.
 | `scripts/balance.ts` | Headless balance runs with a kiting bot (`node scripts/balance.ts mtmoon 900`) |
 | `scripts/*.mjs` | Playwright screenshot / flow / co-op / perf checks (uses installed Edge) |
 | `scripts/render-music.mjs` | Renders every song with the real synth (levels report + optional WAVs) |
+| `scripts/sfx-levels.mjs` | Renders every sound effect with the real synth and prints peak/RMS |
+| `scripts/stageshots.mjs` | Screenshots a run on each route (`FIGHT=1` fast-forwards into combat) |
+| `scripts/props-sheet.mjs` | Contact sheet of every route's props, for checking the pixel art |
 
 ## Credits
 
@@ -95,3 +98,4 @@ their own upgrades, fainted teammates are revived by standing next to them.
 - Item icons: [PokeAPI/sprites](https://github.com/PokeAPI/sprites).
 - Fonts: Press Start 2P, Pixelify Sans (SIL OFL) via Fontsource.
 - Music and sound effects: original compositions, synthesized in the browser.
+- World tiles and props: original pixel art, painted procedurally at load time.

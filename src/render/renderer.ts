@@ -5,8 +5,8 @@ import { dirRow, TAU } from '../engine/math.ts';
 import type { Cinematic, Phase } from '../game/sim.ts';
 import { CHEST_BALL, CHEST_COLOR, type ChestTier, type Enemy, type GameEvent, type Pickup, type Player, type Projectile } from '../game/types.ts';
 import { assets, type Anim } from './assets.ts';
-import { Background, DECOR_CELL, type DecorSprite } from './background.ts';
-import { DamageNumbers, Particles } from './fx.ts';
+import { Background, type DecorSprite } from './background.ts';
+import { DamageNumbers, Particles, Shape } from './fx.ts';
 import { HAZARD, HAZARD_IMPACT } from '../game/hazards.ts';
 
 /** What the renderer needs from a world — satisfied by Sim (host/solo) and the network replica (client). */
@@ -122,7 +122,9 @@ export class Renderer {
     switch (ev.e) {
       case 'hit':
         if (this.showNumbers) this.numbers.add(ev.x, ev.y, ev.dmg, ev.eff, ev.crit);
-        P.burst(ev.x, ev.y + 4, ev.crit ? 6 : 3, 60, TYPE_COLORS[ev.type], 0.25, 2, true);
+        // impact star + debris streaks in the move's type colour
+        P.spawn(ev.x + (Math.random() - 0.5) * 6, ev.y - 4 + (Math.random() - 0.5) * 6, 0, 0, ev.crit ? 0.2 : 0.14, ev.crit ? 6 : 4, TYPE_COLORS[ev.type], 0, true, Shape.SPARK);
+        P.burst(ev.x, ev.y - 2, ev.crit ? 5 : 2, ev.crit ? 160 : 110, TYPE_COLORS[ev.type], 0.18, 1, true, 0, Shape.STREAK);
         if (ev.eff > 1 && this.labelCd <= 0) {
           this.numbers.label(ev.x, ev.y - 10, 'Super effective!', '#ffb347');
           this.labelCd = 1.4;
@@ -132,15 +134,19 @@ export class Renderer {
         }
         break;
       case 'kill': {
-        P.burst(ev.x, ev.y - 6, ev.boss ? 60 : 8, ev.boss ? 220 : 90, '#ffffff', 0.4, 3);
-        P.burst(ev.x, ev.y - 6, ev.boss ? 40 : 5, ev.boss ? 180 : 70, TYPE_COLORS[ev.type], 0.5, 2, true);
+        // faint "poof": a smoke puff cluster, a pop ring and a few type-coloured sparks
+        P.burst(ev.x, ev.y - 8, ev.boss ? 26 : 3, ev.boss ? 120 : 36, '#e8e8f0', ev.boss ? 0.7 : 0.3, ev.boss ? 6 : 3, false, -20, Shape.PUFF);
+        P.ring(ev.x, ev.y - 6, ev.boss ? 48 : 14, '#ffffff', ev.boss ? 0.45 : 0.22);
+        P.burst(ev.x, ev.y - 6, ev.boss ? 30 : 4, ev.boss ? 200 : 90, TYPE_COLORS[ev.type], 0.4, ev.boss ? 4 : 3, true, 0, Shape.SPARK);
         if (ev.boss) { this.addShake(8); this.screenFlash('#fff', 0.6); }
-        if (ev.shiny) P.burst(ev.x, ev.y, 30, 140, '#fff6a8', 0.9, 3, true);
+        if (ev.shiny) P.burst(ev.x, ev.y - 8, 18, 120, '#fff6a8', 0.8, 4, true, 0, Shape.SPARK);
         break;
       }
       case 'boom':
         this.booms.push({ x: ev.x, y: ev.y, r: ev.r, color: TYPE_COLORS[ev.type], t: 0 });
-        P.burst(ev.x, ev.y, 30, ev.r * 3, TYPE_COLORS[ev.type], 0.5, 3, true);
+        P.burst(ev.x, ev.y, 18, ev.r * 3, TYPE_COLORS[ev.type], 0.45, 3, true, 0, Shape.SPARK);
+        P.burst(ev.x, ev.y, 8, ev.r * 1.5, '#d8d0c8', 0.6, 5, false, -15, Shape.PUFF);
+        P.ring(ev.x, ev.y, ev.r, TYPE_COLORS[ev.type], 0.3);
         this.addShake(3);
         break;
       case 'chain':
@@ -160,7 +166,10 @@ export class Renderer {
         }
         break;
       case 'levelup':
-        for (const p of world.players) P.burst(p.x, p.y - 10, 24, 120, '#ffe680', 0.6, 2, true);
+        for (const p of world.players) {
+          P.ring(p.x, p.y - 10, 26, '#ffe680', 0.4);
+          for (let i = 0; i < 14; i++) P.spawn(p.x + (Math.random() - 0.5) * 30, p.y - Math.random() * 20, 0, -40 - Math.random() * 60, 0.7, 3 + Math.random() * 2, '#ffe680', 0, true, Shape.SPARK);
+        }
         break;
       case 'repel':
         this.screenFlash('#ffffff', 0.8);
@@ -168,7 +177,7 @@ export class Renderer {
         break;
       case 'revive': {
         const p = world.players[ev.player];
-        if (p) P.burst(p.x, p.y - 10, 50, 200, '#ff9de2', 0.8, 3, true);
+        if (p) { P.burst(p.x, p.y - 10, 30, 180, '#ff9de2', 0.8, 4, true, 0, Shape.SPARK); P.ring(p.x, p.y - 10, 40, '#ffd1f0', 0.5); }
         this.screenFlash('#ffd1f0', 0.4);
         break;
       }
@@ -176,12 +185,12 @@ export class Renderer {
         if (ev.player === this.localId) this.screenFlash('#000', 0.5);
         break;
       case 'shiny':
-        P.burst(ev.x, ev.y - 8, 20, 90, '#fff6a8', 0.9, 2, true);
+        P.burst(ev.x, ev.y - 8, 14, 90, '#fff6a8', 0.9, 4, true, 0, Shape.SPARK);
         break;
       case 'pickup': {
         const p = world.players[ev.player];
-        if (p && ev.kind === 'chest') { P.burst(p.x, p.y - 10, 40, 160, '#fff1a8', 0.8, 3, true); this.screenFlash('#fff', 0.3); }
-        if (p && (ev.kind === 'oran' || ev.kind === 'sitrus')) P.burst(p.x, p.y - 10, 16, 60, '#7dff8a', 0.6, 2, true);
+        if (p && ev.kind === 'chest') { P.burst(p.x, p.y - 10, 28, 160, '#fff1a8', 0.8, 4, true, 0, Shape.SPARK); P.ring(p.x, p.y - 10, 34, '#fff1a8', 0.4); this.screenFlash('#fff', 0.3); }
+        if (p && (ev.kind === 'oran' || ev.kind === 'sitrus')) for (let i = 0; i < 10; i++) P.spawn(p.x + (Math.random() - 0.5) * 22, p.y - Math.random() * 16, 0, -30 - Math.random() * 30, 0.7, 2, '#7dff8a', 0, true, Shape.DOT);
         break;
       }
       case 'bossDown':
@@ -240,7 +249,8 @@ export class Renderer {
     const L = left, T = top, W = this.canvas.width / z, H = this.canvas.height / z;
 
     this.bg!.drawGround(g, L - 2, T - 2, W + 4, H + 4);
-    this.drawFlatDecor(L, T, W, H);
+    this.bg!.prefetch(L, T, W, H);
+    this.bg!.drawAnimated(g, L, T, W, H, world.time);
 
     // ground-level effects
     const fxL = Math.floor(L), fxT = Math.floor(T);
@@ -254,7 +264,7 @@ export class Renderer {
     list.length = 0;
     for (const e of world.enemies) if (e.alive && inView(e.x, e.y, L, T, W, H, 60 * e.scale)) list.push({ y: e.y, k: 0, e });
     for (const p of world.players) if (p.connected) list.push({ y: p.y, k: 1, p });
-    this.collectTallDecor(L, T, W, H, list);
+    this.bg!.tallIn(L, T, W, H, world.time, (d, x, y) => list.push({ y, k: 2, d, x }));
     list.sort((a, b) => a.y - b.y);
     g.fillStyle = 'rgba(0,0,0,0.28)';
     for (const d of list) {
@@ -264,7 +274,7 @@ export class Renderer {
     for (const d of list) {
       if (d.k === 0) this.drawEnemy(d.e, world.time);
       else if (d.k === 1) this.drawPlayer(d.p, world.time);
-      else g.drawImage(d.d.c, Math.round(d.x - d.d.ax), Math.round(d.y - d.d.ay));
+      else this.drawTallDecor(d.d, d.x, d.y, me);
     }
 
     // projectiles & effects above sprites
@@ -357,23 +367,14 @@ export class Renderer {
 
   // ─────────────────────────── decor ───────────────────────────
 
-  private drawFlatDecor(L: number, T: number, W: number, H: number) {
+  /** Tall props go see-through while the local partner is behind them, so trees never hide you. */
+  private drawTallDecor(d: DecorSprite, x: number, y: number, me: Player | undefined) {
     const g = this.g;
-    const x0 = Math.floor(L / DECOR_CELL) - 1, x1 = Math.ceil((L + W) / DECOR_CELL) + 1;
-    const y0 = Math.floor(T / DECOR_CELL) - 1, y1 = Math.ceil((T + H) / DECOR_CELL) + 1;
-    for (let cx = x0; cx <= x1; cx++) for (let cy = y0; cy <= y1; cy++) {
-      const d = this.bg!.decorAt(cx, cy);
-      if (d && !d.s.tall) g.drawImage(d.s.c, Math.round(d.x - d.s.ax), Math.round(d.y - d.s.ay));
-    }
-  }
-
-  private collectTallDecor(L: number, T: number, W: number, H: number, list: Drawable[]) {
-    const x0 = Math.floor(L / DECOR_CELL) - 1, x1 = Math.ceil((L + W) / DECOR_CELL) + 1;
-    const y0 = Math.floor(T / DECOR_CELL) - 1, y1 = Math.ceil((T + H) / DECOR_CELL) + 2;
-    for (let cx = x0; cx <= x1; cx++) for (let cy = y0; cy <= y1; cy++) {
-      const d = this.bg!.decorAt(cx, cy);
-      if (d && d.s.tall) list.push({ y: d.y, k: 2, d: d.s, x: d.x });
-    }
+    const dx = Math.round(x - d.ax), dy = Math.round(y - d.ay);
+    const behind = me && me.y < y && me.y > dy && Math.abs(me.x - x) < d.c.width / 2 + 4;
+    if (behind) g.globalAlpha = 0.45;
+    g.drawImage(d.c, dx, dy);
+    if (behind) g.globalAlpha = 1;
   }
 
   // ─────────────────────────── sprites ───────────────────────────
@@ -433,7 +434,7 @@ export class Renderer {
       g.fillStyle = 'rgba(170,225,255,0.45)';
       g.fillRect(e.x - 10 * e.scale, e.y - 24 * e.scale, 20 * e.scale, 24 * e.scale);
     }
-    if (e.shiny && Math.random() < 0.08) this.particles.spawn(e.x + (Math.random() - 0.5) * 20, e.y - 10 - Math.random() * 16, 0, -20, 0.5, 2, '#fff6a8', 0, true);
+    if (e.shiny && Math.random() < 0.08) this.particles.spawn(e.x + (Math.random() - 0.5) * 20, e.y - 10 - Math.random() * 16, 0, -20, 0.5, 3, '#fff6a8', 0, true, Shape.SPARK);
     if (e.elite || e.alpha || (e.boss && e.hp < e.maxHp)) {
       const w = 22 * e.scale;
       g.fillStyle = '#000';
@@ -483,7 +484,7 @@ export class Renderer {
     // Forms without a Mega sprite grow and glow instead.
     const scale = grow * (mega && !mega.sprite ? 1.25 : 1);
     this.drawAnim(anim, p.x, p.y, time * (p.moving ? 1.2 : 1), dirRow(p.fx, p.fy), scale, blink);
-    if (p.shiny && Math.random() < 0.12) this.particles.spawn(p.x + (Math.random() - 0.5) * 22, p.y - 6 - Math.random() * 22, 0, -24, 0.6, 2, '#fff6a8', 0, true);
+    if (p.shiny && Math.random() < 0.12) this.particles.spawn(p.x + (Math.random() - 0.5) * 22, p.y - 6 - Math.random() * 22, 0, -24, 0.6, 3, '#fff6a8', 0, true, Shape.SPARK);
     for (const b of p.buffs) {
       if (b.kind === 'shield') { g.strokeStyle = 'rgba(160,220,255,0.6)'; g.lineWidth = 1.5; g.beginPath(); g.arc(p.x, p.y - 12 * grow, 18 * grow, 0, TAU); g.stroke(); }
       if (b.kind === 'dodge' && Math.floor(time * 10) % 2 === 0) this.drawAnim(anim, p.x + 8 * grow, p.y, time, dirRow(p.fx, p.fy), scale, 0, 0.3);
@@ -541,9 +542,9 @@ export class Renderer {
     for (const e of world.enemies) {
       if (!e.alive || !inView(e.x, e.y, L, T, W, H, 20)) continue;
       const st = e.st;
-      if (st.burn > 0 && Math.random() < 0.15) P.spawn(e.x + (Math.random() - 0.5) * 12, e.y - 8, 0, -30, 0.4, 2, '#ff8a3d', 0, true);
-      if (st.poison > 0 && Math.random() < 0.12) P.spawn(e.x + (Math.random() - 0.5) * 12, e.y - 10, 0, -18, 0.6, 2, '#c069ff', 0);
-      if (st.paralyze > 0 && Math.random() < 0.12) P.spawn(e.x + (Math.random() - 0.5) * 16, e.y - 14 + (Math.random() - 0.5) * 10, 0, 0, 0.12, 2, '#fff36b', 0, true);
+      if (st.burn > 0 && Math.random() < 0.15) P.spawn(e.x + (Math.random() - 0.5) * 12, e.y - 8, 0, -30, 0.4, 3, Math.random() < 0.5 ? '#ff8a3d' : '#ffd060', 0, true, Shape.PUFF);
+      if (st.poison > 0 && Math.random() < 0.12) P.spawn(e.x + (Math.random() - 0.5) * 12, e.y - 10, 0, -18, 0.6, 3, '#c069ff', 0, false, Shape.RING);
+      if (st.paralyze > 0 && Math.random() < 0.12) P.spawn(e.x + (Math.random() - 0.5) * 16, e.y - 14 + (Math.random() - 0.5) * 10, 0, 0, 0.12, 3, '#fff36b', 0, true, Shape.SPARK);
       if (st.confuse > 0 && Math.random() < 0.15) P.spawn(e.x + Math.cos(world.time * 8) * 8, e.y - 26, 0, 0, 0.2, 2, '#ffe14d', 0, true);
     }
   }
@@ -593,7 +594,7 @@ export class Renderer {
       g.globalAlpha = 1;
       g.globalCompositeOperation = 'source-over';
       if (tier >= 2 && Math.random() < 0.1 * tier) {
-        this.particles.spawn(pk.x + (Math.random() - 0.5) * 22, pk.y - 8 - Math.random() * 20, 0, -30, 0.6, 2, CHEST_COLOR[tier], 0, true);
+        this.particles.spawn(pk.x + (Math.random() - 0.5) * 22, pk.y - 8 - Math.random() * 20, 0, -30, 0.6, 3, CHEST_COLOR[tier], 0, true, Shape.SPARK);
       }
     }
     if (img) g.drawImage(img, Math.round(pk.x - 15), Math.round(pk.y - 22 + bob), 30, 30);
@@ -825,11 +826,11 @@ export class Renderer {
         return;
       }
       case 'orbit':
-        this.particles.spawn(pr.x, pr.y, 0, 0, 0.25, pr.r * 0.6, col, 0, true);
+        this.particles.spawn(pr.x, pr.y, 0, 0, 0.22, Math.max(2, pr.r * 0.45), col, 0, true, Shape.PUFF);
         this.drawBullet(pr, col, world.time);
         return;
       default:
-        if (pr.fx === 'flame' && Math.random() < 0.6) this.particles.spawn(pr.x, pr.y, -pr.vx * 0.1, -pr.vy * 0.1 - 10, 0.3, 3, Math.random() < 0.5 ? '#ffb347' : '#ff5e2b', 0, true);
+        if (pr.fx === 'flame' && Math.random() < 0.6) this.particles.spawn(pr.x, pr.y, -pr.vx * 0.1, -pr.vy * 0.1 - 10, 0.3, 3, Math.random() < 0.5 ? '#ffb347' : '#ff5e2b', 0, true, Shape.PUFF);
         this.drawBullet(pr, col, world.time);
     }
   }
@@ -912,7 +913,8 @@ export class Renderer {
     }
     const k = Math.min(1, (pr.t - pr.delay) / (pr.life - pr.delay));
     if (pr.t - pr.delay < 0.03) {
-      this.particles.burst(pr.x, pr.y, 14, pr.r * 4, col, 0.4, 3, true);
+      this.particles.burst(pr.x, pr.y, 10, pr.r * 4, col, 0.4, 3, true, 0, Shape.SPARK);
+      this.particles.ring(pr.x, pr.y, pr.r, col, 0.25);
       this.addShake(0.6);
     }
     g.globalCompositeOperation = 'lighter';
@@ -946,7 +948,7 @@ export class Renderer {
       return;
     }
     const k = Math.min(1, (t - flight) / Math.max(0.05, pr.life - pr.delay - flight));
-    if (t - flight < 0.03) { this.particles.burst(pr.x, pr.y, 18, pr.r * 4, col, 0.45, 3, true); this.addShake(1); }
+    if (t - flight < 0.03) { this.particles.burst(pr.x, pr.y, 12, pr.r * 4, col, 0.45, 3, true, 0, Shape.SPARK); this.particles.burst(pr.x, pr.y, 5, pr.r * 1.5, '#d8d0c8', 0.5, 4, false, -15, Shape.PUFF); this.addShake(1); }
     g.globalCompositeOperation = 'lighter';
     g.globalAlpha = (1 - k) * 0.9;
     g.drawImage(assets.glow.get(pr.type)!, pr.x - pr.r * 1.4, pr.y - pr.r * 1.4, pr.r * 2.8, pr.r * 2.8);
@@ -1099,7 +1101,7 @@ export class Renderer {
     if (k > 0.72 && k < 0.76) {
       this.flash = 0.9;
       this.flashColor = '#fff';
-      this.particles.burst(p.x, p.y - 10, 80, 260, '#ffffff', 1, 3, true);
+      this.particles.burst(p.x, p.y - 10, 50, 260, '#ffffff', 1, 5, true, 0, Shape.SPARK);
     }
     g.textAlign = 'center';
     const fs = Math.max(12, Math.round(H / 40));
@@ -1134,7 +1136,7 @@ export class Renderer {
       g.imageSmoothingEnabled = false;
       g.drawImage(img, f * anim.fw, 0, anim.fw, anim.fh, W / 2 - (anim.fw * scale) / 2, H / 2 - (anim.fh * scale) / 2 - 20, anim.fw * scale, anim.fh * scale);
     }
-    if (k > 0.82 && k < 0.86) this.particles.burst(world.players[c.player]?.x ?? 0, (world.players[c.player]?.y ?? 0) - 10, 60, 200, '#fff6a8', 1, 3, true);
+    if (k > 0.82 && k < 0.86) this.particles.burst(world.players[c.player]?.x ?? 0, (world.players[c.player]?.y ?? 0) - 10, 40, 200, '#fff6a8', 1, 5, true, 0, Shape.SPARK);
     g.textAlign = 'center';
     const fs = Math.max(12, Math.round(H / 40));
     g.font = `${fs}px "Press Start 2P", monospace`;

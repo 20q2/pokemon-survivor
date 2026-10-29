@@ -453,7 +453,7 @@ export function creditsScreen(app: App) {
     h('div', { class: 'panel', style: 'width:min(900px,100%)' },
       h('p', null, h('b', null, 'Pokémon Survivors'), ' is a free, non-commercial fan game. Pokémon and all related names are © Nintendo, Creatures Inc. and GAME FREAK inc. This project is not affiliated with or endorsed by them.'),
       h('p', null, 'Pokémon sprites & portraits: ', h('b', null, 'PMD Sprite Collab'), ' (sprites.pmdcollab.org), licensed CC BY-NC 4.0, original Mystery Dungeon art © Spike Chunsoft. Contributors per species are listed below.'),
-      h('p', null, 'Item icons: PokeAPI sprites repository. Music & sound effects: original, synthesized in your browser. Fonts: Press Start 2P (CodeMan38), Pixelify Sans (Stefie Justprince), SIL OFL.'),
+      h('p', null, 'Item icons: PokeAPI sprites repository. Music & sound effects: original, synthesized in your browser. World tiles: original pixel art, painted procedurally. Fonts: Press Start 2P (CodeMan38), Pixelify Sans (Stefie Justprince), SIL OFL.'),
       list,
     ),
   );

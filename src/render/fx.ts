@@ -2,6 +2,20 @@
 
 const MAX_PARTICLES = 2400;
 
+/**
+ * Particle shapes, all drawn as whole pixels on the world-resolution effects layer so they share
+ * the sprites' pixel grid. Fades are stepped (4 levels), like handheld-era palette fades.
+ *   DOT    a square (≤2 px) or a rounded plus (≥3 px)
+ *   SPARK  a 4-point star that flashes white first, then takes its colour and shrinks
+ *   PUFF   a pixel disc that grows as it fades (smoke, dust, steam)
+ *   RING   an expanding pixel ring (shockwaves, pops)
+ *   STREAK a short line along its velocity (impact debris, speed lines)
+ */
+export const Shape = { DOT: 0, SPARK: 1, PUFF: 2, RING: 3, STREAK: 4 } as const;
+export type Shape = (typeof Shape)[keyof typeof Shape];
+
+const step = (k: number) => Math.ceil(Math.min(1, k * 1.4) * 4) / 4;
+
 export class Particles {
   n = 0;
   x = new Float32Array(MAX_PARTICLES);
@@ -14,8 +28,9 @@ export class Particles {
   grav = new Float32Array(MAX_PARTICLES);
   color: string[] = new Array(MAX_PARTICLES).fill('#fff');
   additive = new Uint8Array(MAX_PARTICLES);
+  shape = new Uint8Array(MAX_PARTICLES);
 
-  spawn(x: number, y: number, vx: number, vy: number, life: number, size: number, color: string, grav = 0, additive = false) {
+  spawn(x: number, y: number, vx: number, vy: number, life: number, size: number, color: string, grav = 0, additive = false, shape: Shape = Shape.DOT) {
     let i = this.n;
     if (i >= MAX_PARTICLES) {
       // overwrite a random old one rather than dropping new feedback
@@ -23,15 +38,20 @@ export class Particles {
     } else this.n++;
     this.x[i] = x; this.y[i] = y; this.vx[i] = vx; this.vy[i] = vy;
     this.life[i] = life; this.max[i] = life; this.size[i] = size; this.color[i] = color;
-    this.grav[i] = grav; this.additive[i] = additive ? 1 : 0;
+    this.grav[i] = grav; this.additive[i] = additive ? 1 : 0; this.shape[i] = shape;
   }
 
-  burst(x: number, y: number, count: number, speed: number, color: string, life = 0.5, size = 2, additive = false, grav = 0) {
+  burst(x: number, y: number, count: number, speed: number, color: string, life = 0.5, size = 2, additive = false, grav = 0, shape: Shape = Shape.DOT) {
     for (let i = 0; i < count; i++) {
       const a = Math.random() * Math.PI * 2;
       const s = speed * (0.3 + Math.random() * 0.7);
-      this.spawn(x, y, Math.cos(a) * s, Math.sin(a) * s, life * (0.6 + Math.random() * 0.6), size, color, grav, additive);
+      this.spawn(x, y, Math.cos(a) * s, Math.sin(a) * s, life * (0.6 + Math.random() * 0.6), size, color, grav, additive, shape);
     }
+  }
+
+  /** A single expanding ring. */
+  ring(x: number, y: number, radius: number, color: string, life = 0.3, additive = true) {
+    this.spawn(x, y, 0, 0, life, radius, color, 0, additive, Shape.RING);
   }
 
   update(dt: number) {
@@ -45,7 +65,7 @@ export class Particles {
       this.x[w] = this.x[i] + this.vx[w] * dt;
       this.y[w] = this.y[i] + this.vy[w] * dt;
       this.max[w] = this.max[i]; this.size[w] = this.size[i]; this.color[w] = this.color[i];
-      this.grav[w] = this.grav[i]; this.additive[w] = this.additive[i];
+      this.grav[w] = this.grav[i]; this.additive[w] = this.additive[i]; this.shape[w] = this.shape[i];
       w++;
     }
     this.n = w;
@@ -55,10 +75,54 @@ export class Particles {
     for (let i = 0; i < this.n; i++) {
       if ((this.additive[i] === 1) !== additivePass) continue;
       const k = this.life[i] / this.max[i];
-      const s = Math.max(1, this.size[i] * (0.4 + k * 0.6));
-      g.globalAlpha = Math.min(1, k * 1.6);
+      const x = Math.round(this.x[i]), y = Math.round(this.y[i]);
+      const size = this.size[i];
+      g.globalAlpha = step(k);
       g.fillStyle = this.color[i];
-      g.fillRect(this.x[i] - s / 2, this.y[i] - s / 2, s, s);
+      switch (this.shape[i]) {
+        case Shape.SPARK: {
+          if (k > 0.75) g.fillStyle = '#ffffff';
+          const a = Math.max(1, Math.round(size * (0.35 + k * 0.65)));
+          g.fillRect(x - a, y, a * 2 + 1, 1);
+          g.fillRect(x, y - a, 1, a * 2 + 1);
+          if (a >= 3) { g.fillRect(x - 1, y - 1, 3, 3); }
+          break;
+        }
+        case Shape.PUFF: {
+          g.globalAlpha = step(k) * 0.6;
+          const r = Math.max(1, Math.round(size * (1.3 - k * 0.7)));
+          for (let yy = -r; yy <= r; yy++) {
+            const w = Math.floor(Math.sqrt(r * r - yy * yy + r * 0.8));
+            g.fillRect(x - w, y + yy, w * 2 + 1, 1);
+          }
+          break;
+        }
+        case Shape.RING: {
+          const r = Math.max(2, Math.round(size * (1.15 - k)));
+          const n = Math.max(8, Math.round(r * 1.6));
+          for (let j = 0; j < n; j++) {
+            const t = (j / n) * Math.PI * 2;
+            g.fillRect(Math.round(x + Math.cos(t) * r), Math.round(y + Math.sin(t) * r * 0.75), 1, 1);
+          }
+          break;
+        }
+        case Shape.STREAK: {
+          const vx = this.vx[i], vy = this.vy[i];
+          const sp = Math.hypot(vx, vy) || 1;
+          const len = Math.min(6, 1 + sp * 0.03) * (0.5 + k * 0.5);
+          for (let j = 0; j <= len; j++) g.fillRect(Math.round(x - (vx / sp) * j), Math.round(y - (vy / sp) * j), 1, 1);
+          break;
+        }
+        default: {
+          const s = Math.max(1, Math.round(size * (0.4 + k * 0.6)));
+          if (s <= 2) g.fillRect(x - (s >> 1), y - (s >> 1), s, s);
+          else {
+            const h = s >> 1;
+            g.fillRect(x - h, y - h + 1, s, s - 2);
+            g.fillRect(x - h + 1, y - h, s - 2, s);
+          }
+        }
+      }
     }
     g.globalAlpha = 1;
   }
