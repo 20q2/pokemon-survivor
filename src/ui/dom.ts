@@ -1,5 +1,7 @@
 import { TYPE_COLORS, type PType } from '../data/types.ts';
 import { audio } from '../audio/audio.ts';
+import { ASSET_BASE } from '../render/assets.ts';
+import type { Category } from '../data/moves.ts';
 
 type Child = Node | string | number | null | undefined | false | Child[];
 type Attrs = Record<string, unknown> & { class?: string; style?: string; onclick?: (e: MouseEvent) => void };
@@ -34,9 +36,26 @@ export function btn(label: Child, onClick: () => void, cls = '', attrs: Attrs = 
   }, label);
 }
 
+/** Pixel type plate (Gen 6 style) used everywhere a type is named. */
 export function typeBadge(t: PType) {
-  return h('span', { class: 'type', style: `background:${TYPE_COLORS[t]}` }, t);
+  return h('img', { class: 'type-plate', src: `${ASSET_BASE}ui/plate/${t}.png`, alt: t, title: cap(t), draggable: 'false' });
 }
+
+/** Physical / Special / Status move-category icon. */
+export function catBadge(c: Category) {
+  return h('img', { class: 'cat-icon', src: `${ASSET_BASE}ui/cat/${c}.png`, alt: c, title: cap(c), draggable: 'false' });
+}
+
+/** A move's icon: its type symbol on a tile tinted with the type colour. */
+export function moveIcon(type: PType, label: string, cls = 'move-ic') {
+  return h('div', { class: cls, style: `--tc:${TYPE_COLORS[type]}` },
+    h('img', { src: `${ASSET_BASE}ui/logo/${type}.png`, alt: type, draggable: 'false' }),
+    label ? h('span', { class: 'ab' }, label) : null);
+}
+
+export const moveAbbr = (name: string) => name.split(/[\s-]/).map((w) => w.slice(0, 4)).join(' ').toUpperCase();
+
+export const uiIcon = (name: string) => `${ASSET_BASE}ui/${name}.png`;
 
 export function img(src: string, cls = 'px', alt = '') {
   return h('img', { src, class: cls, alt, draggable: 'false', loading: 'lazy' });

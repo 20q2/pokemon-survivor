@@ -30,6 +30,8 @@ export interface RunSession {
   choose(i: number): void;
   reroll(): void;
   skip(): void;
+  /** Fast-forward a treasure cinematic (solo only; co-op waits for everyone). */
+  skipCine?(): void;
   banish(i: number): void;
   paused: boolean;
   dispose(): void;
@@ -104,6 +106,7 @@ export class LocalSession implements RunSession {
   choose(i: number) { this.sim.choose(this.localId, i); }
   reroll() { this.sim.reroll(this.localId); }
   skip() { this.sim.skip(this.localId); }
+  skipCine() { if (!this.coop) this.sim.skipCine(); }
   banish(i: number) { this.sim.banish(this.localId, i); }
   seen() { return this.sim.seenSpecies; }
   defeated() { return this.sim.defeatedSpecies; }

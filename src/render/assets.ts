@@ -58,9 +58,12 @@ class AssetStore {
   private images = new Map<string, HTMLImageElement>();
   glow = new Map<PType, HTMLCanvasElement>();
   credits: unknown[] = [];
+  /** Image requests made / finished (loaded or failed), for the boot progress bar. */
+  readonly stats = { requested: 0, settled: 0 };
 
   async init() {
     const res = await fetch(`${ASSET_BASE}manifest.json`);
+    if (!res.ok) throw new Error(`asset manifest: HTTP ${res.status}`);
     this.manifest = await res.json();
     for (const t of TYPES) this.glow.set(t, makeGlow(TYPE_COLORS[t]));
   }
@@ -70,9 +73,15 @@ class AssetStore {
     if (cached?.complete) return Promise.resolve(cached);
     return new Promise((resolve, reject) => {
       const img = cached ?? new Image();
-      img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error(`failed to load ${url}`));
+      // Listeners, not onload=: a second caller awaiting the same in-flight image (e.g. an Idle
+      // anim that reuses the Walk sheet) would otherwise replace the first caller's handler.
+      img.addEventListener('load', () => resolve(img), { once: true });
+      img.addEventListener('error', () => reject(new Error(`failed to load ${url}`)), { once: true });
       if (!cached) {
+        this.stats.requested++;
+        const settle = () => this.stats.settled++;
+        img.addEventListener('load', settle, { once: true });
+        img.addEventListener('error', settle, { once: true });
         img.src = url;
         this.images.set(url, img);
       }
@@ -114,6 +123,14 @@ class AssetStore {
 
   itemUrl(id: string) {
     return `${ASSET_BASE}items/${id}.png`;
+  }
+
+  /** A UI icon (public/assets/ui/<name>.png) if loaded; starts loading otherwise. */
+  uiImage(name: string): HTMLImageElement | undefined {
+    const url = `${ASSET_BASE}ui/${name}.png`;
+    const img = this.images.get(url);
+    if (!img) void this.image(url).catch(() => undefined);
+    return img?.complete ? img : undefined;
   }
 
   itemImage(id: string): HTMLImageElement | undefined {

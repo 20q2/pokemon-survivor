@@ -2,10 +2,10 @@ import { MOVES, MASTERY_OF, MAX_MOVE_LEVEL, moveStatsAt, overLevelMult, type Mov
 import { ITEMS, VITAMIN, vitaminDesc } from '../data/items.ts';
 import { TYPE_COLORS } from '../data/types.ts';
 import { assets } from '../render/assets.ts';
-import type { ChestReward, Player, UpgradeOffer } from '../game/types.ts';
+import type { Player, UpgradeOffer } from '../game/types.ts';
 import type { RunSession } from '../game/session.ts';
 import { audio } from '../audio/audio.ts';
-import { btn, cap, h, img, typeBadge } from './dom.ts';
+import { btn, catBadge, h, img, typeBadge } from './dom.ts';
 
 const BEHAVIOR_TEXT: Record<string, string> = {
   projectile: 'Projectile', melee: 'Melee swipe', orbit: 'Orbits you', aura: 'Aura', nova: 'Shockwave', beam: 'Beam',
@@ -31,11 +31,6 @@ function upgradeDiff(id: string, level: number): string {
   return parts.join(', ') || 'Stronger';
 }
 
-function moveIcon(id: string) {
-  const def = MOVES[id];
-  return h('div', { class: 'ic', style: `background:${TYPE_COLORS[def.type]}` }, h('div', { class: 'ab' }, def.name.split(/[\s-]/).map((w) => w.slice(0, 4)).join('\n').toUpperCase()));
-}
-
 export function offerCard(o: UpgradeOffer, p: Player, index: number, onPick: () => void) {
   let icon: HTMLElement, name: string, tag: string, desc: string;
   let meta: HTMLElement | null = null;
@@ -44,14 +39,15 @@ export function offerCard(o: UpgradeOffer, p: Player, index: number, onPick: () 
     case 'newMove':
     case 'moveUp': {
       const def = MOVES[o.id];
-      icon = moveIcon(o.id);
+      // Moves come as a TM disc in the move's type colour.
+      icon = h('div', { class: 'ic tm', style: `--tc:${TYPE_COLORS[def.type]}` }, img(assets.itemUrl(`tm-${def.type}`)));
       name = def.name;
       const limit = o.kind === 'moveUp' && o.level > MAX_MOVE_LEVEL;
       tag = o.kind === 'newMove' ? 'NEW MOVE' : limit ? `LIMIT ★${o.level - MAX_MOVE_LEVEL}` : `Lv ${o.level}`;
       desc = o.kind === 'newMove' ? def.desc : limit
         ? `Limit break: +${Math.round((overLevelMult(o.level) / overLevelMult(o.level - 1) - 1) * 100)}% power.`
         : upgradeDiff(o.id, o.level);
-      meta = h('div', { class: 'meta' }, typeBadge(def.type), h('span', { class: `cat ${def.cat}` }, cap(def.cat)), h('span', { class: 'hint' }, BEHAVIOR_TEXT[def.behavior]));
+      meta = h('div', { class: 'meta' }, typeBadge(def.type), catBadge(def.cat), h('span', { class: 'hint' }, BEHAVIOR_TEXT[def.behavior]));
       if (p.types.includes(def.type) && def.cat !== 'status') note = 'STAB ×1.5';
       const mast = MASTERY_OF[o.id];
       if (mast && o.kind === 'moveUp' && o.level === MAX_MOVE_LEVEL) note = `Max! Hold ${ITEMS[mast.mastery!.item].name} to master`;
@@ -172,21 +168,3 @@ export class LevelUpUI {
   }
 }
 
-export function chestPopup(rewards: ChestReward[]): HTMLElement {
-  const rows = rewards.map((r, i) => {
-    const delay = `animation-delay:${0.5 + i * 0.25}s`;
-    if (r.kind === 'mastery') {
-      const to = MOVES[r.id];
-      return h('div', { class: 'rw mastery', style: delay }, `${MOVES[r.from!].name} → ${to.name}!`);
-    }
-    if (r.kind === 'move') return h('div', { class: 'rw', style: delay }, h('span', { class: 'type', style: `background:${TYPE_COLORS[MOVES[r.id].type]}` }, 'move'), `${MOVES[r.id].name} Lv ${r.level}`);
-    if (r.kind === 'item') return h('div', { class: 'rw', style: delay }, img(assets.itemUrl(r.id)), `${ITEMS[r.id].name} Lv ${r.level}`);
-    return h('div', { class: 'rw', style: delay }, img(assets.itemUrl(r.id)), `${VITAMIN[r.id].name} ×${r.level}`);
-  });
-  const mastery = rewards.some((r) => r.kind === 'mastery');
-  return h('div', { class: 'chest-pop' }, h('div', { class: 'panel' },
-    img(assets.itemUrl(mastery ? 'master-ball' : 'poke-ball'), 'chest-ball'),
-    h('h3', null, mastery ? 'MOVE MASTERED!' : 'Treasure!'),
-    rows,
-  ));
-}

@@ -34,10 +34,6 @@ canvas#game { position: fixed; inset: 0; display: block; image-rendering: pixela
 button { font: inherit; }
 img.px, .px img { image-rendering: pixelated; }
 
-#boot { position: fixed; inset: 0; display: grid; place-content: center; text-align: center; color: #fff; font-family: var(--head); font-size: 12px; background: var(--bg); z-index: 50; }
-#boot img { width: 60px; image-rendering: pixelated; animation: spin 1s linear infinite; margin: 0 auto 16px; }
-@keyframes spin { to { transform: rotate(360deg); } }
-
 /* ───────── screens ───────── */
 #ui { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
 #ui > * { pointer-events: auto; }
@@ -159,6 +155,11 @@ textarea { min-height: 70px; font-size: 12px; font-family: monospace; }
 .hud-stats { font-size: 10px; text-align: right; line-height: 1.9; text-shadow: 1px 1px 0 #000; }
 .minimap { width: clamp(120px, 14vw, 176px); aspect-ratio: 1; padding: 4px; background: rgba(12, 20, 52, 0.62); border: 2px solid #8fb6ff; border-radius: 8px; box-shadow: inset 0 0 0 2px rgba(10, 16, 40, 0.9), 0 0 0 2px rgba(0,0,0,0.6); }
 .mm-canvas { width: 100%; height: 100%; image-rendering: pixelated; display: block; }
+.mega-row { display: flex; align-items: center; gap: 3px; margin-top: 4px; }
+.mega-row .mega-meter { margin-top: 0; width: 104px; }
+.mega-sigil { width: 16px; height: 16px; image-rendering: pixelated; }
+.mega-row.ready .mega-meter { animation: megaPulse 0.5s steps(2) infinite; }
+.mega-row.active .fill { animation: megaHue 1s linear infinite; }
 .mega-meter { position: relative; width: 120px; height: 8px; margin-top: 4px; background: #1d1430; border: 1px solid #000; overflow: hidden; }
 .mega-meter .fill { height: 100%; width: 100%; transform-origin: left; background: linear-gradient(90deg, #ff4d6d, #ffbe0b, #3bd16f, #3a86ff, #b14dff); }
 .mega-meter .lbl { position: absolute; inset: 0; font-size: 6px; line-height: 8px; text-align: center; color: #fff; text-shadow: 1px 1px 0 #000; letter-spacing: 1px; }
@@ -372,3 +373,60 @@ input[type=text], textarea { background: rgba(0, 0, 0, 0.35); color: var(--ink);
   .card .key { top: 4px; left: auto; right: 8px; }
   .card.focus::after, .card:hover::after { display: none; }
 }
+
+/* official-style icons: pixel type plates, category marks and type symbols */
+.type-plate { height: 20px; width: 50px; image-rendering: pixelated; vertical-align: middle; filter: drop-shadow(0 1px 0 rgba(0,0,0,0.5)); }
+.cat-icon { height: 14px; width: 32px; image-rendering: pixelated; vertical-align: middle; filter: drop-shadow(0 1px 0 rgba(0,0,0,0.5)); }
+.move-ic { position: relative; display: grid; place-items: center; border-radius: 6px;
+  background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--tc) 55%, #fff) 0 30%, var(--tc) 70%);
+  box-shadow: inset 0 0 0 2px rgba(0,0,0,0.35), inset 0 -3px 0 rgba(0,0,0,0.2); }
+.move-ic img { width: 72%; height: 72%; object-fit: contain; filter: brightness(0) invert(1) drop-shadow(0 2px 0 rgba(0,0,0,0.35)); }
+.card .ic.move-ic { width: 56px; height: 56px; border: 2px solid var(--frame); box-shadow: 0 0 0 2px var(--border), inset 0 -4px 0 rgba(0,0,0,0.25); }
+.dex-ic { width: 44px; height: 44px; grid-row: span 3; }
+.slot.move { background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--tc) 55%, #fff) 0 30%, var(--tc) 72%); }
+.slot.move .logo { position: absolute; width: 24px; height: 24px; top: 3px; left: 50%; transform: translateX(-50%); filter: brightness(0) invert(1) drop-shadow(0 1px 0 rgba(0,0,0,0.4)); image-rendering: auto; }
+.slot.move .ab { position: absolute; bottom: 0; left: 0; right: 0; font-size: 5px; line-height: 7px; background: rgba(0,0,0,0.45); padding: 0 1px; }
+.slot.move .lv { bottom: auto; top: 1px; right: 2px; }
+.pool-move .pl { width: 14px; height: 14px; filter: brightness(0) invert(1); flex: none; }
+.pool-move { justify-content: flex-start; }
+.pool-move .gate { margin-left: auto; }
+.mastery-mark { width: 18px; height: 18px; vertical-align: middle; image-rendering: auto; }
+.ach .nm { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.shiny-mark { width: 22px; height: 22px; image-rendering: pixelated; flex: none; }
+
+/* ───────── treasure slot machine ───────── */
+.chest-pop { pointer-events: auto; cursor: pointer; overflow: hidden; }
+.chest-panel { position: relative; text-align: center; min-width: min(360px, 92vw); max-width: 94vw; padding: 16px 18px 14px;
+  border-color: var(--chest); box-shadow: 0 0 0 2px var(--border), inset 0 0 0 2px var(--border), 0 0 26px color-mix(in srgb, var(--chest) 55%, transparent), 0 5px 0 2px rgba(0,0,0,0.42); }
+.chest-panel h3 { color: var(--chest); text-shadow: 2px 2px 0 #000; margin: 6px 0 12px; opacity: 0; transition: opacity 0.2s; }
+.chest-pop.popped .chest-panel h3 { opacity: 1; }
+.chest-panel .chest-ball { width: 72px; image-rendering: pixelated; animation: capture 0.9s steps(1) 1; }
+.chest-pop.popped .chest-ball { animation: burst 0.45s ease-out forwards; }
+@keyframes capture { 0% { transform: rotate(0); } 15% { transform: rotate(-22deg); } 30% { transform: rotate(0); } 45% { transform: rotate(22deg); } 60% { transform: rotate(0); } 75% { transform: rotate(-14deg); } 90% { transform: rotate(0) scale(1.1); } }
+@keyframes burst { 0% { transform: scale(1.1); filter: brightness(3); } 100% { transform: scale(0.8); filter: none; } }
+.chest-panel::before { content: ''; position: absolute; left: 50%; top: 52px; width: 10px; height: 10px; margin: -5px; border-radius: 50%; background: var(--chest); opacity: 0; pointer-events: none; }
+.chest-pop.popped .chest-panel::before { animation: ring 0.6s ease-out 1; }
+@keyframes ring { 0% { opacity: 0.9; transform: scale(1); } 100% { opacity: 0; transform: scale(40); } }
+.reels { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; min-height: 102px; }
+.reel { width: 78px; display: flex; flex-direction: column; align-items: center; gap: 4px; opacity: 0; transform: translateY(8px); transition: opacity 0.2s, transform 0.2s; }
+.chest-pop.popped .reel { opacity: 1; transform: none; }
+.reel-window { width: 66px; height: 66px; display: grid; place-items: center; background: rgba(0,0,0,0.45); border: 2px solid var(--frame-dim); border-radius: 6px; box-shadow: inset 0 6px 8px rgba(0,0,0,0.5); overflow: hidden; }
+.reel-face { width: 58px; height: 58px; }
+.reel-face.item { display: grid; place-items: center; background: #e8efff; border-radius: 6px; }
+.reel-face.item img { width: 48px; image-rendering: pixelated; }
+.reel.landed .reel-window { border-color: var(--chest); box-shadow: 0 0 12px var(--chest), inset 0 0 0 2px rgba(255,255,255,0.4); animation: land 0.3s ease-out; }
+.reel.mastery .reel-window { animation: land 0.3s ease-out, rainbow 1s linear infinite; }
+@keyframes land { 0% { transform: scale(1.35); } 100% { transform: scale(1); } }
+@keyframes rainbow { to { filter: hue-rotate(360deg); } }
+.reel-label-slot { min-height: 30px; }
+.reel-label { font-size: 13px; line-height: 1.15; color: var(--ink); animation: pop 0.25s ease-out; }
+.reel-label span { display: block; font-family: var(--head); font-size: 7px; color: var(--chest); margin-top: 2px; }
+.reel-label.mastery { color: #8dff9e; display: flex; flex-direction: column; align-items: center; }
+.skip-hint { margin-top: 8px; font-size: 12px; color: var(--ink-soft); }
+.chest-panel.tier-4 { animation: rainbow 1.6s linear infinite; }
+.coin-layer { position: absolute; left: 50%; top: 42%; width: 0; height: 0; pointer-events: none; z-index: 2; }
+.coin { position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; background: #ffd94a; border: 2px solid #b8860b; box-shadow: inset -2px -2px 0 #e0a800; }
+/* TM discs for moves on level-up cards and treasure reels */
+.card .ic.tm, .reel-face.tm { display: grid; place-items: center; border-radius: 6px;
+  background: radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--tc) 35%, #fff) 0 35%, color-mix(in srgb, var(--tc) 70%, #1a2350) 80%); }
+.card .ic.tm img, .reel-face.tm img { width: 48px; image-rendering: pixelated; filter: drop-shadow(0 2px 0 rgba(0,0,0,0.35)); }

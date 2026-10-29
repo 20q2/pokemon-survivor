@@ -1,6 +1,8 @@
 import type { WorldView } from '../render/renderer.ts';
-import { SLOT_COLORS } from '../render/renderer.ts';
+import { SLOT_COLORS, chestTier } from '../render/renderer.ts';
+import { CHEST_COLOR } from '../game/types.ts';
 import { h } from './dom.ts';
+import { assets } from '../render/assets.ts';
 
 /** World radius (px) the minimap covers around the local partner. */
 const RANGE = 1300;
@@ -55,6 +57,19 @@ export class Minimap {
       g.fillRect(Math.round(px - size / 2), Math.round(py - size / 2), size, size);
     };
 
+    /** Pinned icon (falls back to a dot until the image has loaded). */
+    const icon = (x: number, y: number, name: string, size: number, fallback: string) => {
+      const im = assets.uiImage(name);
+      if (!im) { dot(x, y, 4, fallback, true); return; }
+      let [px, py] = pos(x, y);
+      if (px < 4 || py < 4 || px > SIZE - 4 || py > SIZE - 4) {
+        const dx = px - half, dy = py - half;
+        const s = (half - 5) / Math.max(Math.abs(dx), Math.abs(dy));
+        px = half + dx * s; py = half + dy * s;
+      }
+      g.drawImage(im, Math.round(px - size / 2), Math.round(py - size / 2), size, size);
+    };
+
     // wild Pokémon: a dim speckle
     g.fillStyle = 'rgba(255,90,90,0.55)';
     for (const e of world.enemies) {
@@ -65,21 +80,18 @@ export class Minimap {
     for (const e of world.enemies) {
       if (!e.alive) continue;
       if (e.boss) dot(e.x, e.y, 5, blink ? '#ff2d2d' : '#ffffff', true);
-      else if (e.alpha) {
-        dot(e.x, e.y, 5, '#000', true);
-        dot(e.x, e.y, 3, blink ? '#ff3b3b' : '#ff9a3b', true);
-      } else if (e.role === 'treasure') dot(e.x, e.y, 3, '#ffe066', true);
+      else if (e.alpha) icon(e.x, e.y, 'alpha', 9, '#ff3b3b');
+      else if (e.role === 'treasure') dot(e.x, e.y, 3, '#ffe066', true);
       else if (e.elite) dot(e.x, e.y, 2, '#ffa94d', false);
     }
     for (const pk of world.pickups) {
       if (pk.dead) continue;
       if (pk.kind === 'chest') {
-        dot(pk.x, pk.y, 5, '#000', true);
-        dot(pk.x, pk.y, 3, '#ffd43b', true);
-      } else if (pk.kind === 'mega-stone') {
-        dot(pk.x, pk.y, 5, '#000', true);
-        dot(pk.x, pk.y, 3, `hsl(${Math.floor((this.t * 160) % 360)},100%,65%)`, true);
-      } else if (pk.kind !== 'candy' && pk.kind !== 'coin') dot(pk.x, pk.y, 2, '#74e0ff', false);
+        const t = chestTier(pk.value);
+        dot(pk.x, pk.y, t >= 3 ? 6 : 5, '#000', true);
+        dot(pk.x, pk.y, t >= 3 ? 4 : 3, CHEST_COLOR[t], true);
+      } else if (pk.kind === 'mega-stone') icon(pk.x, pk.y, 'mega', 9, `hsl(${Math.floor((this.t * 160) % 360)},100%,65%)`);
+      else if (pk.kind !== 'candy' && pk.kind !== 'coin') dot(pk.x, pk.y, 2, '#74e0ff', false);
     }
     for (const p of world.players) {
       if (!p.connected) continue;

@@ -15,7 +15,7 @@ import { stageThumbnail } from '../render/background.ts';
 import { dirRow } from '../engine/math.ts';
 import type { RunSession } from '../game/session.ts';
 import type { Player } from '../game/types.ts';
-import { btn, cap, fmtTime, h, img, toast, typeBadge } from './dom.ts';
+import { btn, cap, catBadge, fmtTime, h, img, moveIcon, toast, typeBadge, uiIcon } from './dom.ts';
 import { lobbyMenu } from './lobby.ts';
 
 const nn = (...a: (Node | string | null)[]) => a.filter((x): x is Node | string => x !== null);
@@ -113,7 +113,7 @@ function movePool(app: App, line: Line) {
         class: `pool-move${known ? '' : ' unknown'}`,
         style: known ? `--tc:${TYPE_COLORS[def.type]}` : '',
         title: known ? `${def.name} (${cap(def.type)}, ${def.cat}): ${def.desc}` : 'Not discovered yet: learn or be offered it in a run.',
-      }, h('span', { class: 'mn' }, known ? def.name : '???'), e.gate ? h('span', { class: 'gate' }, e.gate) : null);
+      }, known ? img(uiIcon(`logo/${def.type}`), 'pl') : null, h('span', { class: 'mn' }, known ? def.name : '???'), e.gate ? h('span', { class: 'gate' }, e.gate) : null);
     })),
   );
 }
@@ -157,8 +157,8 @@ export function selectScreen(app: App, onConfirm: (lineId: string) => void, titl
             renderRoster();
             renderDetail();
           },
-        }), '✨ Use Shiny form (+10% ₽)')
-        : h('div', { class: 'hint' }, '✨ Shiny: clear a stage at max friendship, or clear Cerulean Cave.'),
+        }), img(uiIcon('shiny'), 'shiny-mark'), 'Use Shiny form (+10% ₽)')
+        : h('div', { class: 'hint row' }, img(uiIcon('shiny'), 'shiny-mark'), 'Shiny: clear a stage at max friendship, or clear Cerulean Cave.'),
       btn('Choose!', () => { if (unlocked) onConfirm(sel); else audio.sfx('error'); }, 'primary', { disabled: !unlocked }),
     ));
   };
@@ -271,7 +271,7 @@ export function shopScreen(app: App) {
       tms.append(h('div', { class: 'panel upg' },
         img(assets.itemUrl(`tm-${m.type}`)),
         h('div', { class: 'nm' }, `TM ${m.name}`),
-        h('div', null, typeBadge(m.type), ' ', h('span', { class: `cat ${m.cat}` }, cap(m.cat))),
+        h('div', null, typeBadge(m.type), ' ', catBadge(m.cat)),
         h('div', { class: 'ds' }, m.desc),
         btn(owned ? 'OWNED' : `₽${TM_COST}`, () => {
           if (owned || s.money < TM_COST) { audio.sfx('error'); return; }
@@ -348,8 +348,8 @@ export function dexScreen(app: App, tab: 'mons' | 'moves' | 'items' = 'mons') {
       const learners = LINES.filter((l) => l.starter === m.id || l.learnset.some((e) => e.move === m.id) || Object.values(l.branchMoves ?? {}).some((ms) => ms.includes(m.id)));
       const tm = (TM_LIST as { id: string }[]).some((t) => t.id === m.id);
       body.append(h('div', { class: `panel ach${m.mastery ? ' done' : ''}` },
-        h('div', { class: 'ic', style: `background:${TYPE_COLORS[m.type]};width:44px;height:44px;border-radius:8px;display:grid;place-items:center;grid-row:span 3;font-family:var(--head);font-size:7px;color:#fff;text-shadow:1px 1px 0 #000;text-align:center` }, m.name.split(/[\s-]/).map((w) => w.slice(0, 4)).join(' ').toUpperCase()),
-        h('div', { class: 'nm' }, m.mastery ? `★ ${m.name}` : m.name, ' ', h('span', { class: `cat ${m.cat}` }, cap(m.cat))),
+        moveIcon(m.type, '', 'move-ic dex-ic'),
+        h('div', { class: 'nm' }, m.mastery ? img(uiIcon('mastery'), 'mastery-mark') : null, m.name, ' ', typeBadge(m.type), ' ', catBadge(m.cat)),
         h('div', { class: 'ds' }, m.desc),
         h('div', { class: 'rw' }, m.mastery
           ? `Master ${MOVES[m.mastery.from].name} (Lv8) + hold ${ITEMS[m.mastery.item].name}, then open a treasure.`

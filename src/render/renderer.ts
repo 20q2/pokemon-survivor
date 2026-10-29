@@ -3,7 +3,7 @@ import { MEGA, SPECIES } from '../data/pokedex.ts';
 import type { StageDef } from '../data/stages.ts';
 import { dirRow, TAU } from '../engine/math.ts';
 import type { Cinematic, Phase } from '../game/sim.ts';
-import type { Enemy, GameEvent, Pickup, Player, Projectile } from '../game/types.ts';
+import { CHEST_BALL, CHEST_COLOR, type ChestTier, type Enemy, type GameEvent, type Pickup, type Player, type Projectile } from '../game/types.ts';
 import { assets, type Anim } from './assets.ts';
 import { Background, DECOR_CELL, type DecorSprite } from './background.ts';
 import { DamageNumbers, Particles } from './fx.ts';
@@ -415,6 +415,10 @@ export class Renderer {
       g.fillStyle = '#000';
       g.fillRect(e.x - w / 2 - 1, e.y - 34 * e.scale - 1, w + 2, 4);
       g.fillStyle = e.boss || e.alpha ? '#ff4b4b' : '#ffc53d';
+      if (e.alpha) {
+        const icon = assets.uiImage('alpha');
+        if (icon) g.drawImage(icon, Math.round(e.x - w / 2 - 14), Math.round(e.y - 34 * e.scale - 6), 12, 12);
+      }
       g.fillRect(e.x - w / 2, e.y - 34 * e.scale, w * Math.max(0, e.hp / e.maxHp), 2);
     }
   }
@@ -539,7 +543,8 @@ export class Renderer {
       g.fillRect(Math.round(pk.x - w / 2), Math.round(pk.y - 4 + bob), Math.round(w), 6);
       return;
     }
-    const icon = PICKUP_ICON[pk.kind];
+    const tier = pk.kind === 'chest' ? chestTier(pk.value) : 1;
+    const icon = pk.kind === 'chest' ? CHEST_BALL[tier] : PICKUP_ICON[pk.kind];
     const img = icon ? assets.itemImage(icon) : undefined;
     const bob = Math.sin(time * 4 + pk.id) * 2;
     if (pk.kind === 'mega-stone') {
@@ -553,12 +558,17 @@ export class Renderer {
       g.globalCompositeOperation = 'source-over';
     }
     if (pk.kind === 'chest') {
+      // A beam of light in the ball's colour; rarer balls shine taller, wider and sparkle.
       g.globalCompositeOperation = 'lighter';
       g.globalAlpha = 0.35 + 0.15 * Math.sin(time * 5);
-      g.fillStyle = '#fff3b0';
-      g.fillRect(pk.x - 5, pk.y - 80, 10, 74);
+      g.fillStyle = CHEST_COLOR[tier];
+      const bw = 6 + tier * 2, bh = 60 + tier * 22;
+      g.fillRect(Math.round(pk.x - bw / 2), Math.round(pk.y - bh - 6), bw, bh);
       g.globalAlpha = 1;
       g.globalCompositeOperation = 'source-over';
+      if (tier >= 2 && Math.random() < 0.1 * tier) {
+        this.particles.spawn(pk.x + (Math.random() - 0.5) * 22, pk.y - 8 - Math.random() * 20, 0, -30, 0.6, 2, CHEST_COLOR[tier], 0, true);
+      }
     }
     if (img) g.drawImage(img, Math.round(pk.x - 15), Math.round(pk.y - 22 + bob), 30, 30);
   }
@@ -939,7 +949,7 @@ export class Renderer {
       g.restore();
     };
     for (const e of world.enemies) if (e.boss && e.alive) mark(e.x, e.y, '#ff4b4b', 14 * Math.min(2, z / 2));
-    for (const pk of world.pickups) if (pk.kind === 'chest') mark(pk.x, pk.y, '#ffd94a', 10 * Math.min(2, z / 2));
+    for (const pk of world.pickups) if (pk.kind === 'chest') mark(pk.x, pk.y, CHEST_COLOR[chestTier(pk.value)], (9 + chestTier(pk.value)) * Math.min(2, z / 2));
     for (const pk of world.pickups) if (pk.kind === 'mega-stone') mark(pk.x, pk.y, `hsl(${Math.floor((world.time * 120) % 360)},100%,65%)`, 12 * Math.min(2, z / 2));
     for (const p of world.players) if (p.id !== this.localId && p.connected) mark(p.x, p.y, SLOT_COLORS[p.slot], 10 * Math.min(2, z / 2));
   }
@@ -1042,6 +1052,8 @@ export class Renderer {
 }
 
 export const SLOT_COLORS = ['#ff6b6b', '#4dabf7', '#69db7c', '#ffd43b'];
+
+export const chestTier = (v: number) => Math.max(1, Math.min(4, Math.round(v))) as ChestTier;
 
 function isGroundFx(pr: Projectile) {
   return !pr.hostile && (pr.behavior === 'zone' || pr.behavior === 'trail' || pr.behavior === 'aura');

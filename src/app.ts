@@ -14,9 +14,12 @@ import { loadSave, storeSave, type SaveData } from './meta/save.ts';
 import { metaBonuses } from './meta/shop.ts';
 import { assets } from './render/assets.ts';
 import { Renderer } from './render/renderer.ts';
-import { banner, MenuNav, toast } from './ui/dom.ts';
+import { banner, MenuNav, toast, uiIcon } from './ui/dom.ts';
+import { chestShow, type ChestShow } from './ui/chest.ts';
+import { chestDuration } from './game/sim.ts';
+import { CHEST_BALL, CHEST_NAME } from './game/types.ts';
 import { Hud } from './ui/hud.ts';
-import { chestPopup, LevelUpUI } from './ui/runui.ts';
+import { LevelUpUI } from './ui/runui.ts';
 import * as screens from './ui/menus.ts';
 import type { NetHost, NetClient } from './net/net.ts';
 
@@ -29,10 +32,12 @@ export class App {
   readonly ui: HTMLElement;
   session: RunSession | null = null;
   private attract: LocalSession | null = null;
+  /** Sprites for the current title-screen demo; the boot screen waits on the first one. */
+  attractReady: Promise<void> = Promise.resolve();
   private levelUp: LevelUpUI;
   private last = performance.now();
   private pauseEl: HTMLElement | null = null;
-  private chestEl: HTMLElement | null = null;
+  private chest: ChestShow | null = null;
   private ended = false;
   private endTimer = 0;
   private bossMusic = false;
@@ -117,7 +122,7 @@ export class App {
     });
     this.renderer.reset();
     this.renderer.localId = 0;
-    void this.preload(this.attract);
+    this.attractReady = this.preload(this.attract).catch((e) => console.warn('attract preload', e));
   }
 
   private stepAttract(dt: number) {
@@ -197,8 +202,8 @@ export class App {
     this.levelUp.close();
     this.pauseEl?.remove();
     this.pauseEl = null;
-    this.chestEl?.remove();
-    this.chestEl = null;
+    this.chest?.dispose();
+    this.chest = null;
     if (this.net) {
       this.net.close();
       this.net = null;
@@ -295,18 +300,19 @@ export class App {
         banner(ev.final ? `${SPECIES[ev.species].name.toUpperCase()} fainted! STAGE CLEAR!` : `The wild ${SPECIES[ev.species].name.toUpperCase()} fainted!`, false, 2600);
         break;
       case 'chest':
-        audio.sfx(ev.rewards.some((r) => r.kind === 'mastery') ? 'mastery' : 'chest');
         if (ev.player === me) {
           this.discover(s.world.players[me].lineId, ev.rewards.filter((r) => r.kind === 'move' || r.kind === 'mastery').map((r) => r.id));
-          this.chestEl?.remove();
-          this.chestEl = chestPopup(ev.rewards);
-          this.ui.appendChild(this.chestEl);
-          const el = this.chestEl;
-          setTimeout(() => { el.remove(); if (this.chestEl === el) this.chestEl = null; }, 2600);
+          this.chest?.dispose();
+          const close = () => { show.dispose(); if (this.chest === show) this.chest = null; };
+          const show: ChestShow = chestShow(ev.rewards, ev.tier, s.coop ? null : () => { s.skipCine?.(); setTimeout(close, 650); });
+          this.chest = show;
+          this.ui.appendChild(show.el);
+          setTimeout(close, chestDuration(ev.rewards) * 1000 + 150);
         } else {
+          audio.sfx('chest');
           const p = s.world.players[ev.player];
           const m = ev.rewards.find((r) => r.kind === 'mastery');
-          toast('Treasure', m ? `${p?.name} mastered ${MOVES[m.id].name}!` : `${p?.name} opened a treasure.`, assets.itemUrl('poke-ball'));
+          toast('Treasure', m ? `${p?.name} mastered ${MOVES[m.id].name}!` : `${p?.name} opened a ${CHEST_NAME[ev.tier]}.`, assets.itemUrl(CHEST_BALL[ev.tier]));
         }
         break;
       case 'warn':
@@ -346,13 +352,13 @@ export class App {
         const p = s.world.players[ev.player];
         const evolved = s.world.players.some((x) => fullyEvolved(x.lineId, x.speciesId));
         banner(ev.player === me ? 'You found the MEGA STONE!' : `${p?.name} found the MEGA STONE!`, false, 2600);
-        toast('Mega Stone', evolved ? 'Fight to charge the rainbow meter. When it fills, your partner Mega Evolves!' : 'Fully evolve your partner, then fight to charge Mega Evolution.', assets.itemUrl('key-stone'));
+        toast('Mega Stone', evolved ? 'Fight to charge the rainbow meter. When it fills, your partner Mega Evolves!' : 'Fully evolve your partner, then fight to charge Mega Evolution.', uiIcon('mega-hires'));
         break;
       }
       case 'poi':
         if (ev.kind === 'cache') toast('Itemfinder', 'Something is buried nearby. Check the map!', assets.itemUrl('dowsing-machine'));
         else if (ev.kind === 'mega-stone') { banner('A MEGA STONE is shining somewhere! Check the map!', false, 3200); audio.sfx('shiny'); }
-        else toast('Alpha spotted!', `An Alpha ${SPECIES[ev.species!].name} roams nearby. Defeat it for big rewards!`, assets.portraitUrl(ev.species!));
+        else toast('Alpha spotted!', `An Alpha ${SPECIES[ev.species!].name} roams nearby. Defeat it for big rewards!`, uiIcon('alpha'));
         break;
       case 'alphaDown':
         this.alphasDown++;

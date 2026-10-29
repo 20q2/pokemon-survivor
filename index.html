@@ -6,6 +6,31 @@
     <meta name="theme-color" content="#14182b" />
     <title>Pokémon Survivors</title>
     <link rel="icon" href="./assets/items/poke-ball.png" />
+    <!-- Loader styles live here, not in style.css, so the boot screen is styled on first paint
+         instead of waiting for the JS bundle to download and inject the stylesheet. -->
+    <style>
+      html, body { margin: 0; height: 100%; background: #0d1230; overflow: hidden; }
+      #boot {
+        position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 22px; padding: 16px; text-align: center; color: #f4f7ff; font-family: 'Press Start 2P', monospace;
+        background: radial-gradient(ellipse at center, #1a2360, #0d1230 70%); transition: opacity 0.4s ease;
+      }
+      #boot.out { opacity: 0; pointer-events: none; }
+      #boot .boot-ball { width: 56px; height: 56px; image-rendering: pixelated; animation: boot-bob 0.9s steps(2) infinite; }
+      #boot .boot-logo, #boot .boot-status { opacity: 0; transition: opacity 0.25s; }
+      #boot.fonts .boot-logo, #boot.fonts .boot-status { opacity: 1; }
+      #boot .boot-logo .l1 { font-size: clamp(20px, 5vw, 44px); color: #ffd94a; -webkit-text-stroke: 2px #2a5ea8; text-shadow: 0 4px 0 #2a5ea8, 0 8px 0 #000; letter-spacing: 2px; }
+      #boot .boot-logo .l2 { font-size: clamp(12px, 2.4vw, 24px); color: #fff; text-shadow: 3px 3px 0 #c62828, 5px 5px 0 #000; margin-top: 12px; letter-spacing: 4px; }
+      #boot .boot-bar { width: min(320px, 80vw); height: 14px; border: 3px solid #d6e4ff; box-shadow: 0 0 0 3px #070b24; background: #070b24; }
+      #boot .boot-fill { height: 100%; background: linear-gradient(#ffe98a 0 40%, #ffd94a 40% 75%, #d9a821 75%); transform-origin: left; transform: scaleX(0); }
+      #boot .boot-status { min-height: 1.5em; font-size: 10px; line-height: 1.5; color: #a9b8e6; max-width: 90vw; }
+      #boot .boot-retry { display: none; font: inherit; font-size: 12px; padding: 12px 18px; cursor: pointer; color: #f4f7ff; background: #1e3184; border: 3px solid #070b24; border-radius: 10px; box-shadow: 0 4px 0 rgba(0,0,0,0.35); }
+      #boot.failed .boot-retry { display: block; }
+      #boot.failed .boot-ball { animation: none; filter: grayscale(1); }
+      #boot.failed .boot-status { color: #ff8a80; }
+      @keyframes boot-bob { 50% { transform: translateY(-6px) rotate(-12deg); } }
+      @media (prefers-reduced-motion: reduce) { #boot .boot-ball { animation: none; } }
+    </style>
   </head>
   <body>
     <canvas id="game"></canvas>
@@ -14,8 +39,11 @@
     <div id="banner"></div>
     <div id="toasts"></div>
     <div id="boot">
-      <img src="./assets/items/poke-ball.png" alt="" />
-      <p>Loading…</p>
+      <img class="boot-ball" src="./assets/items/poke-ball.png" alt="" />
+      <div class="boot-logo"><div class="l1">POKÉMON</div><div class="l2">SURVIVORS</div></div>
+      <div class="boot-bar" role="progressbar" aria-label="Loading" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="boot-fill"></div></div>
+      <div class="boot-status" role="status" aria-live="polite">Loading…</div>
+      <button class="boot-retry" type="button">Retry</button>
     </div>
     <script type="module" src="./src/main.ts"></script>
   </body>

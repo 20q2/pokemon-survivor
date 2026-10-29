@@ -14,6 +14,10 @@ const OUT = join(ROOT, 'public', 'assets');
 const CACHE = join(ROOT, 'scripts', '.cache');
 const SC = 'https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master';
 const ITEM_URL = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items';
+const TYPE_PLATE_URL = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/types/generation-vi/x-y';
+const PS_MISC = 'https://raw.githubusercontent.com/msikma/pokesprite/master/misc';
+/** PokeAPI type ids (plates are named by id). */
+const TYPE_ID = { normal: 1, fighting: 2, flying: 3, poison: 4, ground: 5, rock: 6, bug: 7, ghost: 8, steel: 9, fire: 10, water: 11, grass: 12, electric: 13, psychic: 14, ice: 15, dragon: 16, dark: 17, fairy: 18 };
 const FORCE = process.argv.includes('--force');
 
 const PLAYER_SPECIES = new Set(LINES.flatMap((l) => [...l.stages, ...Object.values(l.branch ?? {})]));
@@ -26,7 +30,7 @@ const EXTRA_ITEMS = [
   'big-nugget', 'shiny-charm', 'soothe-bell', 'moon-stone', 'escape-rope', 'x-attack', 'x-sp-atk', 'x-speed',
   'choice-band', 'choice-specs', 'zoom-lens', 'magnet', 'key-stone', 'venusaurite', 'charizardite-x', 'blastoisinite',
   'gengarite', 'alakazite', 'sceptilite', 'blazikenite', 'swampertite', 'tyranitarite', 'gardevoirite', 'mega-ring',
-  'itemfinder', 'dowsing-machine', 'star-piece', 'pearl', 'big-pearl', 'stardust', 'comet-shard',
+  'dowsing-machine', 'star-piece', 'pearl', 'big-pearl', 'stardust', 'comet-shard',
   ...TYPES.map((t) => `tm-${t}`),
 ];
 
@@ -165,6 +169,18 @@ async function main() {
     else console.warn(`!! missing item icon ${id}`);
   });
   manifest.items.sort();
+
+  // UI icons: Gen 6 pixel type plates, Gen 8 type symbols, Gen 4 move-category icons and
+  // special-attribute marks (pokesprite).
+  const ui = join(OUT, 'ui');
+  await pool(TYPES, 6, async (t) => {
+    await download(`${TYPE_PLATE_URL}/${TYPE_ID[t]}.png`, join(ui, 'plate', `${t}.png`));
+    await download(`${PS_MISC}/type-logos/gen8/${t}.png`, join(ui, 'logo', `${t}.png`));
+  });
+  for (const c of ['physical', 'special', 'status']) await download(`${PS_MISC}/seals/gen4/move-${c}.png`, join(ui, 'cat', `${c}.png`));
+  for (const [name, file] of [['alpha', 'alpha-icon'], ['mega', 'mega-evolution-sigil'], ['mega-hires', 'mega-evolution-sigil-hires'], ['mastery', 'move-mastery'], ['shiny', 'shiny-stars']]) {
+    await download(`${PS_MISC}/special-attribute/${file}.png`, join(ui, `${name}.png`));
+  }
   credits.sort((a, b) => a.dex - b.dex);
   await writeFile(join(OUT, 'manifest.json'), JSON.stringify(manifest));
   await writeFile(join(OUT, 'credits.json'), JSON.stringify(credits, null, 1));

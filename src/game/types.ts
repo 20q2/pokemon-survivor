@@ -128,6 +128,7 @@ export interface Enemy {
   shiny: boolean;
   /** Alpha Pokémon: huge, territorial, marked on the minimap. */
   alpha: boolean;
+  guardian?: boolean;
   homeX: number; homeY: number;
   alive: boolean;
   flash: number;
@@ -210,7 +211,7 @@ export type GameEvent =
   | { e: 'evolve'; player: number; from: string; to: string }
   | { e: 'boss'; species: string; final: boolean }
   | { e: 'bossDown'; species: string; final: boolean }
-  | { e: 'chest'; player: number; rewards: ChestReward[] }
+  | { e: 'chest'; player: number; rewards: ChestReward[]; tier: ChestTier }
   | { e: 'mega'; player: number; species: string }
   | { e: 'megaEnd'; player: number }
   | { e: 'megaStone'; player: number }
@@ -227,6 +228,12 @@ export type GameEvent =
   | { e: 'repel' }
   | { e: 'learn'; player: number; move: string }
   | { e: 'enemyShot'; x: number; y: number };
+
+/** Treasure rarity, shown by the Poké Ball it comes in. Stored as a chest pickup's `value`. */
+export type ChestTier = 1 | 2 | 3 | 4;
+export const CHEST_BALL: Record<ChestTier, string> = { 1: 'poke-ball', 2: 'great-ball', 3: 'ultra-ball', 4: 'master-ball' };
+export const CHEST_COLOR: Record<ChestTier, string> = { 1: '#fff3b0', 2: '#7fb8ff', 3: '#ffd84a', 4: '#d38bff' };
+export const CHEST_NAME: Record<ChestTier, string> = { 1: 'Poké Ball', 2: 'Great Ball', 3: 'Ultra Ball', 4: 'Master Ball' };
 
 export interface ChestReward { kind: 'mastery' | 'move' | 'item' | 'vitamin'; id: string; level?: number; from?: string }
 

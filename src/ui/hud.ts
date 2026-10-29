@@ -6,7 +6,7 @@ import { assets } from '../render/assets.ts';
 import type { RunSession } from '../game/session.ts';
 import type { Player } from '../game/types.ts';
 import { RUN_LENGTH } from '../data/stages.ts';
-import { cap, fmtTime, h, img, typeBadge } from './dom.ts';
+import { catBadge, fmtTime, h, img, typeBadge, uiIcon } from './dom.ts';
 import { Minimap } from './minimap.ts';
 import { MEGA_DURATION } from '../game/mega.ts';
 
@@ -81,7 +81,7 @@ export class Hud {
     };
     this.megaFill = h('div', { class: 'fill' });
     this.megaLabel = h('div', { class: 'lbl' }, 'MEGA');
-    this.mega = h('div', { class: 'mega-meter hidden' }, this.megaFill, this.megaLabel);
+    this.mega = h('div', { class: 'mega-row hidden' }, img(uiIcon('mega'), 'mega-sigil'), h('div', { class: 'mega-meter' }, this.megaFill, this.megaLabel));
     const mine = card(me, false);
     mine.querySelector('.hp')!.after(this.mega);
     this.left.append(mine);
@@ -93,8 +93,8 @@ export class Hud {
       const cd = h('div', { class: 'cd' });
       this.cdEls.push(cd);
       const lvText = def.mastery ? '★' : m.level > MAX_MOVE_LEVEL ? `★${m.level - MAX_MOVE_LEVEL}` : String(m.level);
-      moves.append(this.tipped(h('div', { class: `slot${def.mastery ? ' mastered' : ''}`, style: `background:${TYPE_COLORS[def.type]}` },
-        h('div', { class: 'ab' }, ABBR(def.name)), cd, h('div', { class: 'lv' }, lvText)), () => this.moveTip(me, m.id)));
+      moves.append(this.tipped(h('div', { class: `slot move${def.mastery ? ' mastered' : ''}`, style: `--tc:${TYPE_COLORS[def.type]}` },
+        img(uiIcon(`logo/${def.type}`), 'logo'), h('div', { class: 'ab' }, ABBR(def.name)), cd, h('div', { class: 'lv' }, lvText)), () => this.moveTip(me, m.id)));
     }
     const items = h('div', { class: 'slots' });
     for (let i = 0; i < me.itemSlots; i++) {
@@ -144,7 +144,7 @@ export class Hud {
     if (st.count > 1) facts.push(`×${Math.round(st.count + (me.stats?.countBonus ?? 0))}`);
     return h('div', null,
       h('b', null, def.name, ' ', h('span', { class: 'lvl' }, def.mastery ? 'MASTERED' : lvl > MAX_MOVE_LEVEL ? `Lv ${MAX_MOVE_LEVEL} ★${lvl - MAX_MOVE_LEVEL}` : `Lv ${lvl}`)),
-      h('div', { class: 'meta' }, typeBadge(def.type), h('span', { class: `cat ${def.cat}` }, cap(def.cat)), h('span', null, BEHAVIOR_TEXT[def.behavior])),
+      h('div', { class: 'meta' }, typeBadge(def.type), catBadge(def.cat), h('span', null, BEHAVIOR_TEXT[def.behavior])),
       h('p', null, def.desc),
       h('p', { class: 'facts' }, facts.join(' · ') + (stab ? ' · STAB ×1.5' : '')),
       m ? h('p', { class: 'facts' }, `Dealt ${Math.round(m.dmgDealt).toLocaleString()} · ${m.kills.toLocaleString()} KOs`) : null,

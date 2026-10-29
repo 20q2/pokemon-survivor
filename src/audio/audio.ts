@@ -421,6 +421,19 @@ export class AudioEngine {
         [72, 79, 84, 88, 91, 96].forEach((m, i) => this.tone(d, t + i * 0.09, midiHz(m), 0.25, 0.12, 'pulse', 0.125));
         this.noiseHit(d, t + 0.5, 0.6, 0.15, 4000);
         break;
+      case 'tick':
+        // reel tick: short blip, pitch climbs as the reel slows
+        if (!this.gate('tick', 0.03)) return;
+        this.tone(d, t, midiHz(84 + Math.round(arg)), 0.035, 0.05, 'pulse', 0.25);
+        break;
+      case 'ding':
+        [0, 7, 12].forEach((iv, i) => this.tone(d, t + i * 0.045, midiHz(79 + arg * 2 + iv), 0.16, 0.1, 'pulse', 0.125));
+        break;
+      case 'reveal':
+        // the ball bursts: noise whoosh + rising chord, bigger for rarer balls
+        this.noiseHit(d, t, 0.35 + arg * 0.1, 0.18 + arg * 0.04, 2500, 14000);
+        [60, 64, 67, 72].slice(0, 2 + Math.min(2, arg)).forEach((m, i) => this.tone(d, t + i * 0.05, midiHz(m + 12), 0.3, 0.09, 'pulse', 0.5));
+        break;
       case 'mega':
         // rainbow sphere: shimmering rising arpeggio, then the burst
         for (let i = 0; i < 20; i++) this.tone(d, t + i * 0.075, midiHz(60 + [0, 4, 7, 11][i % 4] + Math.floor(i / 4) * 5), 0.14, 0.07, 'pulse', 0.125);

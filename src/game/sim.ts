@@ -12,7 +12,7 @@ import { fireMoves, updateProjectiles, damagePlayer } from './combat.ts';
 import { activateMega, updateMega } from './mega.ts';
 import { Spawner, updateEnemies, killEnemy } from './enemies.ts';
 import type {
-  ChestReward, Enemy, GameEvent, Pickup, PickupKind, Player, Projectile, UpgradeOffer,
+  ChestReward, ChestTier, Enemy, GameEvent, Pickup, PickupKind, Player, Projectile, UpgradeOffer,
 } from './types.ts';
 
 export interface PlayerInit {
@@ -41,16 +41,22 @@ export interface Cinematic {
   from?: string;
   to?: string;
   rewards?: ChestReward[];
+  tier?: ChestTier;
   species?: string;
 }
 
 export const DT = 1 / 60;
+
+/** How long the treasure "slot machine" plays: ball pops, then one reel lands per reward. */
+export function chestDuration(rewards: ChestReward[]): number {
+  return 2.1 + 0.55 * rewards.length;
+}
 export const MAX_ENEMIES = 520;
 
 export function xpForLevel(level: number): number {
   // Snappy first levels, then a quadratic curve so the build fills out over the whole run.
   const k = level - 1;
-  return Math.round(5 + 4 * k + 0.9 * k * k + (k > 24 ? 0.06 * (k - 24) ** 3 : 0));
+  return Math.round(6 + 4.5 * k + 1.05 * k * k + (k > 24 ? 0.07 * (k - 24) ** 3 : 0));
 }
 
 export class Sim {
@@ -315,7 +321,7 @@ export class Sim {
         this.xp += this.xpNext - this.xp + 0.01;
         break;
       case 'chest':
-        this.openChest(p);
+        this.openChest(p, Math.max(1, Math.min(4, Math.round(pk.value))) as ChestTier);
         break;
       case 'mega-stone':
         this.megaStone = true;
@@ -390,6 +396,11 @@ export class Sim {
     this.cine = c;
     this.phase = 'cine';
     if (c.kind === 'evolve') this.emit({ e: 'evolve', player: c.player, from: c.from!, to: c.to! });
+  }
+
+  /** Solo only: fast-forward the current treasure/boss cinematic. */
+  skipCine() {
+    if (this.cine && this.cine.kind !== 'evolve' && this.cine.kind !== 'mega') this.cine.t = Math.max(this.cine.t, this.cine.dur - 0.25);
   }
 
   private updateCine(dt: number) {
@@ -469,45 +480,49 @@ export class Sim {
     if (this.offers.size === 0) this.phase = 'play';
   }
 
-  /** Chests master a ready move, otherwise grant 1/3/5 upgrades. */
-  openChest(p: Player) {
+  /**
+   * Open a treasure. The ball's tier sets how many rewards it holds (Poké 1, sometimes 2;
+   * Great 2, sometimes 3; Ultra 3, sometimes 5; Master 5). A move that is ready to master is always mastered
+   * first; small balls give only the mastery, Ultra and Master balls give it on top.
+   */
+  openChest(p: Player, tier: ChestTier = 1) {
     const rewards: ChestReward[] = [];
-    const ready = masteryCandidates(p);
-    if (ready.length) {
+    const master = () => {
+      const ready = masteryCandidates(p);
+      if (!ready.length) return false;
       const m = ready[0];
       const owned = p.moves.find((x) => x.id === m.from)!;
       owned.id = m.to;
       owned.level = Math.max(owned.level, MAX_MOVE_LEVEL);
       p.masteries++;
       rewards.push({ kind: 'mastery', id: m.to, from: m.from });
-    } else {
-      const roll = this.rng.next();
-      const n = roll < 0.03 ? 5 : roll < 0.15 ? 3 : 1;
-      for (let i = 0; i < n; i++) {
-        let ups = ownedUpgrades(p);
-        // Nothing to level? Grant something new instead.
-        if (!ups.length) ups = generateOffers(p, this.rng, 3, this.tms.get(p.id) ?? []).filter((o) => o.kind === 'newMove' || o.kind === 'newItem');
-        // A complete build still gets something: vitamins.
-        if (!ups.length) ups = [randomFiller(p, this.rng)];
-        const o = this.rng.pick(ups);
-        applyOffer(p, o);
-        const lvl = o.kind === 'newMove' || o.kind === 'newItem' ? 1 : o.level;
-        rewards.push({ kind: o.kind === 'moveUp' || o.kind === 'newMove' ? 'move' : o.kind === 'vitamin' ? 'vitamin' : 'item', id: o.id, level: lvl });
-        // A chest can complete a mastery chain mid-way: master immediately.
-        const ready = masteryCandidates(p);
-        if (ready.length) {
-          const m = ready[0];
-          const owned = p.moves.find((x) => x.id === m.from)!;
-          owned.id = m.to;
-          p.masteries++;
-          rewards.push({ kind: 'mastery', id: m.to, from: m.from });
-        }
-      }
+      return true;
+    };
+    const mastered = master();
+    const roll = this.rng.next();
+    let n = tier === 1 ? (roll < 0.1 ? 2 : 1) : tier === 2 ? (roll < 0.15 ? 3 : 2) : tier === 3 ? (roll < 0.2 ? 5 : 3) : 5;
+    if (mastered && tier <= 2) n = 0;
+    for (let i = 0; i < n; i++) {
+      let ups = ownedUpgrades(p);
+      // Nothing to level? Grant something new instead.
+      if (!ups.length) ups = generateOffers(p, this.rng, 3, this.tms.get(p.id) ?? []).filter((o) => o.kind === 'newMove' || o.kind === 'newItem');
+      // A complete build still gets something: limit breaks and vitamins.
+      if (!ups.length) ups = [randomFiller(p, this.rng)];
+      const o = this.rng.pick(ups);
+      applyOffer(p, o);
+      const lvl = o.kind === 'newMove' || o.kind === 'newItem' ? 1 : o.level;
+      rewards.push({ kind: o.kind === 'moveUp' || o.kind === 'newMove' ? 'move' : o.kind === 'vitamin' ? 'vitamin' : 'item', id: o.id, level: lvl });
+      master(); // a reward can complete a mastery chain mid-way
     }
+    // A mastery always shows as a Master Ball.
+    const shown: ChestTier = rewards.some((r) => r.kind === 'mastery') ? 4 : tier;
     this.refreshStats();
-    this.emit({ e: 'chest', player: p.id, rewards });
-    this.queueCine({ kind: 'chest', t: 0, dur: 2.6, player: p.id, rewards });
+    this.emit({ e: 'chest', player: p.id, rewards, tier: shown });
+    // A little gold rides along with every treasure.
+    this.money += 2 + tier * 2;
+    this.queueCine({ kind: 'chest', t: 0, dur: chestDuration(rewards), player: p.id, rewards, tier: shown });
   }
+
 
   // ───────────────────────────── cleanup ─────────────────────────────
 

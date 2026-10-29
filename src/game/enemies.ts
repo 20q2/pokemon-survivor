@@ -16,6 +16,8 @@ export interface SpawnOpts {
   swarmDir?: { x: number; y: number };
   shiny?: boolean;
   alpha?: boolean;
+  /** Guards map treasure: drops no treasure of its own. */
+  guardian?: boolean;
 }
 
 export class Spawner {
@@ -85,8 +87,8 @@ export class Spawner {
       }
     }
     if (t >= this.nextElite) {
-      this.nextElite += Math.max(35, 75 - m * 3);
-      const count = 1 + Math.floor(m / 5);
+      this.nextElite += Math.max(48, 80 - m * 2.5);
+      const count = 1 + Math.floor(m / 7);
       for (let i = 0; i < count; i++) this.spawnOffscreen(sim.rng.pick(sim.stage.elites), { elite: true });
     }
     if (t >= this.nextTreasure) {
@@ -145,7 +147,7 @@ export class Spawner {
       const n = poi.kind === 'mega-stone' ? 2 + Math.floor(this.minute / 6) : 1;
       for (let i = 0; i < n; i++) {
         const a = sim.rng.range(0, TAU);
-        spawnEnemy(sim, sim.rng.pick(sim.stage.elites), poi.x + Math.cos(a) * 60, poi.y + Math.sin(a) * 60, { elite: true });
+        spawnEnemy(sim, sim.rng.pick(sim.stage.elites), poi.x + Math.cos(a) * 60, poi.y + Math.sin(a) * 60, { elite: true, guardian: true });
       }
       sim.emit({ e: 'warn', text: poi.kind === 'mega-stone' ? 'Powerful Pokémon guard the Mega Stone!' : 'Something is guarding the treasure!' });
     }
@@ -158,7 +160,7 @@ export class Spawner {
     const p = this.anchor();
     const a = sim.rng.range(0, TAU);
     const x = p.x + Math.cos(a) * dist, y = p.y + Math.sin(a) * dist;
-    const pk = sim.spawnPickup(kind === 'cache' ? 'chest' : 'mega-stone', x, y);
+    const pk = sim.spawnPickup(kind === 'cache' ? 'chest' : 'mega-stone', x, y, kind === 'cache' ? (sim.rng.chance(0.3) ? 3 : 2) : 1);
     pk.vx = pk.vy = 0;
     this.pois.push({ kind, id: pk.id, x, y, guarded: false });
     sim.emit({ e: 'poi', kind, x, y });
@@ -263,7 +265,7 @@ export function spawnEnemy(sim: Sim, speciesId: string, x: number, y: number, op
   const e: Enemy = {
     id: sim.id(), speciesId, types: sp.types, role, x, y, radius, vx: 0, vy: 0, dirX: 0, dirY: 1,
     hp, maxHp: hp, speed, dmg, special: bspa > batk, xp, elite: !!opts.elite, boss: !!opts.boss,
-    final: !!opts.boss?.final, shiny, alpha: !!opts.alpha, homeX: x, homeY: y, alive: true, flash: 0,
+    final: !!opts.boss?.final, shiny, alpha: !!opts.alpha, guardian: !!opts.guardian, homeX: x, homeY: y, alive: true, flash: 0,
     st: { burn: 0, poison: 0, poisonStacks: 0, paralyze: 0, freeze: 0, slow: 0, confuse: 0, flinch: 0, dotTick: 0, burnDmg: 0, poisonDmg: 0, dotOwner: 0, coin: 0 },
     contactCd: 0, ai: sim.rng.range(0, 2), aiState: opts.swarmDir ? 9 : 0, aiX: opts.swarmDir?.x ?? 0, aiY: opts.swarmDir?.y ?? 0,
     patterns: opts.boss?.patterns ?? [], patternIdx: 0, minions: opts.boss?.minions ?? [], knockResist, scale,
@@ -591,16 +593,19 @@ export function killEnemy(sim: Sim, e: Enemy, killerId: number) {
   if (r.chance(0.0004)) sim.spawnPickup('rare-candy', e.x, e.y);
   if (e.role === 'treasure') {
     for (let i = 0; i < 6; i++) sim.spawnPickup('coin', e.x, e.y, e.speciesId === 'chansey' ? 4 : 3);
-    if (e.speciesId === 'chansey') sim.spawnPickup('chest', e.x, e.y);
+    if (e.speciesId === 'chansey') sim.spawnPickup('chest', e.x, e.y, 2);
   }
   if (e.shiny) {
     if (killer) killer.shinyKills++;
-    sim.spawnPickup('chest', e.x, e.y);
+    sim.spawnPickup('chest', e.x, e.y, 2);
     for (let i = 0; i < 5; i++) sim.spawnPickup('coin', e.x, e.y, 4);
   }
-  if (e.elite && r.chance(0.35)) sim.spawnPickup('chest', e.x, e.y);
+  if (e.elite && !e.guardian) {
+    const roll = r.next();
+    sim.spawnPickup('chest', e.x, e.y, roll < 0.02 ? 3 : roll < 0.16 ? 2 : 1);
+  }
   if (e.alpha) {
-    sim.spawnPickup('chest', e.x, e.y);
+    sim.spawnPickup('chest', e.x, e.y, 3);
     sim.spawnPickup('rare-candy', e.x, e.y);
     for (let i = 0; i < 6; i++) sim.spawnPickup('coin', e.x, e.y, 3);
     sim.emit({ e: 'alphaDown', species: e.speciesId });
@@ -608,7 +613,7 @@ export function killEnemy(sim: Sim, e: Enemy, killerId: number) {
   if (e.boss) {
     sim.bossesDefeated++;
     if (killer) killer.bossKills++;
-    sim.spawnPickup('chest', e.x, e.y);
+    sim.spawnPickup('chest', e.x, e.y, e.final ? 4 : 3);
     for (let i = 0; i < 10; i++) sim.spawnPickup('coin', e.x, e.y, 5);
     sim.spawnPickup('sitrus', e.x, e.y);
     if (e.final) sim.finalDefeated = true;
