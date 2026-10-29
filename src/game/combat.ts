@@ -4,7 +4,7 @@ import { TAU, wrapAngle } from '../engine/math.ts';
 import { baseDamage, incomingDamage, resolveHit } from './damage.ts';
 import { killEnemy } from './enemies.ts';
 import type { Sim } from './sim.ts';
-import type { Enemy, OwnedMove, Player, Projectile, Shape } from './types.ts';
+import type { Enemy, Player, Projectile, Shape } from './types.ts';
 
 const HIGH_CRIT = new Set(['razor-leaf', 'karate-chop', 'leaf-blade', 'night-slash', 'blaze-kick', 'cross-chop', 'air-slash', 'stone-edge', 'crunch']);
 const COUNT_BEHAVIORS = new Set(['projectile', 'strike', 'zone', 'chain', 'boomerang', 'orbit', 'lob', 'wave']);
@@ -16,7 +16,7 @@ export function makeProjectile(sim: Sim, o: Partial<Projectile>): Projectile {
     cat: 'special', shape: 'circle', x: 0, y: 0, vx: 0, vy: 0, angle: 0, r: 6, len: 0, t: 0, life: 1,
     delay: 0, attach: false, ox: 0, oy: 0, orbitR: 0, orbitSpd: 0, orbitA: 0, homing: 0, speed: 0,
     boomerang: 0, returning: false, tx: 0, ty: 0, sx: 0, sy: 0, pierce: -1, tick: 0, dmg: 0, knock: 0,
-    chance: 0, crit: 0, hit: new Map(), dead: false, hitOnce: false, growth: 0,
+    chance: 0, crit: 0, hit: new Map(), dead: false, growth: 0,
     ...o,
   };
   sim.projectiles.push(p);
@@ -78,7 +78,7 @@ export function fireMoves(sim: Sim, dt: number) {
       if (m.cd > 0) continue;
       const def = MOVES[m.id];
       const s = scaledStats(def, m.level, p);
-      fire(sim, p, m, def, s);
+      fire(sim, p, def, s);
       m.cd += Math.max(0.12, s.cd);
       if (m.cd < 0) m.cd = s.cd;
     }
@@ -150,7 +150,7 @@ function spawnAura(sim: Sim, p: Player, def: MoveDef, s: MoveStats, moveId = def
   });
 }
 
-function fire(sim: Sim, p: Player, m: OwnedMove, def: MoveDef, s: MoveStats) {
+function fire(sim: Sim, p: Player, def: MoveDef, s: MoveStats) {
   sim.emit({ e: 'fire', player: p.id, move: def.id, type: def.type, behavior: def.behavior });
   const c = common(p, def, s);
   switch (def.behavior) {
@@ -322,7 +322,7 @@ function fire(sim: Sim, p: Player, m: OwnedMove, def: MoveDef, s: MoveStats) {
         const flight = Math.max(0.25, Math.hypot(tx - p.x, ty - p.y) / s.speed);
         makeProjectile(sim, {
           ...c, shape: 'circle', x: p.x, y: p.y, sx: p.x, sy: p.y, tx, ty, r: s.area, len: flight,
-          life: flight + 0.35, delay: i * 0.08, pierce: -1, tick: 0, hitOnce: true,
+          life: flight + 0.35, delay: i * 0.08, pierce: -1, tick: 0,
         });
       }
       break;
@@ -337,7 +337,6 @@ function fire(sim: Sim, p: Player, m: OwnedMove, def: MoveDef, s: MoveStats) {
       break;
     }
   }
-  void m;
 }
 
 // ─────────────────────────── projectile update ───────────────────────────

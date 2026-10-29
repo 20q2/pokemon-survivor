@@ -1,5 +1,5 @@
 import type { PType } from '../data/types.ts';
-import type { Behavior, BuffKind, Category, Fx, MoveStats, StatusKind } from '../data/moves.ts';
+import type { Behavior, BuffKind, Category, Fx, StatusKind } from '../data/moves.ts';
 import type { AbilityId } from '../data/pokedex.ts';
 import type { EnemyRole, BossPattern } from '../data/stages.ts';
 import type { MetaBonuses } from '../meta/shop.ts';
@@ -174,7 +174,6 @@ export interface Projectile {
   crit: number;
   hit: Map<number, number>; // enemy id -> time it may be hit again
   dead: boolean;
-  hitOnce: boolean;         // explode once (lob) when landing
   growth: number;           // ring max radius for nova
 }
 
@@ -221,4 +220,3 @@ export interface UpgradeOffer {
   level: number; // resulting level
 }
 
-export type MoveStatsSnapshot = MoveStats;

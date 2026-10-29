@@ -94,11 +94,9 @@ export class LevelUpUI {
   private session: RunSession | null = null;
 
   private root: HTMLElement;
-  private onShown: () => void;
 
-  constructor(root: HTMLElement, onShown: () => void) {
+  constructor(root: HTMLElement) {
     this.root = root;
-    this.onShown = onShown;
     window.addEventListener('keydown', this.keyHandler);
   }
 
@@ -161,7 +159,6 @@ export class LevelUpUI {
     );
     this.root.appendChild(this.el);
     (cards.firstElementChild as HTMLElement | null)?.focus();
-    this.onShown();
   }
 
   close() {

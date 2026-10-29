@@ -50,7 +50,7 @@ export class App {
     this.renderer = new Renderer(document.getElementById('game') as HTMLCanvasElement);
     this.input = new Input(document.getElementById('game')!);
     this.nav = new MenuNav(this.ui);
-    this.levelUp = new LevelUpUI(this.ui, () => undefined);
+    this.levelUp = new LevelUpUI(this.ui);
     this.applyOptions();
     this.hud.onPause = () => this.togglePause();
     const unlock = () => audio.unlock();

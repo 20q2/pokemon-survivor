@@ -165,8 +165,7 @@ export class Renderer {
 
   // ─────────────────────────── frame ───────────────────────────
 
-  render(world: WorldView, dt: number, alpha = 1) {
-    void alpha;
+  render(world: WorldView, dt: number) {
     const g = this.g;
     if (this.bgStage !== world.stage.id) {
       this.bg = new Background(world.stage);

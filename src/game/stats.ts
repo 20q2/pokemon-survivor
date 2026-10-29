@@ -48,7 +48,6 @@ export function derivePlayerStats(p: Player, level: number, time: number): Deriv
       case 'typeDmg': s.typeDmg[def.type!] = (s.typeDmg[def.type!] ?? 0) + v; break;
       case 'physDmg': s.physDmg += v; break;
       case 'specDmg': s.specDmg += v; break;
-      case 'allDmg': s.physDmg += v; s.specDmg += v; break;
       case 'cooldown': s.cooldown *= 1 - v; break;
       case 'crit': s.crit += v; break;
       case 'critDmg': s.critDmg += v; break;

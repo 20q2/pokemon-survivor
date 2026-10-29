@@ -124,6 +124,6 @@ export function projFromWire(a: unknown[]): Projectile {
   PROJ_KEYS.forEach((k, i) => { o[k] = a[i]; });
   return {
     ...(o as unknown as Projectile),
-    returning: false, pierce: -1, tick: 0, knock: 0, chance: 0, crit: 0, hit: new Map(), dead: false, hitOnce: false,
+    returning: false, pierce: -1, tick: 0, knock: 0, chance: 0, crit: 0, hit: new Map(), dead: false,
   };
 }

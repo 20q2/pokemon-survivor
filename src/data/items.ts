@@ -3,7 +3,7 @@ import type { PType } from './types.ts';
 export const MAX_ITEM_LEVEL = 5;
 
 export type ItemStat =
-  | 'typeDmg' | 'physDmg' | 'specDmg' | 'allDmg' | 'cooldown' | 'crit' | 'critDmg' | 'area'
+  | 'typeDmg' | 'physDmg' | 'specDmg' | 'cooldown' | 'crit' | 'critDmg' | 'area'
   | 'regen' | 'lifesteal' | 'exp' | 'money' | 'thorns' | 'superEff' | 'flinch' | 'speed'
   | 'maxHp' | 'pickup' | 'duration' | 'count' | 'focus' | 'lifeOrb';
 

@@ -2,7 +2,6 @@ import type { StageDef } from '../data/stages.ts';
 import type { RunSummary } from '../meta/achievements.ts';
 import { MOVES, MAX_MOVE_LEVEL } from '../data/moves.ts';
 import { MAX_ITEM_LEVEL } from '../data/items.ts';
-import { LINE } from '../data/pokedex.ts';
 import type { WorldView } from '../render/renderer.ts';
 import { Sim, DT, type Phase, type SimConfig } from './sim.ts';
 import type { GameEvent, Player, UpgradeOffer } from './types.ts';
@@ -113,7 +112,6 @@ export class LocalSession implements RunSession {
 /** Build the per-player summary used for saves/achievements. */
 export function summarize(session: RunSession, p: Player, cleared: boolean, extra: { bosses: number; died: boolean; defeatedChansey: boolean }): RunSummary {
   const w = session.world;
-  const line = LINE[p.lineId];
   const moveTypesOk = p.moves.every((m) => p.types.includes(MOVES[m.id].type) || MOVES[m.id].cat === 'status');
   return {
     stageId: session.stage.id,
@@ -134,7 +132,7 @@ export function summarize(session: RunSession, p: Player, cleared: boolean, extr
     firstHit: session.firstHit,
     maxedMoves: p.moves.filter((m) => m.level >= MAX_MOVE_LEVEL || MOVES[m.id].mastery).length,
     maxedItems: p.items.filter((i) => i.level >= MAX_ITEM_LEVEL).length,
-    stabOnly: moveTypesOk && !!line,
+    stabOnly: moveTypesOk,
     defeatedChansey: extra.defeatedChansey,
     died: extra.died,
     elite: !!(session.world as { elite?: boolean }).elite,
