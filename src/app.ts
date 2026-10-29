@@ -331,10 +331,10 @@ export class App {
         audio.sfx('warn');
         break;
       case 'wave':
-        waveBanner(ev.text, assets.portraitUrl(ev.species), 2200);
+        waveBanner(ev.text, assets.portraitUrl(ev.species));
         audio.sfx('wave');
         break;
-      case 'toast':
+      case 'toast': // game event; unrelated to the top-right toast() helper
         notice(ev.text);
         audio.sfx('tick');
         break;

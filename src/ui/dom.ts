@@ -215,21 +215,24 @@ export function toast(title: string, text: string, icon?: string) {
 }
 
 let bannerTimer = 0;
-export function banner(text: string, boss = false, ms = 2600) {
+function showBanner(dialog: HTMLElement, ms: number) {
   const box = document.getElementById('banner')!;
-  box.innerHTML = '';
-  box.appendChild(h('div', { class: `dialog${boss ? ' boss' : ''}` }, text));
+  box.replaceChildren(dialog);
   clearTimeout(bannerTimer);
-  bannerTimer = window.setTimeout(() => { box.innerHTML = ''; }, ms);
+  bannerTimer = window.setTimeout(() => box.replaceChildren(), ms);
 }
 
-/** Minute-change banner: species sprite plus a line, styled apart from the red alert banner. */
+export function banner(text: string, boss = false, ms = 2600) {
+  showBanner(h('div', { class: `dialog${boss ? ' boss' : ''}` }, text), ms);
+}
+
+/** Minute-change banner: species sprite plus a line, styled apart from the red alert banner.
+ *  Lowest priority: it never replaces a banner already showing (boss, warn, mega stone...);
+ *  the wave sting still plays, so the minute is still marked. */
 export function waveBanner(text: string, sprite: string, ms = 2200) {
-  const box = document.getElementById('banner')!;
-  box.innerHTML = '';
-  box.appendChild(h('div', { class: 'dialog wave' }, img(sprite, 'px'), text));
-  clearTimeout(bannerTimer);
-  bannerTimer = window.setTimeout(() => { box.innerHTML = ''; }, ms);
+  const cur = document.querySelector('#banner .dialog');
+  if (cur && !cur.classList.contains('wave')) return;
+  showBanner(h('div', { class: 'dialog wave' }, img(sprite, 'px'), text), ms);
 }
 
 /** Quiet one-line notice under the banner; never replaces or blocks it. */

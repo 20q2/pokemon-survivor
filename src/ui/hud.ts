@@ -53,6 +53,7 @@ export class Hud {
     this.el.innerHTML = '';
     this.xpFill = h('div', { class: 'fill' });
     this.lv = h('div', { class: 'lv' }, 'Lv 1');
+    this.lastTime = -1; // new run: don't pulse against the previous run's final time
     this.timer = h('div', { class: 'timer' }, '00:00');
     this.stats = h('div', { class: 'hud-stats' });
     this.left = h('div', { class: 'hud-left' });
