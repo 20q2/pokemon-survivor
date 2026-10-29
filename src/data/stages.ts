@@ -63,7 +63,7 @@ export const ENEMY_ROLE: Record<string, EnemyRole> = {
 };
 
 /** Quota shape shared by every stage (after Vampire Survivors' Mad Forest); minutes 5 and 9 breathe. */
-export const WAVE_MIN = [15, 35, 75, 60, 45, 10, 110, 150, 60, 10, 260, 70, 220, 190, 280, 300];
+export const WAVE_MIN = [15, 35, 60, 50, 45, 10, 110, 150, 60, 10, 260, 70, 220, 190, 280, 300];
 /** Set pieces shared by every stage: rings own the breathing minutes (5, 9) and 13, swarms ramp up late. */
 export const WAVE_EVENTS: Record<number, WaveEvent[]> = {
   2: [{ kind: 'swarm', at: 30, repeats: 1 }],

@@ -112,7 +112,7 @@ describe('data integrity', () => {
   });
 
   it('wave quotas follow the shared non-monotonic table', () => {
-    const table = [15, 35, 75, 60, 45, 10, 110, 150, 60, 10, 260, 70, 220, 190, 280, 300];
+    const table = [15, 35, 60, 50, 45, 10, 110, 150, 60, 10, 260, 70, 220, 190, 280, 300];
     for (const st of STAGES) {
       expect(st.waves.map((w) => w.min), st.id).toEqual(table);
       for (const w of st.waves) if (w.elite) expect(st.elites, st.id).toContain(w.elite);

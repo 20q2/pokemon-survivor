@@ -136,7 +136,7 @@ export class Spawner {
     this.nextQuota = t + w.interval;
     // Only filler counts toward the quota; set pieces and carriers have their own pacing.
     let alive = 0;
-    for (const e of sim.enemies) if (e.alive && !e.boss && !e.elite && !e.alpha && e.role !== 'treasure' && e.aiState !== 9 && e.aiState !== 10) alive++;
+    for (const e of sim.enemies) if (e.alive && !e.boss && !e.elite && !e.alpha && e.role !== 'treasure' && !isSetPiece(e)) alive++;
     const min = Math.round(w.min * (1 + 0.35 * (n - 1)) * (sim.elite ? 1.25 : 1));
     if (alive < min) {
       // Instant backfill; spawnEnemy stops at MAX_ENEMIES.
@@ -490,7 +490,7 @@ export function updateEnemies(sim: Sim, dt: number) {
     e.vy *= damp;
     if ((mx || my) && mult > 0) { e.dirX = mx; e.dirY = my; }
     // ─ recycle enemies left far behind
-    if (!e.boss && !e.alpha && e.aiState !== 9 && e.aiState !== 10 && player) {
+    if (!e.boss && !e.alpha && !isSetPiece(e) && player) {
       const lim = Math.max(player.viewW, player.viewH) * 0.9 + 150;
       if (Math.abs(e.x - player.x) > lim || Math.abs(e.y - player.y) > lim) {
         if (e.role === 'treasure') { e.alive = false; continue; }
@@ -557,7 +557,7 @@ function separate(sim: Sim, dt: number) {
         e.st.ffCd = 0.6;
         rawDamageEnemy(sim, o, Math.max(4, o.maxHp * 0.08), e.types[0], e.lastHitBy, e.st.charm > 0 ? 'disarming-voice' : 'confusion');
       }
-      if (e.aiState === 10) return; // walls hold their line against regulars
+      if (isSetPiece(e)) return; // swarm crossers and walls hold their line
       const d = Math.sqrt(d2);
       const push = (rr - d) * 0.25;
       const wE = e.boss ? 0.05 : o.boss ? 1.6 : 1;
@@ -831,4 +831,9 @@ function spreadOnDeath(sim: Sim, e: Enemy) {
     const next = sim.grid.nearest(e.x, e.y, 150, (o) => o !== e && o.alive && o.st.seed <= 0);
     if (next) { next.st.seed = 5; next.st.seedDmg = st.seedDmg; next.st.seedOwner = st.seedOwner; }
   }
+}
+
+/** Swarm crossers (9) and ring walls (10): scripted movers outside the quota, recycling and crowd shoving. */
+function isSetPiece(e: Enemy) {
+  return e.aiState === 9 || e.aiState === 10;
 }
