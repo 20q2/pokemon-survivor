@@ -4,7 +4,7 @@ import { metaBonuses } from '../src/meta/shop.ts';
 import { botChoose, botSteer } from '../src/game/bot.ts';
 import { LINES } from '../src/data/pokedex.ts';
 import { STAGES } from '../src/data/stages.ts';
-import { spawnEnemy } from '../src/game/enemies.ts';
+import { AI, isSetPiece, spawnEnemy } from '../src/game/enemies.ts';
 
 /** `immortal`: the simple bot can still wander into a forest pocket and get swarmed on some
  *  layouts; tests about progress (not survival) shouldn't hinge on that. */
@@ -399,7 +399,7 @@ describe('hit-stop', () => {
 });
 
 describe('minute waves', () => {
-  const regulars = (sim: Sim) => sim.enemies.filter((e) => e.alive && !e.boss && !e.elite && !e.alpha && e.role !== 'treasure' && e.aiState !== 9 && e.aiState !== 10);
+  const regulars = (sim: Sim) => sim.enemies.filter((e) => e.alive && !e.boss && !e.elite && !e.alpha && e.role !== 'treasure' && !isSetPiece(e));
 
   function playMinuteOne(players: number) {
     const sim = new Sim({
@@ -480,7 +480,7 @@ describe('minute waves', () => {
     let spawned = 0, first = 0, hp = 0;
     const startDist: number[] = [];
     const sim = runFrom(299.9, 360, (s) => {
-      const wall = s.enemies.filter((e) => e.alive && e.aiState === 10);
+      const wall = s.enemies.filter((e) => e.alive && e.aiState === AI.WALL);
       if (!spawned && wall.length) {
         spawned = wall.length; first = s.time; hp = wall[0].maxHp;
         const p = s.players[0];
@@ -489,7 +489,7 @@ describe('minute waves', () => {
       s.events.length = 0;
     });
     expect(spawned).toBe(26 + 2 * 5);
-    expect(sim.enemies.filter((e) => e.aiState === 10)).toHaveLength(0); // ttl 45 s from ~300
+    expect(sim.enemies.filter((e) => e.aiState === AI.WALL)).toHaveLength(0); // ttl 45 s from ~300
     expect(first).toBeLessThan(300.2);
     expect(hp).toBeGreaterThan(0);
     expect(Math.min(...startDist)).toBeGreaterThan(150);

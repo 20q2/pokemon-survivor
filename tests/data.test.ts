@@ -5,7 +5,7 @@ import { lookKey } from '../src/ui/movelook.ts';
 import { VERB_TEXT } from '../src/ui/verbs.ts';
 import { ITEMS, TYPE_BOOSTER } from '../src/data/items.ts';
 import { LINES, SPECIES, finalForms, lineSpecies } from '../src/data/pokedex.ts';
-import { STAGES, ENEMY_ROLE } from '../src/data/stages.ts';
+import { STAGES, ENEMY_ROLE, eventTimes } from '../src/data/stages.ts';
 import { TYPES, effectiveness, typeMult } from '../src/data/types.ts';
 import manifest from '../public/assets/manifest.json';
 
@@ -131,12 +131,20 @@ describe('wave set pieces', () => {
       for (const m of SWARM_MINUTES) expect(st.waves[m].events!.map((e) => e.kind), `${st.id} m${m}`).toEqual(['swarm']);
     }
   });
+  it('no two events in a minute fire at the same time', () => {
+    for (const st of STAGES) {
+      for (const [m, w] of st.waves.entries()) {
+        const times = eventTimes(m, w.events).map((x) => x.at);
+        expect(new Set(times).size, `${st.id} m${m}`).toBe(times.length);
+      }
+    }
+  });
   it('ring minutes are the breathing minutes and every event ends inside its minute', () => {
     for (const st of STAGES) {
       for (const m of RING_MINUTES.slice(0, 2)) expect(st.waves[m].min, `${st.id} m${m}`).toBe(10);
       for (const [m, w] of st.waves.entries()) {
         for (const ev of w.events ?? []) {
-          const end = ev.kind === 'swarm' ? ev.at + (ev.repeats ?? 0) * (ev.every ?? 0) : ev.at + ev.duration;
+          const end = ev.kind === 'swarm' ? ev.at + (ev.repeat?.count ?? 0) * (ev.repeat?.every ?? 0) : ev.at + ev.duration;
           expect(end, `${st.id} m${m}`).toBeLessThan(60);
         }
       }

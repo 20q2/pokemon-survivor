@@ -11,11 +11,11 @@ export type BossPattern = 'charge' | 'radial' | 'aimed' | 'summon' | 'slam' | 's
 export interface SpawnEntry { species: string; w: number }
 /**
  * A set piece inside a wave; `at` is seconds into the minute. A swarm (a line of crossers of the
- * stage's `swarm` species) fires `1 + repeats` times, `every` seconds apart; a ring is a wall of the
+ * stage's `swarm` species) fires once, then `repeat.count` more times, `repeat.every` seconds apart; a ring is a wall of the
  * wave's dominant species that closes in slowly and gives up after `duration` seconds.
  */
 export type WaveEvent =
-  | { kind: 'swarm'; at: number; repeats?: number; every?: number }
+  | { kind: 'swarm'; at: number; repeat?: { count: number; every: number } }
   | { kind: 'ring'; at: number; duration: number };
 /** One minute of a stage: what spawns, how many regulars to keep alive, and how sturdy they are. */
 export interface WaveDef {
@@ -64,16 +64,25 @@ export const ENEMY_ROLE: Record<string, EnemyRole> = {
 
 /** Quota shape shared by every stage (after Vampire Survivors' Mad Forest); minutes 5 and 9 breathe. */
 export const WAVE_MIN = [15, 35, 60, 50, 45, 10, 110, 150, 60, 10, 260, 70, 220, 190, 280, 300];
+/** Absolute run times (seconds) at which a minute's events fire, soonest first; a swarm repeat is one entry each. */
+export function eventTimes(minute: number, events: WaveEvent[] = []): { at: number; ev: WaveEvent }[] {
+  const out: { at: number; ev: WaveEvent }[] = [];
+  for (const ev of events) {
+    const repeat = ev.kind === 'swarm' ? ev.repeat : undefined;
+    for (let k = 0; k <= (repeat?.count ?? 0); k++) out.push({ at: minute * 60 + ev.at + k * (repeat?.every ?? 0), ev });
+  }
+  return out.sort((a, b) => a.at - b.at);
+}
 /** Set pieces shared by every stage: rings own the breathing minutes (5, 9) and 13, swarms ramp up late. */
 export const WAVE_EVENTS: Record<number, WaveEvent[]> = {
-  2: [{ kind: 'swarm', at: 30, repeats: 1 }],
-  4: [{ kind: 'swarm', at: 20, repeats: 3, every: 5 }],
+  2: [{ kind: 'swarm', at: 30, repeat: { count: 1, every: 10 } }],
+  4: [{ kind: 'swarm', at: 20, repeat: { count: 3, every: 5 } }],
   5: [{ kind: 'ring', at: 0, duration: 45 }],
-  7: [{ kind: 'swarm', at: 10, repeats: 3, every: 5 }],
+  7: [{ kind: 'swarm', at: 10, repeat: { count: 3, every: 5 } }],
   9: [{ kind: 'ring', at: 0, duration: 45 }],
-  11: [{ kind: 'swarm', at: 15, repeats: 5, every: 4 }],
+  11: [{ kind: 'swarm', at: 15, repeat: { count: 5, every: 4 } }],
   13: [{ kind: 'ring', at: 0, duration: 40 }],
-  14: [{ kind: 'swarm', at: 5, repeats: 6, every: 3 }],
+  14: [{ kind: 'swarm', at: 5, repeat: { count: 6, every: 3 } }],
 };
 export const WAVE_INTERVAL = [1, 1, 0.5, 0.5, 0.5, 0.25, 0.25, 0.25, 0.25, 0.25, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1];
 /** Roughly 1 + 0.15m + 0.025m^2 + 0.0025m^3 at whole minutes. */

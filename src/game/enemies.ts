@@ -1,5 +1,5 @@
 import { SPECIES } from '../data/pokedex.ts';
-import { ENEMY_ROLE, RUN_LENGTH, type BossDef, type EnemyRole, type SpawnEntry, type WaveDef, type WaveEvent, waveAt } from '../data/stages.ts';
+import { ENEMY_ROLE, RUN_LENGTH, type BossDef, type EnemyRole, type SpawnEntry, type WaveDef, type WaveEvent, eventTimes, waveAt } from '../data/stages.ts';
 import { TAU, dist2 } from '../engine/math.ts';
 import { freshStatus, makeProjectile, rawDamageEnemy } from './combat.ts';
 import { megaOnKill } from './mega.ts';
@@ -11,6 +11,19 @@ import { heal } from './ledger.ts';
 
 const ROLE_HP: Record<EnemyRole, number> = { chaser: 1, fast: 0.7, tank: 2.4, ranged: 1, bomber: 0.8, treasure: 6 };
 const ROLE_SPEED: Record<EnemyRole, number> = { chaser: 1, fast: 1.4, tank: 0.7, ranged: 0.95, bomber: 1.15, treasure: 1.25 };
+
+/** aiState doubles as per-role state (bosses, bombers, alphas); these are the shared values. */
+export const AI = { BOMBER_FUSE: 1, CROSSER: 9, WALL: 10 } as const;
+/** Elites cast raid attacks only after this run time; the first half is pure crowd-shepherding. */
+const ELITE_RAID_FROM = 360;
+/** Raid cooldown (s) for wave elites vs guardians. */
+const ELITE_RAID_CD: [number, number] = [12, 16];
+const GUARDIAN_RAID_CD: [number, number] = [5, 8];
+/** Ring walls start at this fraction of the view and slowly close in. */
+const RING_RADIUS = 0.6;
+/** Past the run's end a bare minute gets a set piece this often (s), with rings lasting RING_OVERTIME_S. */
+const OVERTIME_PERIOD = 35;
+const RING_OVERTIME_S = 40;
 
 export interface SpawnOpts {
   elite?: boolean;
@@ -75,6 +88,7 @@ export class Spawner {
   }
 
   update() {
+    // updateEvents must stay after updateWave: pendingEvents is rebuilt there on a minute change.
     const sim = this.sim;
     const t = sim.time;
     this.updateWave(t);
@@ -113,12 +127,7 @@ export class Spawner {
       const prev = sim.stage.waves[Math.max(0, idx - 1)];
       this.waveIdx = idx;
       this.nextQuota = t; // the new minute's quota lands with its banner
-      this.pendingEvents = [];
-      for (const ev of w.events ?? []) {
-        const swarm = ev.kind === 'swarm' ? ev : undefined;
-        for (let k = 0; k <= (swarm?.repeats ?? 0); k++) this.pendingEvents.push({ at: idx * 60 + ev.at + k * (swarm?.every ?? 0), ev });
-      }
-      this.pendingEvents.sort((x, y) => x.at - y.at);
+      this.pendingEvents = eventTimes(idx, w.events);
       if (idx > 0) {
         const species = w.headline ?? (w.species.find((e) => !prev.species.some((p) => p.species === e.species)) ?? w.species[0]).species;
         sim.emit({ e: 'wave', minute: idx, species, text: w.text ?? `${SPECIES[species].name} appear!` });
@@ -158,9 +167,9 @@ export class Spawner {
     if (t < RUN_LENGTH || this.wave.events?.length) return;
     if (this.nextOvertime === 0) this.nextOvertime = t;
     if (t < this.nextOvertime) return;
-    this.nextOvertime = t + 35;
+    this.nextOvertime = t + OVERTIME_PERIOD;
     this.overtimeRing = !this.overtimeRing;
-    if (this.overtimeRing) this.ring(40);
+    if (this.overtimeRing) this.ring(RING_OVERTIME_S);
     else this.swarm();
   }
 
@@ -269,7 +278,7 @@ export class Spawner {
     const count = 26 + Math.floor(this.minute * 2);
     const species = this.wave.species.reduce((best, e) => (e.w > best.w ? e : best)).species;
     sim.emit({ e: 'warn', text: 'You’re surrounded!' });
-    const r = Math.max(p.viewW, p.viewH) * 0.6;
+    const r = Math.max(p.viewW, p.viewH) * RING_RADIUS;
     for (let i = 0; i < count; i++) {
       const a = (i / count) * TAU;
       spawnEnemy(sim, species, p.x + Math.cos(a) * r, p.y + Math.sin(a) * r * 0.75, { wall: { speed: sim.rng.range(25, 35), ttl: duration } });
@@ -316,7 +325,7 @@ export function spawnEnemy(sim: Sim, speciesId: string, x: number, y: number, op
     hp, maxHp: hp, speed, dmg, special: bspa > batk, xp, elite: !!opts.elite, boss: !!opts.boss,
     final: !!opts.boss?.final, shiny, alpha: !!opts.alpha, guardian: !!opts.guardian, homeX: x, homeY: y, alive: true, flash: 0,
     st: freshStatus(),
-    contactCd: 0, ai: sim.rng.range(0, 2), aiState: opts.swarmDir ? 9 : opts.wall ? 10 : 0, aiX: opts.swarmDir?.x ?? 0, aiY: opts.swarmDir?.y ?? 0,
+    contactCd: 0, ai: sim.rng.range(0, 2), aiState: opts.swarmDir ? AI.CROSSER : opts.wall ? AI.WALL : 0, aiX: opts.swarmDir?.x ?? 0, aiY: opts.swarmDir?.y ?? 0,
     patterns: opts.boss?.patterns ?? [], patternIdx: 0, minions: opts.boss?.minions ?? [], knockResist, scale,
     lastHitBy: 0, animOffset: sim.rng.range(0, 10),
   };
@@ -417,13 +426,9 @@ export function updateEnemies(sim: Sim, dt: number) {
         const r = alphaAI(sim, e, player, d, dx, dy, dt);
         if (!e.alive) continue;
         mx = r.x; my = r.y; mult *= r.speed;
-      } else if (e.aiState === 9) {
-        // swarm: fly straight across the screen then disappear
-        mx = e.aiX; my = e.aiY;
-        e.ai -= dt;
-        if (e.ai <= 0) { e.alive = false; continue; }
-      } else if (e.aiState === 10) {
-        // wall: keep marching at the fixed slow speed (mx/my already point at the player), then give up
+      } else if (isSetPiece(e)) {
+        // crossers fly their fixed line, walls keep marching at the player (mx/my already point there); both give up when ai runs out
+        if (e.aiState === AI.CROSSER) { mx = e.aiX; my = e.aiY; }
         e.ai -= dt;
         if (e.ai <= 0) { e.alive = false; continue; }
       } else if (e.elite && st.charm <= 0 && eliteRaid(sim, e, player, d, dt)) {
@@ -440,14 +445,14 @@ export function updateEnemies(sim: Sim, dt: number) {
             break;
           }
           case 'bomber': {
-            if (e.aiState === 1) {
+            if (e.aiState === AI.BOMBER_FUSE) {
               mult = 0;
               e.ai -= dt;
               e.flash = (Math.floor(e.ai * 10) % 2) * 0.1;
               if (e.ai <= 0) explode(sim, e);
               break;
             }
-            if (d < 34) { e.aiState = 1; e.ai = 0.7; }
+            if (d < 34) { e.aiState = AI.BOMBER_FUSE; e.ai = 0.7; }
             break;
           }
           case 'treasure':
@@ -683,10 +688,10 @@ function eliteRaid(sim: Sim, e: Enemy, target: Player, d: number, dt: number): b
   }
   if (e.role === 'bomber') return false;
   // The first half of a run is pure crowd-shepherding; guardians keep their old tempo.
-  if (!e.guardian && sim.time < 360) return false;
+  if (!e.guardian && sim.time < ELITE_RAID_FROM) return false;
   e.raidCd = (e.raidCd ?? sim.rng.range(2, 5)) - dt;
   if (e.raidCd > 0 || d > (e.role === 'ranged' ? 260 : 170) || e.st.freeze > 0 || e.st.flinch > 0) return false;
-  e.raidCd = e.guardian ? sim.rng.range(5, 8) : sim.rng.range(12, 16);
+  e.raidCd = sim.rng.range(...(e.guardian ? GUARDIAN_RAID_CD : ELITE_RAID_CD));
   e.casting = castRaid(sim, e, eliteMove(e), target, 'elite');
   return true;
 }
@@ -834,6 +839,6 @@ function spreadOnDeath(sim: Sim, e: Enemy) {
 }
 
 /** Swarm crossers (9) and ring walls (10): scripted movers outside the quota, recycling and crowd shoving. */
-function isSetPiece(e: Enemy) {
-  return e.aiState === 9 || e.aiState === 10;
+export function isSetPiece(e: Enemy) {
+  return e.aiState === AI.CROSSER || e.aiState === AI.WALL;
 }
