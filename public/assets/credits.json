@@ -1,0 +1,1989 @@
+[
+ {
+  "species": "Bulbasaur",
+  "dex": 1,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT"
+  ],
+  "shinySprite": [
+   "ShyStarryRain"
+  ]
+ },
+ {
+  "species": "Ivysaur",
+  "dex": 2,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Emmuffin"
+  ],
+  "shinySprite": [
+   "SilverDeoxys563"
+  ]
+ },
+ {
+  "species": "Venusaur",
+  "dex": 3,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "",
+   "G〜"
+  ],
+  "shinySprite": [
+   "SilverDeoxys563"
+  ]
+ },
+ {
+  "species": "Charmander",
+  "dex": 4,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "baronessfaron"
+  ],
+  "shinySprite": [
+   "ShyStarryRain"
+  ]
+ },
+ {
+  "species": "Charmeleon",
+  "dex": 5,
+  "sprite": [
+   "CHUNSOFT",
+   "bwappi",
+   "Grimlin"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "0palite"
+  ],
+  "shinySprite": [
+   "ShyStarryRain",
+   "Emmuffin"
+  ]
+ },
+ {
+  "species": "Charizard",
+  "dex": 6,
+  "sprite": [
+   "CHUNSOFT",
+   "Emboarger"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "0palite"
+  ],
+  "shinySprite": [
+   "SilverDeoxys563",
+   "Emboarger",
+   "Emmuffin"
+  ]
+ },
+ {
+  "species": "Squirtle",
+  "dex": 7,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT"
+  ],
+  "shinySprite": [
+   "SilverDeoxys563",
+   "ShyStarryRain"
+  ]
+ },
+ {
+  "species": "Wartortle",
+  "dex": 8,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Emmuffin"
+  ],
+  "shinySprite": [
+   "Emmuffin"
+  ]
+ },
+ {
+  "species": "Blastoise",
+  "dex": 9,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Emmuffin",
+   "Top_Kec"
+  ],
+  "shinySprite": [
+   "SilverDeoxys563"
+  ]
+ },
+ {
+  "species": "Caterpie",
+  "dex": 10,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Frostdrop1",
+   "baronessfaron"
+  ],
+  "shinySprite": [
+   "SilverDeoxys563"
+  ]
+ },
+ {
+  "species": "Metapod",
+  "dex": 11,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "baronessfaron",
+   "Blanky"
+  ],
+  "shinySprite": [
+   "SilverDeoxys563"
+  ]
+ },
+ {
+  "species": "Butterfree",
+  "dex": 12,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Emmuffin"
+  ],
+  "shinySprite": [
+   "Emmuffin"
+  ]
+ },
+ {
+  "species": "Weedle",
+  "dex": 13,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Novie"
+  ],
+  "shinySprite": [
+   "ShyStarryRain"
+  ]
+ },
+ {
+  "species": "Kakuna",
+  "dex": 14,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Caitemis"
+  ],
+  "shinySprite": [
+   "SilverDeoxys563"
+  ]
+ },
+ {
+  "species": "Beedrill",
+  "dex": 15,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Fable"
+  ],
+  "shinySprite": [
+   "SilverDeoxys563"
+  ]
+ },
+ {
+  "species": "Pidgey",
+  "dex": 16,
+  "sprite": [
+   "CHUNSOFT",
+   "JFain"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "JFain"
+  ],
+  "shinySprite": [
+   "SilverDeoxys563"
+  ]
+ },
+ {
+  "species": "Pidgeotto",
+  "dex": 17,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Tainted#3886"
+  ],
+  "shinySprite": [
+   "Moo",
+   "bwappi"
+  ]
+ },
+ {
+  "species": "Rattata",
+  "dex": 19,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Frostdrop1"
+  ],
+  "shinySprite": [
+   "ShyStarryRain"
+  ]
+ },
+ {
+  "species": "Raticate",
+  "dex": 20,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "G〜",
+   "baronessfaron"
+  ],
+  "shinySprite": [
+   "SilverDeoxys563",
+   "3Monika4"
+  ]
+ },
+ {
+  "species": "Spearow",
+  "dex": 21,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Blanky",
+   "Cloudy"
+  ],
+  "shinySprite": [
+   "SilverDeoxys563"
+  ]
+ },
+ {
+  "species": "Ekans",
+  "dex": 23,
+  "sprite": [
+   "CHUNSOFT",
+   "Emmuffin"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Fearless-Quit",
+   "TawnySoup"
+  ],
+  "shinySprite": [
+   "Emmuffin"
+  ]
+ },
+ {
+  "species": "Pikachu",
+  "dex": 25,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT"
+  ],
+  "shinySprite": [
+   "SilverDeoxys563"
+  ]
+ },
+ {
+  "species": "Raichu",
+  "dex": 26,
+  "sprite": [
+   "CHUNSOFT",
+   "Grimlin",
+   "Top_Kec"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "G〜"
+  ],
+  "shinySprite": [
+   "G〜"
+  ]
+ },
+ {
+  "species": "Sandshrew",
+  "dex": 27,
+  "sprite": [
+   "CHUNSOFT",
+   "Emboarger",
+   "3P1C"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Vex",
+   "ShyStarryRain"
+  ],
+  "shinySprite": [
+   "ShyStarryRain"
+  ]
+ },
+ {
+  "species": "Sandslash",
+  "dex": 28,
+  "sprite": [
+   "CHUNSOFT",
+   "Emmuffin"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "XModxGodX",
+   "Okami"
+  ],
+  "shinySprite": [
+   "SilverDeoxys563",
+   "XModxGodX",
+   "Emmuffin"
+  ]
+ },
+ {
+  "species": "Clefairy",
+  "dex": 35,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "estelstarlight"
+  ],
+  "shinySprite": [
+   "Tacocoa"
+  ]
+ },
+ {
+  "species": "Clefable",
+  "dex": 36,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "jackolanternjackalope",
+   "Gust"
+  ],
+  "shinySprite": [
+   "Tacocoa"
+  ]
+ },
+ {
+  "species": "Vulpix",
+  "dex": 37,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT"
+  ],
+  "shinySprite": [
+   "Lovi"
+  ]
+ },
+ {
+  "species": "Zubat",
+  "dex": 41,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "fledermaus"
+  ],
+  "shinySprite": [
+   "Tacocoa"
+  ]
+ },
+ {
+  "species": "Golbat",
+  "dex": 42,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "JFain"
+  ],
+  "shinySprite": [
+   "Tacocoa"
+  ]
+ },
+ {
+  "species": "Oddish",
+  "dex": 43,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Felis-Licht",
+   "ShyStarryRain"
+  ],
+  "shinySprite": [
+   "Tacocoa"
+  ]
+ },
+ {
+  "species": "Paras",
+  "dex": 46,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "G〜",
+   "bwappi"
+  ],
+  "shinySprite": [
+   "Tacocoa"
+  ]
+ },
+ {
+  "species": "Parasect",
+  "dex": 47,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT"
+  ],
+  "shinySprite": [
+   "ShyStarryRain"
+  ]
+ },
+ {
+  "species": "Diglett",
+  "dex": 50,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Gust",
+   "FlowerSnek"
+  ],
+  "shinySprite": [
+   "El_Pangoro_Parse"
+  ]
+ },
+ {
+  "species": "Meowth",
+  "dex": 52,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "PhillipsYoung"
+  ],
+  "shinySprite": [
+   "El_Pangoro_Parse"
+  ]
+ },
+ {
+  "species": "Psyduck",
+  "dex": 54,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Felis-Licht",
+   "Morei"
+  ],
+  "shinySprite": [
+   "",
+   "ShyStarryRain"
+  ]
+ },
+ {
+  "species": "Mankey",
+  "dex": 56,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "baronessfaron"
+  ],
+  "shinySprite": [
+   "El_Pangoro_Parse"
+  ]
+ },
+ {
+  "species": "Primeape",
+  "dex": 57,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT"
+  ],
+  "shinySprite": [
+   "G〜"
+  ]
+ },
+ {
+  "species": "Growlithe",
+  "dex": 58,
+  "sprite": [
+   "CHUNSOFT",
+   "Emmuffin",
+   "JustAGunk"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Deltex12",
+   "LT"
+  ],
+  "shinySprite": [
+   "Audino",
+   "Emmuffin"
+  ]
+ },
+ {
+  "species": "Arcanine",
+  "dex": 59,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "baronessfaron"
+  ],
+  "shinySprite": [
+   "Tacocoa",
+   "baronessfaron"
+  ]
+ },
+ {
+  "species": "Abra",
+  "dex": 63,
+  "sprite": [
+   "CHUNSOFT",
+   "Emmuffin"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "JFain",
+   "cosmosully"
+  ],
+  "shinySprite": [
+   "Tacocoa",
+   "3Monika4",
+   "Emmuffin"
+  ]
+ },
+ {
+  "species": "Kadabra",
+  "dex": 64,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "0palite",
+   "baronessfaron"
+  ],
+  "shinySprite": [
+   "El_Pangoro_Parse"
+  ]
+ },
+ {
+  "species": "Alakazam",
+  "dex": 65,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Gust"
+  ],
+  "shinySprite": [
+   "Morei",
+   "Emmuffin"
+  ]
+ },
+ {
+  "species": "Machop",
+  "dex": 66,
+  "sprite": [
+   "CHUNSOFT",
+   "Emboarger"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Felis-Licht",
+   "Morei"
+  ],
+  "shinySprite": [
+   "Morei"
+  ]
+ },
+ {
+  "species": "Machoke",
+  "dex": 67,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "JFain"
+  ],
+  "shinySprite": [
+   "Tacocoa"
+  ]
+ },
+ {
+  "species": "Machamp",
+  "dex": 68,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT"
+  ],
+  "shinySprite": [
+   "Tacocoa"
+  ]
+ },
+ {
+  "species": "Bellsprout",
+  "dex": 69,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "",
+   "baronessfaron"
+  ],
+  "shinySprite": [
+   "Audino"
+  ]
+ },
+ {
+  "species": "Tentacool",
+  "dex": 72,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Caitemis",
+   "brookriver"
+  ],
+  "shinySprite": [
+   "Tacocoa"
+  ]
+ },
+ {
+  "species": "Geodude",
+  "dex": 74,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "JustAGunk"
+  ],
+  "shinySprite": [
+   "El_Pangoro_Parse"
+  ]
+ },
+ {
+  "species": "Graveler",
+  "dex": 75,
+  "sprite": [
+   "CHUNSOFT",
+   "Emmuffin"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Tainted#3886"
+  ],
+  "shinySprite": [
+   "Emmuffin"
+  ]
+ },
+ {
+  "species": "Golem",
+  "dex": 76,
+  "sprite": [
+   "CHUNSOFT",
+   "Emmuffin"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "baronessfaron"
+  ],
+  "shinySprite": [
+   "Emmuffin",
+   "El_Pangoro_Parse"
+  ]
+ },
+ {
+  "species": "Ponyta",
+  "dex": 77,
+  "sprite": [
+   "CHUNSOFT",
+   "JFain"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "baronessfaron"
+  ],
+  "shinySprite": [
+   "Tacocoa",
+   "Emmuffin"
+  ]
+ },
+ {
+  "species": "Slowpoke",
+  "dex": 79,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "",
+   "Morei"
+  ],
+  "shinySprite": [
+   "ShyStarryRain"
+  ]
+ },
+ {
+  "species": "Magnemite",
+  "dex": 81,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Fearless-Quit",
+   "Emboarger"
+  ],
+  "shinySprite": [
+   "El_Pangoro_Parse"
+  ]
+ },
+ {
+  "species": "Magneton",
+  "dex": 82,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "SirViolet"
+  ],
+  "shinySprite": [
+   "El_Pangoro_Parse"
+  ]
+ },
+ {
+  "species": "Seel",
+  "dex": 86,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "baronessfaron"
+  ],
+  "shinySprite": [
+   "Tacocoa"
+  ]
+ },
+ {
+  "species": "Dewgong",
+  "dex": 87,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Blanca"
+  ],
+  "shinySprite": [
+   "Tacocoa"
+  ]
+ },
+ {
+  "species": "Grimer",
+  "dex": 88,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT"
+  ],
+  "shinySprite": [
+   "Emmuffin"
+  ]
+ },
+ {
+  "species": "Shellder",
+  "dex": 90,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Emmuffin"
+  ],
+  "shinySprite": [
+   "El_Pangoro_Parse"
+  ]
+ },
+ {
+  "species": "Cloyster",
+  "dex": 91,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT"
+  ],
+  "shinySprite": [
+   "El_Pangoro_Parse",
+   "Emmuffin"
+  ]
+ },
+ {
+  "species": "Gastly",
+  "dex": 92,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "JFain"
+  ],
+  "shinySprite": [
+   "El_Pangoro_Parse",
+   "ShyStarryRain"
+  ]
+ },
+ {
+  "species": "Haunter",
+  "dex": 93,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "PhillipsYoung"
+  ],
+  "shinySprite": [
+   "Tacocoa"
+  ]
+ },
+ {
+  "species": "Gengar",
+  "dex": 94,
+  "sprite": [
+   "CHUNSOFT",
+   "Emboarger"
+  ],
+  "portrait": [
+   "CHUNSOFT"
+  ],
+  "shinySprite": [
+   "Tacocoa",
+   "Emboarger"
+  ]
+ },
+ {
+  "species": "Onix",
+  "dex": 95,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "baronessfaron"
+  ],
+  "shinySprite": [
+   "El_Pangoro_Parse"
+  ]
+ },
+ {
+  "species": "Drowzee",
+  "dex": 96,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "drawsstuff",
+   "G〜"
+  ],
+  "shinySprite": [
+   "El_Pangoro_Parse"
+  ]
+ },
+ {
+  "species": "Hypno",
+  "dex": 97,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Caitemis"
+  ],
+  "shinySprite": [
+   "Lovi"
+  ]
+ },
+ {
+  "species": "Krabby",
+  "dex": 98,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   ""
+  ],
+  "shinySprite": [
+   "Tacocoa",
+   "G〜"
+  ]
+ },
+ {
+  "species": "Voltorb",
+  "dex": 100,
+  "sprite": [
+   "CHUNSOFT",
+   "Emboarger"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "JFain"
+  ],
+  "shinySprite": [
+   "Emmuffin"
+  ]
+ },
+ {
+  "species": "Electrode",
+  "dex": 101,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "PhillipsYoung",
+   "G〜"
+  ],
+  "shinySprite": [
+   "Tacocoa",
+   "Noo"
+  ]
+ },
+ {
+  "species": "Cubone",
+  "dex": 104,
+  "sprite": [
+   "CHUNSOFT",
+   "Sceptile",
+   "Some_Shinx"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Felis-Licht",
+   "Emmuffin"
+  ],
+  "shinySprite": [
+   "Emmuffin",
+   "Some_Shinx"
+  ]
+ },
+ {
+  "species": "Marowak",
+  "dex": 105,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Emmuffin"
+  ],
+  "shinySprite": [
+   "El_Pangoro_Parse"
+  ]
+ },
+ {
+  "species": "Hitmonlee",
+  "dex": 106,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Tainted#3886",
+   "G〜"
+  ],
+  "shinySprite": [
+   "Tacocoa"
+  ]
+ },
+ {
+  "species": "Koffing",
+  "dex": 109,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Caitemis"
+  ],
+  "shinySprite": [
+   "Tacocoa"
+  ]
+ },
+ {
+  "species": "Rhyhorn",
+  "dex": 111,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "chikorene"
+  ],
+  "shinySprite": [
+   "Tacocoa"
+  ]
+ },
+ {
+  "species": "Chansey",
+  "dex": 113,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Mojo"
+  ],
+  "shinySprite": [
+   "Tacocoa"
+  ]
+ },
+ {
+  "species": "Kangaskhan",
+  "dex": 115,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Top_Kec"
+  ],
+  "shinySprite": [
+   "Emmuffin"
+  ]
+ },
+ {
+  "species": "Horsea",
+  "dex": 116,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "frostibirb",
+   "Blanky"
+  ],
+  "shinySprite": [
+   "Reppamon"
+  ]
+ },
+ {
+  "species": "Scyther",
+  "dex": 123,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Noo",
+   "G〜"
+  ],
+  "shinySprite": [
+   "Tacocoa"
+  ]
+ },
+ {
+  "species": "Jynx",
+  "dex": 124,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT"
+  ],
+  "shinySprite": [
+   "Audino",
+   "ShyStarryRain"
+  ]
+ },
+ {
+  "species": "Electabuzz",
+  "dex": 125,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Coksi"
+  ],
+  "shinySprite": [
+   "Scizivire"
+  ]
+ },
+ {
+  "species": "Magmar",
+  "dex": 126,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Caitemis"
+  ],
+  "shinySprite": [
+   "Lovi"
+  ]
+ },
+ {
+  "species": "Lapras",
+  "dex": 131,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "C_Pariah",
+   "silverfox88"
+  ],
+  "shinySprite": [
+   "RaoKurai"
+  ]
+ },
+ {
+  "species": "Ditto",
+  "dex": 132,
+  "sprite": [
+   "CHUNSOFT",
+   "Caitemis"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   ""
+  ],
+  "shinySprite": [
+   "ShyStarryRain"
+  ]
+ },
+ {
+  "species": "Eevee",
+  "dex": 133,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT"
+  ],
+  "shinySprite": [
+   "baronessfaron"
+  ]
+ },
+ {
+  "species": "Vaporeon",
+  "dex": 134,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "baronessfaron"
+  ],
+  "shinySprite": [
+   "Emmuffin"
+  ]
+ },
+ {
+  "species": "Jolteon",
+  "dex": 135,
+  "sprite": [
+   "CHUNSOFT",
+   "dmDash"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "baronessfaron",
+   "ShyStarryRain"
+  ],
+  "shinySprite": [
+   "Lovi",
+   "Morei"
+  ]
+ },
+ {
+  "species": "Flareon",
+  "dex": 136,
+  "sprite": [
+   "CHUNSOFT",
+   "Ginnie",
+   "JFain"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Vynnyal",
+   "ShyStarryRain"
+  ],
+  "shinySprite": [
+   "Tacocoa",
+   "ShyStarryRain",
+   "FlowerSnek"
+  ]
+ },
+ {
+  "species": "Articuno",
+  "dex": 144,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT"
+  ],
+  "shinySprite": [
+   "El_Pangoro_Parse",
+   "Emmuffin"
+  ]
+ },
+ {
+  "species": "Zapdos",
+  "dex": 145,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT"
+  ],
+  "shinySprite": [
+   "Emmuffin"
+  ]
+ },
+ {
+  "species": "Moltres",
+  "dex": 146,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT"
+  ],
+  "shinySprite": [
+   "Emmuffin"
+  ]
+ },
+ {
+  "species": "Dratini",
+  "dex": 147,
+  "sprite": [
+   "CHUNSOFT",
+   "JFain"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Gust"
+  ],
+  "shinySprite": [
+   "Pencil"
+  ]
+ },
+ {
+  "species": "Dragonair",
+  "dex": 148,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Emmuffin"
+  ],
+  "shinySprite": [
+   "Lovi"
+  ]
+ },
+ {
+  "species": "Dragonite",
+  "dex": 149,
+  "sprite": [
+   "CHUNSOFT",
+   "SethY",
+   "Deeshura"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Emboarger",
+   "AlexGroeger"
+  ],
+  "shinySprite": [
+   "Deeshura"
+  ]
+ },
+ {
+  "species": "Mewtwo",
+  "dex": 150,
+  "sprite": [
+   "CHUNSOFT",
+   "JFain"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "baronessfaron"
+  ],
+  "shinySprite": [
+   "El_Pangoro_Parse",
+   "JFain"
+  ]
+ },
+ {
+  "species": "Pichu",
+  "dex": 172,
+  "sprite": [
+   "CHUNSOFT",
+   "Spikey-Valentine"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "C_Pariah"
+  ],
+  "shinySprite": [
+   "Lovi",
+   "Spikey-Valentine"
+  ]
+ },
+ {
+  "species": "Mareep",
+  "dex": 179,
+  "sprite": [
+   "CHUNSOFT",
+   "Emmuffin"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Felis-Licht"
+  ],
+  "shinySprite": [
+   "Anonymous",
+   "Emmuffin"
+  ]
+ },
+ {
+  "species": "Espeon",
+  "dex": 196,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "0palite",
+   "baronessfaron"
+  ],
+  "shinySprite": [
+   "Lovi",
+   "Noo",
+   "baronessfaron"
+  ]
+ },
+ {
+  "species": "Umbreon",
+  "dex": 197,
+  "sprite": [
+   "CHUNSOFT",
+   "Emmuffin"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Emmuffin"
+  ],
+  "shinySprite": [
+   "Emmuffin"
+  ]
+ },
+ {
+  "species": "Murkrow",
+  "dex": 198,
+  "sprite": [
+   "CHUNSOFT",
+   "Smalusion",
+   "Caitemis"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "baronessfaron",
+   "Emmuffin"
+  ],
+  "shinySprite": [
+   "Scizivire",
+   "Smalusion",
+   "Caitemis"
+  ]
+ },
+ {
+  "species": "Misdreavus",
+  "dex": 200,
+  "sprite": [
+   "CHUNSOFT",
+   "Emboarger"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "RoyalRust",
+   "Morei"
+  ],
+  "shinySprite": [
+   "Emmuffin"
+  ]
+ },
+ {
+  "species": "Wobbuffet",
+  "dex": 202,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Tainted#3886",
+   "Gust"
+  ],
+  "shinySprite": [
+   "Tacocoa",
+   "Noo"
+  ]
+ },
+ {
+  "species": "Slugma",
+  "dex": 218,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "JFain"
+  ],
+  "shinySprite": [
+   "Chi",
+   "ShyStarryRain"
+  ]
+ },
+ {
+  "species": "Houndour",
+  "dex": 228,
+  "sprite": [
+   "CHUNSOFT",
+   "JFain"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Gust"
+  ],
+  "shinySprite": [
+   "Anonymous",
+   "Morei"
+  ]
+ },
+ {
+  "species": "Elekid",
+  "dex": 239,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Angels-Snack",
+   "Morei"
+  ],
+  "shinySprite": [
+   "G〜"
+  ]
+ },
+ {
+  "species": "Larvitar",
+  "dex": 246,
+  "sprite": [
+   "CHUNSOFT",
+   "JFain"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Emmuffin"
+  ],
+  "shinySprite": [
+   "Lovi",
+   "JFain"
+  ]
+ },
+ {
+  "species": "Pupitar",
+  "dex": 247,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT"
+  ],
+  "shinySprite": [
+   "Tacocoa"
+  ]
+ },
+ {
+  "species": "Tyranitar",
+  "dex": 248,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Ichor"
+  ],
+  "shinySprite": [
+   "Prismatic"
+  ]
+ },
+ {
+  "species": "Treecko",
+  "dex": 252,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT"
+  ],
+  "shinySprite": [
+   "YoukaiMinori",
+   "Morei"
+  ]
+ },
+ {
+  "species": "Grovyle",
+  "dex": 253,
+  "sprite": [
+   "CHUNSOFT",
+   "Deeshura",
+   "JFain"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "baronessfaron"
+  ],
+  "shinySprite": [
+   "YoukaiMinori",
+   "Morei",
+   "Deeshura"
+  ]
+ },
+ {
+  "species": "Sceptile",
+  "dex": 254,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "0palite",
+   "baronessfaron"
+  ],
+  "shinySprite": [
+   "Lovi",
+   "Emmuffin"
+  ]
+ },
+ {
+  "species": "Torchic",
+  "dex": 255,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT"
+  ],
+  "shinySprite": [
+   "Moo"
+  ]
+ },
+ {
+  "species": "Combusken",
+  "dex": 256,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "JFain",
+   "Blanky"
+  ],
+  "shinySprite": [
+   "Moo",
+   "Morei"
+  ]
+ },
+ {
+  "species": "Blaziken",
+  "dex": 257,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Noo"
+  ],
+  "shinySprite": [
+   "baronessfaron"
+  ]
+ },
+ {
+  "species": "Mudkip",
+  "dex": 258,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT"
+  ],
+  "shinySprite": [
+   "Anonymous"
+  ]
+ },
+ {
+  "species": "Marshtomp",
+  "dex": 259,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "C_Pariah"
+  ],
+  "shinySprite": [
+   "Anonymous"
+  ]
+ },
+ {
+  "species": "Swampert",
+  "dex": 260,
+  "sprite": [
+   "CHUNSOFT",
+   "Emmuffin"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Emmuffin"
+  ],
+  "shinySprite": [
+   "Anonymous",
+   "Emmuffin"
+  ]
+ },
+ {
+  "species": "Ralts",
+  "dex": 280,
+  "sprite": [
+   "CHUNSOFT",
+   "JFain",
+   "NeroIntruder"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "baronessfaron"
+  ],
+  "shinySprite": [
+   "Moo",
+   "Morei"
+  ]
+ },
+ {
+  "species": "Kirlia",
+  "dex": 281,
+  "sprite": [
+   "CHUNSOFT",
+   "JFain"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "PhillipsYoung"
+  ],
+  "shinySprite": [
+   "JFain",
+   "Morei"
+  ]
+ },
+ {
+  "species": "Gardevoir",
+  "dex": 282,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Emmuffin"
+  ],
+  "shinySprite": [
+   "Morei"
+  ]
+ },
+ {
+  "species": "Sableye",
+  "dex": 302,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "PhillipsYoung"
+  ],
+  "shinySprite": [
+   "Morei"
+  ]
+ },
+ {
+  "species": "Electrike",
+  "dex": 309,
+  "sprite": [
+   "CHUNSOFT",
+   "JFain"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Caitemis",
+   "baronessfaron"
+  ],
+  "shinySprite": [
+   "Tacocoa",
+   "JFain"
+  ]
+ },
+ {
+  "species": "Numel",
+  "dex": 322,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Emmuffin"
+  ],
+  "shinySprite": [
+   "Emmuffin"
+  ]
+ },
+ {
+  "species": "Shuppet",
+  "dex": 353,
+  "sprite": [
+   "CHUNSOFT",
+   "Caitemis"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "baronessfaron"
+  ],
+  "shinySprite": [
+   "Pokejavi."
+  ]
+ },
+ {
+  "species": "Banette",
+  "dex": 354,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "baronessfaron"
+  ],
+  "shinySprite": [
+   "Anonymous"
+  ]
+ },
+ {
+  "species": "Duskull",
+  "dex": 355,
+  "sprite": [
+   "CHUNSOFT",
+   "JFain"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "baronessfaron",
+   "Emmuffin"
+  ],
+  "shinySprite": [
+   "Emmuffin"
+  ]
+ },
+ {
+  "species": "Dusclops",
+  "dex": 356,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "baronessfaron",
+   "G〜"
+  ],
+  "shinySprite": [
+   "G〜"
+  ]
+ },
+ {
+  "species": "Snorunt",
+  "dex": 361,
+  "sprite": [
+   "CHUNSOFT",
+   "JFain"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Caitemis"
+  ],
+  "shinySprite": [
+   "Emmuffin"
+  ]
+ },
+ {
+  "species": "Spheal",
+  "dex": 363,
+  "sprite": [
+   "CHUNSOFT",
+   "JFain"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "Emmuffin"
+  ],
+  "shinySprite": [
+   "Tacocoa",
+   "JFain"
+  ]
+ },
+ {
+  "species": "Bagon",
+  "dex": 371,
+  "sprite": [
+   "CHUNSOFT",
+   "JFain"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "C_Pariah"
+  ],
+  "shinySprite": [
+   "Pokejavi."
+  ]
+ },
+ {
+  "species": "Shelgon",
+  "dex": 372,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT"
+  ],
+  "shinySprite": [
+   "Tacocoa"
+  ]
+ },
+ {
+  "species": "Leafeon",
+  "dex": 470,
+  "sprite": [
+   "CHUNSOFT",
+   "baronessfaron"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "baronessfaron"
+  ],
+  "shinySprite": [
+   "",
+   "baronessfaron"
+  ]
+ },
+ {
+  "species": "Glaceon",
+  "dex": 471,
+  "sprite": [
+   "CHUNSOFT",
+   "JFain",
+   "baronessfaron"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "PhillipsYoung"
+  ],
+  "shinySprite": [
+   "",
+   "baronessfaron"
+  ]
+ },
+ {
+  "species": "Sylveon",
+  "dex": 700,
+  "sprite": [
+   "baronessfaron"
+  ],
+  "portrait": [
+   "Emmuffin",
+   "",
+   "NeonCityRain"
+  ],
+  "shinySprite": [
+   "Mond"
+  ]
+ }
+]
