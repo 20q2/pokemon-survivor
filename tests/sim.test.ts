@@ -146,3 +146,28 @@ describe('late-game systems', () => {
     expect(sim.enemies.some((e) => e.alpha && e.alive)).toBe(true);
   });
 });
+
+describe('playtest regressions', () => {
+  it('a 12-minute no-meta Raichu run (even untouchable) neither floods gold nor runs out of upgrades by 6:00', async () => {
+    const { generateOffers } = await import('../src/game/levelup.ts');
+    const { runBonus } = await import('../src/meta/progression.ts');
+    const { MAX_MOVE_LEVEL } = await import('../src/data/moves.ts');
+    const { Rng } = await import('../src/engine/math.ts');
+    const sim = new Sim({ stageId: 'viridian', seed: 42, players: [{ name: 'a', lineId: 'pichu', shiny: false, meta: metaBonuses({}), tms: [] }] });
+    sim.invulnerable = true;
+    const p = sim.players[0];
+    let realAt6 = -1;
+    while (sim.time < 720) {
+      if (sim.phase === 'levelup') { sim.choose(0, botChoose(sim, p)); continue; }
+      const m = botSteer(sim, p); p.mx = m.x; p.my = m.y;
+      sim.update(DT);
+      sim.events.length = 0;
+      if (realAt6 < 0 && sim.time >= 360) {
+        realAt6 = generateOffers(p, new Rng(1), 6, []).filter((o) => o.kind !== 'vitamin' && o.kind !== 'heal' && !(o.kind === 'moveUp' && o.level > MAX_MOVE_LEVEL)).length;
+      }
+    }
+    const banked = sim.money * p.stats.money + runBonus({ stageId: 'viridian', time: sim.time, bosses: sim.bossesDefeated, cleared: false } as never);
+    expect(banked, `banked ₽${Math.round(banked)}`).toBeLessThan(1000);
+    expect(realAt6, 'real build upgrades still on offer at 6:00').toBeGreaterThan(0);
+  }, 60_000);
+});
