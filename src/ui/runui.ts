@@ -1,17 +1,14 @@
 import { MOVES, MASTERY_OF, MAX_MOVE_LEVEL, moveStatsAt, overLevelMult, type MoveStats } from '../data/moves.ts';
 import { ITEMS, VITAMIN, vitaminDesc } from '../data/items.ts';
-import { TYPE_COLORS } from '../data/types.ts';
+import { TYPE_COLORS, type PType } from '../data/types.ts';
+import { SPECIES } from '../data/pokedex.ts';
 import { assets } from '../render/assets.ts';
 import type { Player, UpgradeOffer } from '../game/types.ts';
 import type { RunSession } from '../game/session.ts';
 import { audio } from '../audio/audio.ts';
 import { btn, catBadge, h, img, typeBadge } from './dom.ts';
+import { BEHAVIOR_TEXT, buildPanel, hideTip } from './tips.ts';
 
-const BEHAVIOR_TEXT: Record<string, string> = {
-  projectile: 'Projectile', melee: 'Melee swipe', orbit: 'Orbits you', aura: 'Aura', nova: 'Shockwave', beam: 'Beam',
-  strike: 'Strikes from above', zone: 'Hazard', boomerang: 'Boomerang', chain: 'Chains', trail: 'Trail', cone: 'Spray',
-  wave: 'Sweeping wave', buff: 'Self buff', lob: 'Explosive lob',
-};
 
 const STAT_LABEL: Partial<Record<keyof MoveStats, string>> = {
   power: 'power', count: 'amount', area: 'area', cd: 'cooldown', pierce: 'pierce', duration: 'duration', speed: 'speed', range: 'range',
@@ -31,6 +28,11 @@ function upgradeDiff(id: string, level: number): string {
   return parts.join(', ') || 'Stronger';
 }
 
+/** A move shown as a TM disc in its type's colour. */
+function tmIcon(type: PType) {
+  return h('div', { class: 'ic tm', style: `--tc:${TYPE_COLORS[type]}` }, img(assets.itemUrl(`tm-${type}`)));
+}
+
 export function offerCard(o: UpgradeOffer, p: Player, index: number, onPick: () => void) {
   let icon: HTMLElement, name: string, tag: string, desc: string;
   let meta: HTMLElement | null = null;
@@ -40,7 +42,7 @@ export function offerCard(o: UpgradeOffer, p: Player, index: number, onPick: () 
     case 'moveUp': {
       const def = MOVES[o.id];
       // Moves come as a TM disc in the move's type colour.
-      icon = h('div', { class: 'ic tm', style: `--tc:${TYPE_COLORS[def.type]}` }, img(assets.itemUrl(`tm-${def.type}`)));
+      icon = tmIcon(def.type);
       name = def.name;
       const limit = o.kind === 'moveUp' && o.level > MAX_MOVE_LEVEL;
       tag = o.kind === 'newMove' ? 'NEW MOVE' : limit ? `LIMIT ★${o.level - MAX_MOVE_LEVEL}` : `Lv ${o.level}`;
@@ -64,6 +66,24 @@ export function offerCard(o: UpgradeOffer, p: Player, index: number, onPick: () 
       if (masters) note = `Mastery: ${MOVES[masters.mastery!.from].name} → ${masters.name}`;
       break;
     }
+    case 'forget': {
+      // "Forget <old move>, learn <new move> at the same level."
+      const old = p.moves[o.level];
+      const od = MOVES[old.id], nd = MOVES[o.id];
+      icon = tmIcon(od.type);
+      name = od.name;
+      tag = 'FORGET';
+      desc = `${nd.name} takes its place at Lv ${Math.max(1, Math.min(MAX_MOVE_LEVEL, old.level))}.`;
+      meta = h('div', { class: 'meta' }, typeBadge(od.type), catBadge(od.cat), h('span', { class: 'hint' }, od.mastery ? 'MASTERED' : `Lv ${old.level}`));
+      if (od.mastery) note = 'Forgetting a mastered move loses its mastery!';
+      break;
+    }
+    case 'keep':
+      icon = h('div', { class: 'ic item' }, img(assets.itemUrl('escape-rope')));
+      name = `Don't learn`;
+      tag = 'KEEP MOVES';
+      desc = `Give up on ${MOVES[o.id].name} and keep your current four moves.`;
+      break;
     case 'heal':
       icon = h('div', { class: 'ic item' }, img(assets.itemUrl('oran-berry')));
       name = 'Oran Berry'; tag = 'HEAL'; desc = 'Restore 30% of your max HP.';
@@ -134,10 +154,11 @@ export class LevelUpUI {
     this.shownFor = offers;
     this.shownSig = JSON.stringify(offers);
     const me = session.world.players[session.localId];
-    audio.sfx('levelup');
-    const cards = h('div', { class: 'cards' }, offers.map((o, i) => offerCard(o, me, i, () => this.pick(i))));
+    const learning = offers[0]?.kind === 'forget' || offers[0]?.kind === 'keep';
+    audio.sfx(learning ? 'evolved' : 'levelup');
+    const cards = h('div', { class: `cards${learning ? ' learn' : ''}` }, offers.map((o, i) => offerCard(o, me, i, () => this.pick(i))));
     if (this.banishMode) cards.querySelectorAll('.card').forEach((c) => c.classList.add('banish-mode'));
-    const actions = h('div', { class: 'lu-actions' },
+    const actions = learning ? null : h('div', { class: 'lu-actions' },
       me.rerolls > 0 ? btn(`Reroll (${me.rerolls})`, () => session.reroll(), 'small') : null,
       me.skips > 0 ? btn(`Skip (${me.skips})`, () => session.skip(), 'small') : null,
       me.banishes > 0 ? btn(this.banishMode ? 'Cancel banish' : `Banish (${me.banishes})`, () => {
@@ -146,21 +167,24 @@ export class LevelUpUI {
         this.sync(session);
       }, 'small') : null,
     );
-    const build = h('div', { class: 'lu-build' },
-      ...me.moves.map((m) => h('span', { class: 'type', style: `background:${TYPE_COLORS[MOVES[m.id].type]}` }, `${MOVES[m.id].name} ${MOVES[m.id].mastery ? '★' : m.level}`)),
-      ...me.items.map((it) => h('span', { class: 'lu-item' }, img(assets.itemUrl(it.id)), String(it.level))),
-    );
-    this.el = h('div', { class: 'levelup' },
-      h('h2', null, this.banishMode ? 'Banish which?' : `Level ${session.world.level}!`),
-      cards,
-      actions,
-      build,
-    );
+    let heading: HTMLElement;
+    if (learning) {
+      const nd = MOVES[offers[0].id];
+      heading = h('div', { class: 'learn-head' },
+        h('h2', null, `${SPECIES[me.speciesId].name} wants to learn ${nd.name}!`),
+        h('div', { class: 'panel learn-move' }, tmIcon(nd.type),
+          h('div', null,
+            h('div', { class: 'meta' }, typeBadge(nd.type), catBadge(nd.cat), h('span', { class: 'hint' }, BEHAVIOR_TEXT[nd.behavior])),
+            h('div', { class: 'ds' }, nd.desc))),
+        h('div', { class: 'hint' }, `But ${SPECIES[me.speciesId].name} can't learn more than four moves. Forget one?`));
+    } else heading = h('h2', null, this.banishMode ? 'Banish which?' : `Level ${session.world.level}!`);
+    this.el = h('div', { class: 'levelup' }, heading, cards, actions, buildPanel(me));
     this.root.appendChild(this.el);
     (cards.firstElementChild as HTMLElement | null)?.focus();
   }
 
   close() {
+    hideTip();
     this.el?.remove();
     this.el = null;
     this.shownFor = null;

@@ -15,8 +15,7 @@ import { metaBonuses } from './meta/shop.ts';
 import { assets } from './render/assets.ts';
 import { Renderer } from './render/renderer.ts';
 import { banner, MenuNav, toast, uiIcon } from './ui/dom.ts';
-import { chestShow, type ChestShow } from './ui/chest.ts';
-import { chestDuration } from './game/sim.ts';
+import { chestShow, preloadChestFaces, type ChestShow } from './ui/chest.ts';
 import { CHEST_BALL, CHEST_NAME } from './game/types.ts';
 import { Hud } from './ui/hud.ts';
 import { LevelUpUI } from './ui/runui.ts';
@@ -38,6 +37,7 @@ export class App {
   private last = performance.now();
   private pauseEl: HTMLElement | null = null;
   private chest: ChestShow | null = null;
+  private chestAt = 0;
   private ended = false;
   private endTimer = 0;
   private bossMusic = false;
@@ -187,6 +187,7 @@ export class App {
     const me = s.world.players[s.localId];
     banner(`Go! ${SPECIES[me.speciesId].name.toUpperCase()}!`, false, 1800);
     this.alphasDown = 0;
+    preloadChestFaces();
     this.tutorial = this.save.stats.runs === 0 ? [
       { at: 2.5, text: 'Moves fire automatically — just move to survive!' },
       { at: 9, text: 'Grab Exp. Candy to level up and learn new moves.' },
@@ -303,11 +304,10 @@ export class App {
         if (ev.player === me) {
           this.discover(s.world.players[me].lineId, ev.rewards.filter((r) => r.kind === 'move' || r.kind === 'mastery').map((r) => r.id));
           this.chest?.dispose();
-          const close = () => { show.dispose(); if (this.chest === show) this.chest = null; };
-          const show: ChestShow = chestShow(ev.rewards, ev.tier, s.coop ? null : () => { s.skipCine?.(); setTimeout(close, 650); });
-          this.chest = show;
-          this.ui.appendChild(show.el);
-          setTimeout(close, chestDuration(ev.rewards) * 1000 + 150);
+          // Closed by the frame loop once the treasure cinematic ends (dismissed or timed out).
+          this.chest = chestShow(ev.rewards, ev.tier, s.coop ? null : () => s.skipCine?.());
+          this.chestAt = performance.now();
+          this.ui.appendChild(this.chest.el);
         } else {
           audio.sfx('chest');
           const p = s.world.players[ev.player];
@@ -395,6 +395,10 @@ export class App {
         audio.playMusic(STAGE[s.stage.id].music);
       }
       this.renderer.render(s.world, s.paused ? 0 : dt);
+      if (this.chest && s.world.cine?.kind !== 'chest' && performance.now() - this.chestAt > 500) {
+        this.chest.dispose();
+        this.chest = null;
+      }
       if (!this.ended) {
         this.hud.update(s, dt);
         if (this.save.options.autoPick && s.phase() === 'levelup' && s.offers()) {

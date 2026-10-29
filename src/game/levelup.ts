@@ -138,6 +138,25 @@ export function randomFiller(p: Player, rng: Rng): UpgradeOffer {
   return pickFillers(p, rng, 1)[0];
 }
 
+/**
+ * The move a partner learns on evolving: one its new form unlocks (or, for Eevee, its
+ * Eeveelution's signature set), preferring damaging same-type moves it doesn't know yet.
+ */
+export function evolutionMove(p: Player): string | null {
+  const line = LINE[p.lineId];
+  const pool = line.branch ? (line.branchMoves?.[p.speciesId] ?? []) : line.learnset.filter((e) => e.stage === p.stage).map((e) => e.move);
+  const owned = ownedMoveIds(p);
+  const cands = pool.filter((id) => MOVES[id] && !MOVES[id].mastery && !owned.has(id));
+  if (!cands.length) return null;
+  const score = (id: string) => (MOVES[id].cat === 'status' ? 0 : 2) + (p.types.includes(MOVES[id].type) ? 1 : 0);
+  return cands.reduce((best, id) => (score(id) > score(best) ? id : best), cands[0]);
+}
+
+/** "X wants to learn Y": forget one of the four moves, or don't learn it. */
+export function learnOffers(p: Player, move: string): UpgradeOffer[] {
+  return [...p.moves.map((_, i): UpgradeOffer => ({ kind: 'forget', id: move, level: i })), { kind: 'keep', id: move, level: 0 }];
+}
+
 export function applyOffer(p: Player, o: UpgradeOffer) {
   switch (o.kind) {
     case 'newMove':
@@ -159,6 +178,16 @@ export function applyOffer(p: Player, o: UpgradeOffer) {
     }
     case 'heal':
       p.hp = Math.min(p.stats.maxHp, p.hp + p.stats.maxHp * 0.3);
+      break;
+    case 'forget': {
+      // The new move takes the old one's place and keeps its level, so nothing is lost.
+      const old = p.moves[o.level];
+      if (old) p.moves[o.level] = { id: o.id, level: Math.max(1, Math.min(MAX_MOVE_LEVEL, old.level)), cd: 0.3, dmgDealt: 0, kills: 0 };
+      p.pendingLearn = undefined;
+      break;
+    }
+    case 'keep':
+      p.pendingLearn = undefined;
       break;
     case 'vitamin':
       p.vitamins[o.id] = (p.vitamins[o.id] ?? 0) + 1;
@@ -192,6 +221,8 @@ export function offerLabel(o: UpgradeOffer): string {
     case 'newItem': case 'itemUp': return ITEMS[o.id].name;
     case 'heal': return 'Oran Berry';
     case 'vitamin': return VITAMIN[o.id].name;
+    case 'forget': return `Learn ${MOVES[o.id].name}`;
+    case 'keep': return `Don't learn ${MOVES[o.id].name}`;
   }
 }
 

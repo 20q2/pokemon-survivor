@@ -31,7 +31,6 @@ export const SHOP: ShopUpgrade[] = [
   { id: 'skip', name: 'Escape Rope', icon: 'escape-rope', maxRank: 3, baseCost: 120, growth: 1.5, desc: (r) => `${r} skip${r === 1 ? '' : 's'} per run (skipping heals a little)` },
   { id: 'banish', name: 'Max Repel', icon: 'max-repel', maxRank: 3, baseCost: 200, growth: 1.6, desc: (r) => `${r} banish${r === 1 ? '' : 'es'} per run (remove an option for the rest of the run)` },
   { id: 'bag', name: 'Bag Pocket', icon: 'big-nugget', maxRank: 2, baseCost: 1200, growth: 2.5, desc: (r) => `+${r} held-item slot${r === 1 ? '' : 's'}` },
-  { id: 'choice', name: 'Choice Specs', icon: 'choice-specs', maxRank: 1, baseCost: 1500, growth: 1, desc: () => `+1 level-up choice` },
   { id: 'shiny-charm', name: 'Shiny Charm', icon: 'shiny-charm', maxRank: 1, baseCost: 2000, growth: 1, desc: () => `Wild shinies appear 3x as often` },
 ];
 
@@ -48,7 +47,7 @@ export interface MetaBonuses {
   atk: number; spa: number; hp: number; contactDef: number; projDef: number; speed: number;
   cooldown: number; exp: number; money: number; pickup: number; area: number; crit: number;
   startLevels: number; revives: number; rerolls: number; skips: number; banishes: number;
-  itemSlots: number; choices: number; shinyOdds: number;
+  itemSlots: number; shinyOdds: number;
   /** friendship perks for the chosen line */
   friendDmg: number; friendHp: number; friendStartItem: boolean;
 }
@@ -61,7 +60,7 @@ export function metaBonuses(shop: Record<string, number>, friendship = 0): MetaB
     cooldown: 0.03 * r('pp-up'), exp: 0.05 * r('exp-share'), money: 0.1 * r('amulet-coin'),
     pickup: 0.15 * r('big-root'), area: 0.05 * r('wide-lens'), crit: 0.03 * r('lucky-punch'),
     startLevels: r('rare-candy'), revives: r('revive'), rerolls: r('reroll'), skips: r('skip'),
-    banishes: r('banish'), itemSlots: r('bag'), choices: r('choice'), shinyOdds: r('shiny-charm') ? 3 : 1,
+    banishes: r('banish'), itemSlots: r('bag'), shinyOdds: r('shiny-charm') ? 3 : 1,
     friendDmg: friendship >= 200 ? (friendship >= 800 ? 0.1 : 0.05) : 0,
     friendHp: friendship >= 400 ? 0.1 : 0,
     friendStartItem: friendship >= 600,

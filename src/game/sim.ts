@@ -7,7 +7,7 @@ import { Rng, dist2 } from '../engine/math.ts';
 import { SpatialGrid } from '../engine/spatial.ts';
 import type { MetaBonuses } from '../meta/shop.ts';
 import { derivePlayerStats } from './stats.ts';
-import { applyOffer, generateOffers, masteryCandidates, randomFiller, ownedUpgrades } from './levelup.ts';
+import { applyOffer, generateOffers, masteryCandidates, randomFiller, evolutionMove, learnOffers, ownedUpgrades } from './levelup.ts';
 import { fireMoves, updateProjectiles, damagePlayer } from './combat.ts';
 import { activateMega, updateMega } from './mega.ts';
 import { Spawner, updateEnemies, killEnemy } from './enemies.ts';
@@ -47,10 +47,20 @@ export interface Cinematic {
 
 export const DT = 1 / 60;
 
-/** How long the treasure "slot machine" plays: ball pops, then one reel lands per reward. */
-export function chestDuration(rewards: ChestReward[]): number {
-  return 2.1 + 0.55 * rewards.length;
+/** A player has a level-up or a move to learn waiting. */
+const needsChoice = (p: Player) => p.pendingLevels > 0 || !!p.pendingLearn;
+
+/**
+ * Treasure show timing (seconds from the start): the ball wobbles and opens at `open`, rewards
+ * pop out one by one and have all landed by `reveal`. Players must look for at least a second,
+ * may then dismiss it, and are moved on automatically 5 seconds after that (`autoClose`).
+ */
+export function chestTiming(n: number) {
+  const open = 1.5;
+  const reveal = open + 0.45 + 0.55 * n + 0.15;
+  return { open, reveal, autoClose: reveal + 6 };
 }
+
 export const MAX_ENEMIES = 520;
 
 export function xpForLevel(level: number): number {
@@ -121,7 +131,7 @@ export class Sim {
     this.xpNext = xpForLevel(this.level);
     this.refreshStats();
     for (const p of this.players) p.hp = p.stats.maxHp;
-    if (this.players.some((p) => p.pendingLevels > 0)) this.beginLevelUp();
+    if (this.players.some(needsChoice)) this.beginLevelUp();
   }
 
   id() {
@@ -388,6 +398,13 @@ export class Sim {
     p.evolutions++;
     this.refreshStats();
     p.hp = p.stats.maxHp;
+    // Evolving teaches a new move; with four moves already, the player picks one to forget.
+    const learn = evolutionMove(p);
+    if (!learn) return;
+    if (p.moves.length < p.moveSlots) {
+      p.moves.push({ id: learn, level: 1, cd: 0.3, dmgDealt: 0, kills: 0 });
+      this.emit({ e: 'learn', player: p.id, move: learn });
+    } else p.pendingLearn = learn;
   }
 
   private startNextCine() {
@@ -398,9 +415,11 @@ export class Sim {
     if (c.kind === 'evolve') this.emit({ e: 'evolve', player: c.player, from: c.from!, to: c.to! });
   }
 
-  /** Solo only: fast-forward the current treasure/boss cinematic. */
+  /** Solo only: end the current treasure/boss cinematic (the treasure UI enforces its viewing minimum). */
   skipCine() {
-    if (this.cine && this.cine.kind !== 'evolve' && this.cine.kind !== 'mega') this.cine.t = Math.max(this.cine.t, this.cine.dur - 0.25);
+    const c = this.cine;
+    if (!c || c.kind === 'evolve' || c.kind === 'mega' || c.t < 1) return;
+    c.t = Math.max(c.t, c.dur - 0.05);
   }
 
   private updateCine(dt: number) {
@@ -415,7 +434,7 @@ export class Sim {
       this.phase = 'victory';
       return;
     }
-    if (this.players.some((p) => p.pendingLevels > 0)) this.beginLevelUp();
+    if (this.players.some(needsChoice)) this.beginLevelUp();
     else this.phase = 'play';
   }
 
@@ -427,13 +446,14 @@ export class Sim {
   beginLevelUp() {
     this.phase = 'levelup';
     for (const p of this.players) {
-      if (p.pendingLevels > 0 && !this.offers.has(p.id)) this.offers.set(p.id, this.makeOffers(p));
+      if (needsChoice(p) && !this.offers.has(p.id)) this.offers.set(p.id, this.makeOffers(p));
     }
     if (this.offers.size === 0) this.phase = 'play';
   }
 
   private makeOffers(p: Player) {
-    return generateOffers(p, this.rng, 3 + p.meta.choices, this.tms.get(p.id) ?? [], this.stage.types);
+    if (p.pendingLearn) return learnOffers(p, p.pendingLearn);
+    return generateOffers(p, this.rng, 3, this.tms.get(p.id) ?? [], this.stage.types);
   }
 
   choose(playerId: number, index: number) {
@@ -442,13 +462,15 @@ export class Sim {
     if (!offers || !p || !offers[index]) return;
     const o = offers[index];
     applyOffer(p, o);
+    if (o.kind === 'forget') this.emit({ e: 'learn', player: p.id, move: o.id });
+    if (o.kind === 'forget' || o.kind === 'keep') return this.afterChoice(p, false);
     if (o.kind === 'newMove') this.emit({ e: 'learn', player: p.id, move: o.id });
     this.afterChoice(p);
   }
 
   skip(playerId: number) {
     const p = this.players[playerId];
-    if (!p || p.skips <= 0 || !this.offers.has(playerId)) return;
+    if (!p || p.skips <= 0 || !this.offers.has(playerId) || p.pendingLearn) return;
     p.skips--;
     p.hp = Math.min(p.stats.maxHp, p.hp + p.stats.maxHp * 0.1);
     this.afterChoice(p);
@@ -456,7 +478,7 @@ export class Sim {
 
   reroll(playerId: number) {
     const p = this.players[playerId];
-    if (!p || p.rerolls <= 0 || !this.offers.has(playerId)) return;
+    if (!p || p.rerolls <= 0 || !this.offers.has(playerId) || p.pendingLearn) return;
     p.rerolls--;
     this.offers.set(playerId, this.makeOffers(p));
   }
@@ -472,11 +494,11 @@ export class Sim {
     this.offers.set(playerId, this.makeOffers(p));
   }
 
-  private afterChoice(p: Player) {
-    p.pendingLevels--;
+  private afterChoice(p: Player, levelUsed = true) {
+    if (levelUsed) p.pendingLevels--;
     this.offers.delete(p.id);
     this.refreshStats();
-    if (p.pendingLevels > 0) this.offers.set(p.id, this.makeOffers(p));
+    if (needsChoice(p)) this.offers.set(p.id, this.makeOffers(p));
     if (this.offers.size === 0) this.phase = 'play';
   }
 
@@ -520,7 +542,10 @@ export class Sim {
     this.emit({ e: 'chest', player: p.id, rewards, tier: shown });
     // A little gold rides along with every treasure.
     this.money += 2 + tier * 2;
-    this.queueCine({ kind: 'chest', t: 0, dur: chestDuration(rewards), player: p.id, rewards, tier: shown });
+    // Solo: wait for the player to dismiss it (auto after 5 s). Co-op pauses everyone, so it moves on sooner.
+    const timing = chestTiming(rewards.length);
+    const dur = this.players.length > 1 ? timing.reveal + 2 : timing.autoClose;
+    this.queueCine({ kind: 'chest', t: 0, dur, player: p.id, rewards, tier: shown });
   }
 
 

@@ -421,6 +421,14 @@ export class AudioEngine {
         [72, 79, 84, 88, 91, 96].forEach((m, i) => this.tone(d, t + i * 0.09, midiHz(m), 0.25, 0.12, 'pulse', 0.125));
         this.noiseHit(d, t + 0.5, 0.6, 0.15, 4000);
         break;
+      case 'wobble':
+        // capture wobble: a soft click-rattle, a little higher each time
+        this.noiseHit(d, t, 0.04, 0.12, 2500, 9000, true);
+        this.tone(d, t, 300 + arg * 60, 0.05, 0.07, 'triangle', 0.5, 220 + arg * 40);
+        break;
+      case 'pop':
+        this.tone(d, t, midiHz(67 + arg * 2), 0.08, 0.08, 'pulse', 0.25, midiHz(79 + arg * 2));
+        break;
       case 'tick':
         // reel tick: short blip, pitch climbs as the reel slows
         if (!this.gate('tick', 0.03)) return;

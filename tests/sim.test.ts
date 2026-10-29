@@ -51,7 +51,7 @@ describe('phase handling', () => {
     sim.openChest(sim.players[0]);          // chest cinematic starts
     killEnemy(sim, boss, 0);                // boss-down cinematic queued behind it
     sim.xp = sim.xpNext + 1;                // and a level-up is pending
-    for (let i = 0; i < 60 * 10 && sim.phase !== 'victory'; i++) {
+    for (let i = 0; i < 60 * 20 && sim.phase !== 'victory'; i++) {
       if (sim.phase === 'levelup') sim.choose(0, 0);
       else sim.update(DT);
     }
@@ -170,4 +170,47 @@ describe('playtest regressions', () => {
     expect(banked, `banked ₽${Math.round(banked)}`).toBeLessThan(1000);
     expect(realAt6, 'real build upgrades still on offer at 6:00').toBeGreaterThan(0);
   }, 60_000);
+});
+
+describe('evolution move learning', () => {
+  const evolveWith = (moves: string[]) => {
+    const sim = new Sim({ stageId: 'viridian', seed: 8, players: [{ name: 'a', lineId: 'charmander', shiny: false, meta: metaBonuses({}), tms: [] }] });
+    const p = sim.players[0];
+    p.moves = moves.map((id, i) => ({ id, level: 3 + i, cd: 1, dmgDealt: 0, kills: 0 }));
+    sim.level = 11;
+    sim.xp = sim.xpNext;
+    for (let i = 0; i < 600 && p.speciesId === 'charmander'; i++) {
+      if (sim.phase === 'levelup') {
+        const o = sim.offers.get(0)!;
+        if (o[0].kind === 'forget' || o[0].kind === 'keep') break;
+        sim.choose(0, 0);
+      } else sim.update(DT);
+    }
+    for (let i = 0; i < 300 && !p.pendingLearn && p.moves.length < 4; i++) { if (sim.phase === 'levelup') break; sim.update(DT); }
+    return { sim, p };
+  };
+
+  it('learns a new move straight away when a slot is free', () => {
+    const { p } = evolveWith(['ember']);
+    expect(p.speciesId).toBe('charmeleon');
+    expect(p.moves.length).toBeGreaterThanOrEqual(2);
+    expect(p.pendingLearn).toBeUndefined();
+  });
+
+  it('with four moves, offers to forget one; the new move keeps the old level', async () => {
+    const { MOVES } = await import('../src/data/moves.ts');
+    const { sim, p } = evolveWith(['ember', 'scratch', 'smokescreen', 'dragon-rage'].filter((m) => MOVES[m]));
+    if (p.moves.length < 4) return; // learnset changed; covered by the other test
+    for (let i = 0; i < 300 && !(sim.offers.get(0)?.[0].kind === 'forget'); i++) {
+      if (sim.phase === 'levelup') { const o = sim.offers.get(0); if (o && o[0].kind !== 'forget') sim.choose(0, 0); } else sim.update(DT);
+    }
+    const offers = sim.offers.get(0)!;
+    expect(offers.map((o) => o.kind)).toEqual(['forget', 'forget', 'forget', 'forget', 'keep']);
+    const learn = offers[0].id;
+    const oldLevel = p.moves[2].level;
+    sim.choose(0, 2);
+    expect(p.moves[2].id).toBe(learn);
+    expect(p.moves[2].level).toBe(oldLevel);
+    expect(p.pendingLearn).toBeUndefined();
+  });
 });

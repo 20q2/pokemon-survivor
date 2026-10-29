@@ -79,6 +79,8 @@ export interface Player {
   hurtT: number;          // flash timer
   lastHit: number;        // sim time of last damage taken
   pendingLevels: number;  // level-ups waiting for a choice
+  /** A move the partner wants to learn after evolving, while all move slots are full. */
+  pendingLearn?: string;
   kills: number;
   dmgDealt: number;
   dmgTaken: number;
@@ -238,7 +240,8 @@ export const CHEST_NAME: Record<ChestTier, string> = { 1: 'Poké Ball', 2: 'Grea
 export interface ChestReward { kind: 'mastery' | 'move' | 'item' | 'vitamin'; id: string; level?: number; from?: string }
 
 export interface UpgradeOffer {
-  kind: 'newMove' | 'moveUp' | 'newItem' | 'itemUp' | 'heal' | 'vitamin';
+  /** forget: learn `id` in place of move slot `level`; keep: don't learn `id`. */
+  kind: 'newMove' | 'moveUp' | 'newItem' | 'itemUp' | 'heal' | 'vitamin' | 'forget' | 'keep';
   id: string;
   level: number; // resulting level
 }

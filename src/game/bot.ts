@@ -63,11 +63,29 @@ export function botSteer(sim: Sim, p: Player): { x: number; y: number } {
   return l > 1e-6 ? { x: mx / l, y: my / l } : { x: 0, y: 0 };
 }
 
+/**
+ * "X wants to learn Y": swap out the weakest non-mastered move (status moves first) for a
+ * damaging new move if it is low level; otherwise keep the current moves.
+ */
+function learnChoice(me: Player, offers: UpgradeOffer[]): number {
+  const keep = offers.findIndex((o) => o.kind === 'keep');
+  if (MOVES[offers[0].id].cat === 'status') return keep;
+  let bi = -1, best = Infinity;
+  offers.forEach((o, i) => {
+    const m = o.kind === 'forget' ? me.moves[o.level] : undefined;
+    if (!m || MOVES[m.id].mastery) return;
+    const score = m.level - (MOVES[m.id].cat === 'status' ? 4 : 0);
+    if (score < best) { best = score; bi = i; }
+  });
+  return bi >= 0 && best <= 4 ? bi : keep;
+}
+
 /** Pick upgrades: new moves > move levels > items. */
 export function botChoose(sim: Sim, p: Player): number {
   const offers = sim.offers.get(p.id);
   if (!offers) return 0;
-  const score = (k: string) => ({ newMove: 4, moveUp: 3, newItem: 2.5, itemUp: 2, heal: 1, vitamin: 1.5 }[k] ?? 0);
+  if (offers[0].kind === 'forget' || offers[0].kind === 'keep') return learnChoice(p, offers);
+  const score = (k: string) => ({ newMove: 4, moveUp: 3, newItem: 2.5, itemUp: 2, heal: 1, vitamin: 1.5 } as Record<string, number>)[k] ?? 0;
   let bi = 0;
   offers.forEach((o, i) => { if (score(o.kind) > score(offers[bi].kind)) bi = i; });
   return bi;
@@ -77,8 +95,9 @@ export function botChoose(sim: Sim, p: Player): number {
 export function autoChoice(s: { offers(): UpgradeOffer[] | null; world: { players: Player[] }; localId: number }): number {
   const offers = s.offers() ?? [];
   const me = s.world.players[s.localId];
+  if (offers[0]?.kind === 'forget' || offers[0]?.kind === 'keep') return learnChoice(me, offers);
   const score = (o: UpgradeOffer) => {
-    let v = { newMove: 40, moveUp: 30, newItem: 22, itemUp: 18, heal: 5, vitamin: 10 }[o.kind];
+    let v = ({ newMove: 40, moveUp: 30, newItem: 22, itemUp: 18, heal: 5, vitamin: 10 } as Record<string, number>)[o.kind] ?? 0;
     if (o.kind === 'heal') v = me.hp < me.stats.maxHp * 0.35 ? 60 : 5;
     if (o.kind === 'newMove' && me.types.includes(MOVES[o.id].type)) v += 8;
     if ((o.kind === 'newItem' || o.kind === 'itemUp') && me.moves.some((m) => MASTERY_OF[m.id]?.mastery?.item === o.id)) v += 25;
