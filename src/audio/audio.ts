@@ -1,12 +1,14 @@
 import { parseMml, TICKS_PER_WHOLE, type MmlNote } from './mml.ts';
 import { SONGS, type SongDef } from './songs.ts';
+import { SFX, type SfxDef } from './sfx.ts';
 
 export { SONGS };
 
 /**
  * Chiptune engine: hand-composed MML scores (songs.ts) played on a small Game Boy-flavoured
  * synth (two pulse channels with duty cycles, a stepped triangle bass and LFSR noise drums),
- * mixed through per-channel stereo buses and a light room reverb. Sound effects share the synth.
+ * mixed through per-channel stereo buses and a light room reverb. Sound effects are MML phrases
+ * too (sfx.ts) and run through the same voices, envelopes, buses and reverb as the music.
  */
 
 type Ch = 0 | 1 | 2 | 3;
@@ -21,6 +23,15 @@ const MIX: { gain: number; pan: number; send: number }[] = [
   { gain: 0.34, pan: 0, send: 0.05 },
   { gain: 0.3, pan: 0.06, send: 0.08 },
 ];
+/** SFX mix: a little drier than the music so effects stay crisp, but sharing the same room. */
+const SFX_MIX: { gain: number; pan: number; send: number }[] = [
+  { gain: 0.26, pan: -0.08, send: 0.14 },
+  { gain: 0.2, pan: 0.12, send: 0.2 },
+  { gain: 0.42, pan: 0, send: 0.04 },
+  { gain: 0.4, pan: 0, send: 0.06 },
+];
+
+const sfxAsSong = (d: SfxDef): SongDef => ({ title: '', bpm: d.bpm, key: [0, 'major'], p1: d.p1 ?? '', p2: d.p2 ?? '', tri: d.tri ?? '', noise: d.noise ?? '' });
 
 export function compileSong(def: SongDef): CompiledSong {
   const tracks = [def.p1, def.p2, def.tri, def.noise].map((src, i) => (src.trim() ? parseMml(src, def.macros, i === 3) : null));
@@ -51,6 +62,9 @@ export class AudioEngine {
   private noise!: AudioBuffer;
   private metal!: AudioBuffer;
   private buses: GainNode[] = [];
+  private sfxBuses: GainNode[] = [];
+  /** Dry-ish input for the hand-built effects (hits, per-type attacks): same room as the phrases. */
+  private sfxIn!: GainNode;
   private triWave: PeriodicWave | null = null;
   private song: CompiledSong | null = null;
   private songName = '';
@@ -59,8 +73,10 @@ export class AudioEngine {
   private pass = 0;
   private timer: number | null = null;
   private lastPlay = new Map<string, number>();
+  /** Rises with each candy, drains continuously, so only a burst of pickups climbs the scale. */
   private pickupCombo = 0;
   private pickupT = 0;
+  private sfxCache = new Map<string, CompiledSong>();
   musicVol = 0.5;
   sfxVol = 0.6;
   private cache = new Map<string, CompiledSong>();
@@ -87,6 +103,19 @@ export class AudioEngine {
     return ctx.startRendering();
   }
 
+  /** Render one sound effect (or a candy run with `arg` pickups) offline, for level checks. */
+  static async renderSfxOffline(name: string, arg = 0, seconds = 3, sampleRate = 44100): Promise<AudioBuffer> {
+    const e = new AudioEngine();
+    const ctx = new OfflineAudioContext(2, Math.ceil(seconds * sampleRate), sampleRate);
+    e.init(ctx);
+    e.setVolumes(0, 1);
+    if (name === 'candy') {
+      // currentTime is frozen before rendering, so fake the pickup clock to space the run out
+      for (let i = 0; i < arg; i++) { e.lastPlay.clear(); e.pickupT -= 0.08; e.sfx('candy'); }
+    } else e.sfx(name, arg);
+    return ctx.startRendering();
+  }
+
   private init(ctx: BaseAudioContext) {
     this.ctx = ctx;
     this.master = this.ctx.createGain();
@@ -102,7 +131,10 @@ export class AudioEngine {
     tone.type = 'lowpass';
     tone.frequency.value = 10500;
     this.musicGain.connect(tone).connect(this.master);
-    this.sfxGain.connect(this.master);
+    const sfxTone = this.ctx.createBiquadFilter();
+    sfxTone.type = 'lowpass';
+    sfxTone.frequency.value = 9000;
+    this.sfxGain.connect(sfxTone).connect(this.master);
     const verb = this.ctx.createConvolver();
     verb.buffer = this.makeImpulse(1.7);
     const verbOut = this.ctx.createGain();
@@ -119,6 +151,28 @@ export class AudioEngine {
       g.connect(send).connect(verb);
       return g;
     });
+    const sfxVerb = this.ctx.createConvolver();
+    sfxVerb.buffer = this.makeImpulse(1.1);
+    const sfxVerbOut = this.ctx.createGain();
+    sfxVerbOut.gain.value = 0.6;
+    sfxVerb.connect(sfxVerbOut).connect(this.sfxGain);
+    this.sfxBuses = SFX_MIX.map((m) => {
+      const g = this.ctx!.createGain();
+      g.gain.value = m.gain;
+      const pan = this.ctx!.createStereoPanner();
+      pan.pan.value = m.pan;
+      const send = this.ctx!.createGain();
+      send.gain.value = m.send;
+      g.connect(pan).connect(this.sfxGain);
+      g.connect(send).connect(sfxVerb);
+      return g;
+    });
+    this.sfxIn = this.ctx.createGain();
+    this.sfxIn.gain.value = 1;
+    const inSend = this.ctx.createGain();
+    inSend.gain.value = 0.12;
+    this.sfxIn.connect(this.sfxGain);
+    this.sfxIn.connect(inSend).connect(sfxVerb);
     this.setVolumes(this.musicVol, this.sfxVol);
     this.noise = this.lfsrNoise(false);
     this.metal = this.lfsrNoise(true);
@@ -149,21 +203,22 @@ export class AudioEngine {
     return w;
   }
 
-  private tone(dest: AudioNode, t: number, freq: number, dur: number, vol: number, type: 'pulse' | 'triangle' | 'sine' | 'sawtooth', duty = 0.5, slideTo?: number) {
+  /** A one-off chip tone with an optional pitch sweep (pulse, or the stepped triangle). */
+  private tone(dest: AudioNode, t: number, freq: number, dur: number, vol: number, type: 'pulse' | 'triangle', duty = 0.5, slideTo?: number) {
     const ctx = this.ctx!;
     const o = ctx.createOscillator();
-    if (type === 'pulse') o.setPeriodicWave(this.pulseWave(duty));
-    else o.type = type;
+    o.setPeriodicWave(type === 'pulse' ? this.pulseWave(duty) : this.triangleWave());
     o.frequency.setValueAtTime(freq, t);
     if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(20, slideTo), t + dur);
     const g = ctx.createGain();
+    // plucked: fast attack, exponential decay like the music's E1 envelope
     g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(vol, t + 0.005);
-    g.gain.setValueAtTime(vol, t + Math.max(0.006, dur * 0.7));
-    g.gain.linearRampToValueAtTime(0, t + dur);
+    g.gain.linearRampToValueAtTime(vol, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0005, vol * 0.3), t + Math.max(0.006, dur));
+    g.gain.linearRampToValueAtTime(0, t + dur + 0.015);
     o.connect(g).connect(dest);
     o.start(t);
-    o.stop(t + dur + 0.02);
+    o.stop(t + dur + 0.04);
   }
 
   private noiseHit(dest: AudioNode, t: number, dur: number, vol: number, hp: number, lp = 12000, metal = false) {
@@ -288,25 +343,26 @@ export class AudioEngine {
       if (t > ahead) break;
       this.nextIdx++;
       if (t < this.ctx.currentTime - 0.03) continue;
-      this.playEvent(ev, t, song.spt);
+      this.voice(ev, t, song.spt, this.buses[ev.ch]);
     }
   }
 
-  private playEvent(ev: SongEvent, t: number, spt: number) {
+  /** Play one score event on a chip voice. Shared by the music and the sound-effect phrases. */
+  private voice(ev: SongEvent, t: number, spt: number, bus: AudioNode, transpose = 0, volMul = 1) {
     const ctx = this.ctx!;
-    const bus = this.buses[ev.ch];
     const dur = ev.dur * spt;
-    if (ev.ch === 3) return this.drum(bus, ev.drum!, t, ev.vol);
+    if (ev.ch === 3) return this.drum(bus, ev.drum!, t, ev.vol * volMul);
     const o = ctx.createOscillator();
-    const hz = midiHz(ev.midi[0]);
+    const midi = transpose ? ev.midi.map((m) => m + transpose) : ev.midi;
+    const hz = midiHz(midi[0]);
     if (ev.ch === 2) o.setPeriodicWave(this.triangleWave());
     else o.setPeriodicWave(this.pulseWave(DUTY[ev.duty] ?? 0.5));
-    if (ev.midi.length > 1) {
+    if (midi.length > 1) {
       // fast arpeggio: cycle the chord tones like a sound chip would
       const step = 1 / 36;
-      for (let k = 0, tt = t; tt < t + dur; k++, tt += step) o.frequency.setValueAtTime(midiHz(ev.midi[k % ev.midi.length]), tt);
+      for (let k = 0, tt = t; tt < t + dur; k++, tt += step) o.frequency.setValueAtTime(midiHz(midi[k % midi.length]), tt);
     } else o.frequency.setValueAtTime(hz, t);
-    if (ev.vib && dur > 0.24 && ev.midi.length === 1) {
+    if (ev.vib && dur > 0.24 && midi.length === 1) {
       // delayed vibrato, so short notes stay clean and held notes sing
       const lfo = ctx.createOscillator();
       lfo.frequency.value = 5.5;
@@ -319,7 +375,7 @@ export class AudioEngine {
       lfo.stop(t + dur + 0.06);
     }
     const g = ctx.createGain();
-    const peak = ev.vol;
+    const peak = ev.vol * volMul;
     const rel = ev.ch === 2 ? 0.012 : 0.03;
     g.gain.setValueAtTime(0, t);
     g.gain.linearRampToValueAtTime(peak, t + 0.004);
@@ -362,170 +418,111 @@ export class AudioEngine {
     return true;
   }
 
+  /** Play a scored effect from sfx.ts on the chip voices, optionally transposed (semitones). */
+  private phrase(name: string, transpose = 0, volMul = 1) {
+    const def = SFX[name];
+    if (!def || !this.ctx) return;
+    let song = this.sfxCache.get(name);
+    if (!song) {
+      song = compileSong(sfxAsSong(def));
+      this.sfxCache.set(name, song);
+    }
+    const t0 = this.ctx.currentTime + 0.005;
+    const v = (def.vol ?? 1) * volMul;
+    for (const ev of song.events) this.voice(ev, t0 + ev.tick * song.spt, song.spt, this.sfxBuses[ev.ch], transpose, v);
+  }
+
   sfx(name: string, arg = 0) {
     if (!this.ctx || this.sfxVol <= 0) return;
     const t = this.ctx.currentTime + 0.005;
-    const d = this.sfxGain;
+    const d = this.sfxIn;
     switch (name) {
       case 'hit':
-        if (!this.gate('hit', 0.045)) return;
-        this.noiseHit(d, t, 0.05, 0.18, 1500, 6000);
-        this.tone(d, t, 300 + Math.random() * 80, 0.05, 0.06, 'pulse', 0.5, 120);
+        if (!this.gate('hit', 0.05)) return;
+        this.noiseHit(d, t, 0.045, 0.14, 1400, 5500);
+        this.tone(d, t, 260 + Math.random() * 60, 0.05, 0.05, 'pulse', 0.5, 110);
         break;
       case 'super':
         if (!this.gate('super', 0.12)) return;
-        this.tone(d, t, 880, 0.06, 0.1, 'pulse', 0.25, 1320);
-        this.noiseHit(d, t, 0.08, 0.2, 800, 5000);
+        this.noiseHit(d, t, 0.07, 0.16, 900, 5000);
+        this.tone(d, t, midiHz(76), 0.07, 0.07, 'pulse', 0.25, midiHz(83));
         break;
       case 'kill':
-        if (!this.gate('kill', 0.05)) return;
-        this.tone(d, t, 520, 0.07, 0.07, 'pulse', 0.125, 180);
+        if (!this.gate('kill', 0.06)) return;
+        this.tone(d, t, midiHz(69 + ((Math.random() * 3) | 0)), 0.08, 0.08, 'pulse', 0.125, midiHz(57));
+        this.noiseHit(d, t, 0.03, 0.06, 2500, 8000, true);
         break;
       case 'candy': {
+        // A soft pluck on a pentatonic ladder. The combo drains ~5 steps a second, so a steady
+        // trickle of candies stays near the bottom and only a real burst climbs, and it tops out
+        // a little over an octave up instead of shrieking.
         const now = this.ctx.currentTime;
-        if (now - this.pickupT > 0.6) this.pickupCombo = 0;
+        this.pickupCombo = Math.max(0, this.pickupCombo - (now - this.pickupT) * 5);
         this.pickupT = now;
-        if (!this.gate('candy', 0.035)) return;
-        const step = Math.min(this.pickupCombo++, 14);
-        this.tone(d, t, midiHz(76 + [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26, 28, 31, 33][step]), 0.06, 0.07, 'pulse', 0.25);
+        if (!this.gate('candy', 0.055)) return;
+        const LADDER = [0, 2, 4, 7, 9, 12, 14, 16];
+        const step = Math.min(LADDER.length - 1, Math.floor(this.pickupCombo));
+        this.pickupCombo = Math.min(LADDER.length + 1, this.pickupCombo + 1);
+        const vol = 0.085 * (1 - step * 0.05);
+        this.tone(d, t, midiHz(67 + LADDER[step]), 0.07, vol, 'pulse', 0.125);
+        this.tone(d, t, midiHz(55 + LADDER[step]), 0.05, vol * 0.6, 'triangle');
         break;
       }
       case 'coin':
-        if (!this.gate('coin', 0.06)) return;
-        this.tone(d, t, 1319, 0.05, 0.08, 'pulse', 0.5);
-        this.tone(d, t + 0.05, 1976, 0.12, 0.08, 'pulse', 0.5);
-        break;
-      case 'heal':
-        [72, 76, 79, 84].forEach((m, i) => this.tone(d, t + i * 0.06, midiHz(m), 0.1, 0.09, 'triangle'));
+        if (!this.gate('coin', 0.07)) return;
+        this.phrase('coin');
         break;
       case 'hurt':
         if (!this.gate('hurt', 0.12)) return;
-        this.tone(d, t, 220, 0.14, 0.16, 'pulse', 0.5, 90);
-        this.noiseHit(d, t, 0.1, 0.15, 300, 3000);
-        break;
-      case 'levelup':
-        [67, 71, 74, 79, 83, 86].forEach((m, i) => this.tone(d, t + i * 0.055, midiHz(m), 0.12, 0.12, 'pulse', 0.25));
-        this.tone(d, t + 0.33, midiHz(91), 0.35, 0.1, 'pulse', 0.125);
-        break;
-      case 'evolve':
-        for (let i = 0; i < 24; i++) this.tone(d, t + i * 0.11, midiHz(60 + i), 0.1, 0.07, 'pulse', 0.25);
-        break;
-      case 'evolved':
-        [72, 76, 79, 84, 79, 84, 88].forEach((m, i) => this.tone(d, t + i * 0.1, midiHz(m), i === 6 ? 0.6 : 0.12, 0.13, 'pulse', 0.25));
-        [48, 55, 60].forEach((m, i) => this.tone(d, t + i * 0.2, midiHz(m), 0.3, 0.2, 'triangle'));
-        break;
-      case 'chest':
-        [60, 64, 67, 72, 67, 72, 76, 79].forEach((m, i) => this.tone(d, t + i * 0.08, midiHz(m + 7), 0.12, 0.12, 'pulse', 0.5));
-        break;
-      case 'mastery':
-        [72, 79, 84, 88, 91, 96].forEach((m, i) => this.tone(d, t + i * 0.09, midiHz(m), 0.25, 0.12, 'pulse', 0.125));
-        this.noiseHit(d, t + 0.5, 0.6, 0.15, 4000);
-        break;
-      case 'wobble':
-        // capture wobble: a soft click-rattle, a little higher each time
-        this.noiseHit(d, t, 0.04, 0.12, 2500, 9000, true);
-        this.tone(d, t, 300 + arg * 60, 0.05, 0.07, 'triangle', 0.5, 220 + arg * 40);
-        break;
-      case 'pop':
-        this.tone(d, t, midiHz(67 + arg * 2), 0.08, 0.08, 'pulse', 0.25, midiHz(79 + arg * 2));
-        break;
-      case 'tick':
-        // reel tick: short blip, pitch climbs as the reel slows
-        if (!this.gate('tick', 0.03)) return;
-        this.tone(d, t, midiHz(84 + Math.round(arg)), 0.035, 0.05, 'pulse', 0.25);
-        break;
-      case 'ding':
-        [0, 7, 12].forEach((iv, i) => this.tone(d, t + i * 0.045, midiHz(79 + arg * 2 + iv), 0.16, 0.1, 'pulse', 0.125));
-        break;
-      case 'reveal':
-        // the ball bursts: noise whoosh + rising chord, bigger for rarer balls
-        this.noiseHit(d, t, 0.35 + arg * 0.1, 0.18 + arg * 0.04, 2500, 14000);
-        [60, 64, 67, 72].slice(0, 2 + Math.min(2, arg)).forEach((m, i) => this.tone(d, t + i * 0.05, midiHz(m + 12), 0.3, 0.09, 'pulse', 0.5));
-        break;
-      case 'mega':
-        // rainbow sphere: shimmering rising arpeggio, then the burst
-        for (let i = 0; i < 20; i++) this.tone(d, t + i * 0.075, midiHz(60 + [0, 4, 7, 11][i % 4] + Math.floor(i / 4) * 5), 0.14, 0.07, 'pulse', 0.125);
-        this.noiseHit(d, t + 1.55, 0.9, 0.25, 6000);
-        [48, 60, 67, 72, 76, 79].forEach((m, i) => this.tone(d, t + 1.6 + i * 0.03, midiHz(m), 0.9, 0.09, i < 2 ? 'triangle' : 'pulse', 0.25));
-        break;
-      case 'boss':
-        for (let i = 0; i < 4; i++) this.tone(d, t + i * 0.35, i % 2 ? 330 : 440, 0.3, 0.14, 'sawtooth', 0.5);
-        break;
-      case 'raid':
-        // A rising siren as a big attack winds up (arg 1 = boss-sized).
-        if (!this.gate('raid', 0.3)) return;
-        this.tone(d, t, arg ? 140 : 220, arg ? 0.6 : 0.4, arg ? 0.1 : 0.06, 'sawtooth', 0.5, arg ? 560 : 660);
-        if (arg) this.tone(d, t + 0.05, 70, 0.6, 0.08, 'pulse', 0.5, 280);
-        break;
-      case 'warn':
-        this.tone(d, t, 660, 0.12, 0.1, 'pulse', 0.25);
-        this.tone(d, t + 0.15, 660, 0.12, 0.1, 'pulse', 0.25);
-        break;
-      case 'faint':
-        for (let i = 0; i < 8; i++) this.tone(d, t + i * 0.09, midiHz(72 - i * 3), 0.1, 0.12, 'pulse', 0.5);
-        break;
-      case 'revive':
-        [60, 67, 72, 76, 79, 84].forEach((m, i) => this.tone(d, t + i * 0.07, midiHz(m), 0.18, 0.11, 'triangle'));
+        this.phrase('hurt');
         break;
       case 'boom':
         if (!this.gate('boom', 0.08)) return;
-        this.noiseHit(d, t, 0.35, 0.35, 60, 1800);
-        this.tone(d, t, 120, 0.3, 0.2, 'sine', 0.5, 35);
+        this.noiseHit(d, t, 0.35, 0.3, 60, 1600);
+        this.tone(d, t, 140, 0.3, 0.22, 'triangle', 0.5, 40);
         break;
-      case 'shiny':
-        [88, 91, 96, 100].forEach((m, i) => this.tone(d, t + i * 0.05, midiHz(m), 0.08, 0.07, 'pulse', 0.125));
+      case 'raid':
+        // A rising siren as a big attack winds up (arg 1 = boss-sized: lower, louder).
+        if (!this.gate('raid', 0.3)) return;
+        this.phrase('raid', arg ? -7 : 0, arg ? 1.2 : 0.8);
         break;
-      case 'repel':
-        this.noiseHit(d, t, 0.8, 0.3, 200, 8000);
-        this.tone(d, t, 880, 0.6, 0.12, 'pulse', 0.5, 110);
+      case 'wobble': this.phrase('wobble', arg * 2); break;
+      case 'pop': this.phrase('pop', arg * 2); break;
+      case 'tick':
+        if (!this.gate('tick', 0.03)) return;
+        this.phrase('tick', Math.round(arg));
         break;
-      case 'click':
-        this.tone(d, t, 1200, 0.025, 0.06, 'pulse', 0.5);
-        break;
-      case 'select':
-        this.tone(d, t, 988, 0.04, 0.08, 'pulse', 0.25);
-        this.tone(d, t + 0.045, 1319, 0.07, 0.08, 'pulse', 0.25);
-        break;
-      case 'buy':
-        [76, 79, 84].forEach((m, i) => this.tone(d, t + i * 0.06, midiHz(m), 0.08, 0.09, 'pulse', 0.5));
-        break;
-      case 'error':
-        this.tone(d, t, 180, 0.15, 0.12, 'pulse', 0.5);
-        break;
-      case 'victory':
-        [67, 67, 67, 72, 76, 74, 76, 79].forEach((m, i) => this.tone(d, t + [0, 0.15, 0.3, 0.45, 0.75, 1.05, 1.2, 1.4][i], midiHz(m), i === 7 ? 0.9 : 0.14, 0.14, 'pulse', 0.25));
-        [48, 52, 55, 60].forEach((m, i) => this.tone(d, t + i * 0.45, midiHz(m), 0.45, 0.25, 'triangle'));
-        break;
-      case 'gameover':
-        [67, 66, 65, 64, 60].forEach((m, i) => this.tone(d, t + i * 0.28, midiHz(m - 5), i === 4 ? 0.9 : 0.25, 0.13, 'pulse', 0.5));
-        break;
+      case 'ding': this.phrase('ding', arg * 2); break;
+      case 'reveal': this.phrase('reveal', arg * 2, 0.8 + arg * 0.1); break;
       case 'fire':
         this.fireSfx(arg);
         break;
+      default:
+        this.phrase(name);
     }
   }
 
-  /** Per-type attack sounds (arg = type index), throttled per type. */
+  /** Per-type attack sounds (arg = type index), throttled per type. Chip waveforms only. */
   private fireSfx(typeIdx: number) {
     if (!this.gate(`fire${typeIdx}`, 0.09)) return;
     const t = this.ctx!.currentTime + 0.005;
-    const d = this.sfxGain;
-    const v = 0.05;
+    const d = this.sfxIn;
+    const v = 0.045;
     switch (typeIdx) {
-      case 1: this.noiseHit(d, t, 0.16, v * 2.2, 400, 3500); break; // fire
-      case 2: this.tone(d, t, 700, 0.1, v, 'sine', 0.5, 1400); break; // water
-      case 3: this.noiseHit(d, t, 0.08, v * 2, 3000); this.tone(d, t, 1800, 0.06, v * 0.7, 'pulse', 0.125, 900); break; // electric
-      case 4: this.noiseHit(d, t, 0.07, v * 1.5, 2500, 7000); break; // grass
-      case 5: this.tone(d, t, 2200, 0.08, v, 'triangle', 0.5, 2800); break; // ice
-      case 6: this.noiseHit(d, t, 0.06, v * 2.5, 200, 2000); break; // fighting
-      case 7: this.tone(d, t, 300, 0.12, v, 'pulse', 0.25, 200); break; // poison
-      case 8: this.noiseHit(d, t, 0.12, v * 2.5, 60, 900); break; // ground
-      case 9: this.noiseHit(d, t, 0.14, v * 1.4, 1500, 6000); break; // flying
-      case 10: this.tone(d, t, 500, 0.15, v, 'sine', 0.5, 1000); break; // psychic
-      case 13: this.tone(d, t, 400, 0.18, v, 'triangle', 0.5, 250); break; // ghost
-      case 14: this.tone(d, t, 160, 0.15, v * 1.4, 'sawtooth', 0.5, 90); break; // dragon
-      case 17: this.tone(d, t, 1500, 0.1, v, 'triangle', 0.5, 2000); break; // fairy
-      default: this.tone(d, t, 600, 0.05, v, 'pulse', 0.5, 300);
+      case 1: this.noiseHit(d, t, 0.16, v * 2.2, 400, 3200); break; // fire: roar
+      case 2: this.tone(d, t, midiHz(72), 0.1, v, 'triangle', 0.5, midiHz(84)); break; // water: bloop up
+      case 3: this.noiseHit(d, t, 0.07, v * 1.8, 3000, 10000, true); this.tone(d, t, 1800, 0.05, v * 0.6, 'pulse', 0.125, 900); break; // electric: zap
+      case 4: this.noiseHit(d, t, 0.07, v * 1.4, 2500, 7000); break; // grass: rustle
+      case 5: this.tone(d, t, midiHz(91), 0.08, v * 0.8, 'pulse', 0.125, midiHz(96)); break; // ice: glint
+      case 6: this.noiseHit(d, t, 0.06, v * 2.4, 200, 2000); break; // fighting: thump
+      case 7: this.tone(d, t, midiHz(55), 0.12, v, 'pulse', 0.25, midiHz(50)); break; // poison: blub
+      case 8: this.noiseHit(d, t, 0.12, v * 2.4, 60, 900); break; // ground: rumble
+      case 9: this.noiseHit(d, t, 0.14, v * 1.3, 1500, 6000); break; // flying: whoosh
+      case 10: this.tone(d, t, midiHz(71), 0.15, v, 'triangle', 0.5, midiHz(83)); break; // psychic: swell
+      case 13: this.tone(d, t, midiHz(67), 0.18, v, 'triangle', 0.5, midiHz(59)); break; // ghost: droop
+      case 14: this.tone(d, t, midiHz(43), 0.15, v * 1.3, 'pulse', 0.125, midiHz(36)); break; // dragon: growl
+      case 17: this.tone(d, t, midiHz(88), 0.1, v * 0.8, 'triangle', 0.5, midiHz(93)); break; // fairy: twinkle
+      default: this.tone(d, t, midiHz(74), 0.05, v, 'pulse', 0.5, midiHz(62));
     }
   }
 }

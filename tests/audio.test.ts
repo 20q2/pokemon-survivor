@@ -89,3 +89,20 @@ describe('songbook', () => {
     });
   }
 });
+
+describe('sound effects', async () => {
+  const { SFX } = await import('../src/audio/sfx.ts');
+  for (const [name, def] of Object.entries(SFX)) {
+    it(`${name} parses and stays short`, () => {
+      let longest = 0;
+      for (const [ch, src] of [['p1', def.p1], ['p2', def.p2], ['tri', def.tri], ['noise', def.noise]] as const) {
+        if (!src) continue;
+        const t = parseMml(src, {}, ch === 'noise');
+        longest = Math.max(longest, t.length);
+      }
+      const seconds = longest * (60 / def.bpm / (TICKS_PER_WHOLE / 4));
+      expect(longest).toBeGreaterThan(0);
+      expect(seconds, name).toBeLessThan(3);
+    });
+  }
+});
