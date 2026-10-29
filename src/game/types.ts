@@ -210,6 +210,7 @@ export type GameEvent =
   | { e: 'status'; x: number; y: number; kind: StatusKind }
   | { e: 'shiny'; x: number; y: number }
   | { e: 'repel' }
+  | { e: 'learn'; player: number; move: string }
   | { e: 'enemyShot'; x: number; y: number };
 
 export interface ChestReward { kind: 'mastery' | 'move' | 'item' | 'money'; id: string; level?: number; from?: string }

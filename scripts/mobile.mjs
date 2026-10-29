@@ -1,0 +1,26 @@
+import { chromium, devices } from 'playwright-core';
+const out = process.argv[2] ?? '.';
+const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const ctx = await browser.newContext({ ...devices['Pixel 7'] });
+const page = await ctx.newPage();
+page.on('pageerror', (e) => console.log(`[pageerror] ${e.message}`));
+await page.goto('http://127.0.0.1:5391/', { waitUntil: 'networkidle' });
+await page.waitForTimeout(1500);
+await page.screenshot({ path: `${out}/m1-title.png` });
+await page.getByRole('button', { name: 'Play' }).tap();
+await page.waitForTimeout(500);
+await page.screenshot({ path: `${out}/m2-select.png`, fullPage: false });
+await page.getByRole('button', { name: 'Choose!' }).tap();
+await page.waitForTimeout(400);
+await page.locator('.stage').first().tap();
+await page.waitForTimeout(1500);
+// drag on canvas to move
+const box = { x: 200, y: 500 };
+await page.mouse.move(box.x, box.y);
+await page.touchscreen.tap(box.x, box.y);
+await page.waitForTimeout(3000);
+await page.evaluate(() => { const s = window.app.session.sim; s.xp = s.xpNext + 0.5; });
+await page.waitForTimeout(700);
+await page.screenshot({ path: `${out}/m3-levelup.png` });
+await browser.close();
+console.log('ok');

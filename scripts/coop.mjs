@@ -39,6 +39,17 @@ for (let i = 0; i < 10; i++) {
   await Promise.all([host.keyboard.up(keys[i % 4]), guest.keyboard.up(keys[(i + 2) % 4])]);
   for (const p of [host, guest]) if (await p.locator('.levelup .card').count()) await p.keyboard.press('Digit1');
 }
+await host.evaluate(() => { const s = window.app.session.sim; s.xp = s.xpNext + 0.5; });
+await host.waitForTimeout(900);
+await host.screenshot({ path: `${out}/c5-host-levelup.png` });
+await guest.screenshot({ path: `${out}/c6-guest-levelup.png` });
+await host.keyboard.press('Digit1');
+await host.waitForTimeout(500);
+await host.screenshot({ path: `${out}/c7-host-waiting.png` });
+await guest.keyboard.press('Digit2');
+await host.waitForTimeout(800);
+const after = await host.evaluate(() => { const s = window.app.session.sim; return { ph: s.phase, moves: s.players.map((p) => p.moves.map((m) => m.id + m.level).join(',') + '|' + p.items.map((i) => i.id).join(',')) }; });
+console.log('after picks', JSON.stringify(after));
 await host.screenshot({ path: `${out}/c3-host-game.png` });
 await guest.screenshot({ path: `${out}/c4-guest-game.png` });
 const st = await guest.evaluate(() => { const s = window.app.session; return { en: s.world.enemies.length, pr: s.world.projectiles.length, pk: s.world.pickups.length, lv: s.world.level, t: s.world.time.toFixed(1), ph: s.phase() }; });

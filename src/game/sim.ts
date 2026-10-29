@@ -411,8 +411,10 @@ export class Sim {
     const offers = this.offers.get(playerId);
     const p = this.players[playerId];
     if (!offers || !p || !offers[index]) return;
-    applyOffer(p, offers[index]);
-    if (offers[index].kind === 'money') this.money += 25;
+    const o = offers[index];
+    applyOffer(p, o);
+    if (o.kind === 'money') this.money += 25;
+    if (o.kind === 'newMove') this.emit({ e: 'learn', player: p.id, move: o.id });
     this.afterChoice(p);
   }
 

@@ -300,6 +300,12 @@ export class App {
       case 'revive':
         audio.sfx('revive');
         break;
+      case 'learn':
+        if (ev.player === me) {
+          const p = s.world.players[me];
+          banner(`${SPECIES[p.speciesId].name.toUpperCase()} learned ${MOVES[ev.move].name.toUpperCase()}!`, false, 1800);
+        }
+        break;
       case 'boom':
         audio.sfx('boom');
         break;

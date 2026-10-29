@@ -79,7 +79,7 @@ export function generateOffers(
           w = 6;
           // Strongly hint the mastery path when its base move is owned.
           if (p.moves.some((m) => MASTERY_OF[m.id]?.mastery?.item === def.id)) w = 9;
-        } else w = 0.6;
+        } else w = 0.12;
       }
       cands.push({ o: { kind: 'newItem', id: def.id, level: 1 }, w });
     }

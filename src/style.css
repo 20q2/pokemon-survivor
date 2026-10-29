@@ -247,3 +247,15 @@ table.dmg td.n { text-align: right; font-variant-numeric: tabular-nums; }
 .lu-item img { width: 24px; image-rendering: pixelated; }
 .matchup { font-size: 14px; margin-top: 6px; }
 .matchup.good { color: #1f8a3b; } .matchup.bad { color: #b3261e; }
+
+@media (max-width: 640px) {
+  .screen { padding: 64px 10px 30px; }
+  .money-chip { top: 8px; right: 8px; font-size: 10px; padding: 4px 8px; }
+  .topbar h2 { font-size: 12px; }
+  .card { min-height: 0; width: min(46vw, 240px); padding: 10px; }
+  .card .ds { font-size: 13px; }
+  .roster { grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 8px; }
+  .mon img { width: 52px; height: 52px; }
+  .hud-left { transform: scale(0.85); transform-origin: top left; }
+  .hud-stats { font-size: 8px; }
+}
