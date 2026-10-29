@@ -2,6 +2,7 @@ import { LINE } from '../data/pokedex.ts';
 import { MOVES, MASTERY_OF, MAX_MOVE_LEVEL } from '../data/moves.ts';
 import { ITEMS, ITEM_LIST, MAX_ITEM_LEVEL } from '../data/items.ts';
 import type { Rng } from '../engine/math.ts';
+import { effectiveness, type PType } from '../data/types.ts';
 import type { Player, UpgradeOffer } from './types.ts';
 
 /** Move ids already represented (mastered moves also block their base move). */
@@ -25,11 +26,20 @@ export function learnableMoves(p: Player, tms: readonly string[]): string[] {
   return [...out].filter((id) => MOVES[id] && !MOVES[id].mastery);
 }
 
+/** How well a move type fares against a route's wild Pokémon (average multiplier). */
+export function routeEffectiveness(type: PType, routeTypes: readonly PType[]): number {
+  if (!routeTypes.length) return 1;
+  let sum = 0;
+  for (const t of routeTypes) sum += effectiveness(type, [t]);
+  return sum / routeTypes.length;
+}
+
 export function generateOffers(
   p: Player,
   rng: Rng,
   count: number,
   tms: readonly string[],
+  routeTypes: readonly PType[] = [],
 ): UpgradeOffer[] {
   const owned = ownedMoveIds(p);
   const cands: { o: UpgradeOffer; w: number }[] = [];
@@ -47,6 +57,11 @@ export function generateOffers(
       if (p.types.includes(def.type)) w += 3;
       if (p.moves.length <= 1) w += 6;
       if (def.cat === 'status' && p.moves.length < 2) w *= 0.3;
+      if (def.cat !== 'status') {
+        // Lean toward coverage that works on this route.
+        const eff = routeEffectiveness(def.type, routeTypes);
+        w *= eff > 1.15 ? 1.7 : eff < 0.8 ? 0.55 : 1;
+      }
       cands.push({ o: { kind: 'newMove', id, level: 1 }, w });
     }
   }
@@ -109,6 +124,14 @@ export function applyOffer(p: Player, o: UpgradeOffer) {
       p.money += 25;
       break;
   }
+}
+
+/** Level-ups for things the player already owns (used by treasure chests). */
+export function ownedUpgrades(p: Player): UpgradeOffer[] {
+  const out: UpgradeOffer[] = [];
+  for (const m of p.moves) if (m.level < MAX_MOVE_LEVEL && !MOVES[m.id].mastery) out.push({ kind: 'moveUp', id: m.id, level: m.level + 1 });
+  for (const it of p.items) if (it.level < MAX_ITEM_LEVEL) out.push({ kind: 'itemUp', id: it.id, level: it.level + 1 });
+  return out;
 }
 
 /** Moves that are ready to master: max level + matching held item. */

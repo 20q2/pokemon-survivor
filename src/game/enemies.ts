@@ -37,14 +37,21 @@ export class Spawner {
   }
 
   /** Enemy hp multiplier at the current time. */
+  /** Stage difficulty eases in over the first minutes so every route starts fair. */
+  stageFactor() {
+    const ramp = Math.min(1, 0.25 + this.minute / 6);
+    return 1 + (this.sim.stage.difficulty - 1) * ramp;
+  }
+
   hpMult() {
     const m = this.minute;
     const n = this.sim.players.length;
-    return (1 + 0.14 * m + 0.022 * m * m) * this.sim.stage.difficulty * (1 + 0.65 * (n - 1));
+    return (1 + 0.14 * m + 0.022 * m * m) * this.stageFactor() * (1 + 0.65 * (n - 1));
   }
 
   dmgMult() {
-    return (1 + 0.075 * this.minute) * (0.75 + 0.25 * this.sim.stage.difficulty);
+    const grace = Math.min(1, 0.55 + this.minute * 0.15);
+    return grace * (1 + 0.075 * this.minute) * (0.75 + 0.25 * this.stageFactor());
   }
 
   update(dt: number) {
@@ -112,7 +119,11 @@ export class Spawner {
   spawnOffscreen(species: string, opts: SpawnOpts = {}) {
     const p = this.anchor();
     const hw = p.viewW / 2 + 40, hh = p.viewH / 2 + 40;
-    const side = this.sim.rng.int(0, 3);
+    let side = this.sim.rng.int(0, 3);
+    // Bias spawns toward where the player is heading so running away isn't free.
+    if (p.moving && this.sim.rng.chance(0.55)) {
+      side = Math.abs(p.fx) > Math.abs(p.fy) ? (p.fx < 0 ? 2 : 3) : p.fy < 0 ? 0 : 1;
+    }
     let x: number, y: number;
     if (side < 2) {
       x = p.x + this.sim.rng.range(-hw, hw);
@@ -162,7 +173,7 @@ export function spawnEnemy(sim: Sim, speciesId: string, x: number, y: number, op
   const shiny = opts.shiny ?? (!opts.boss && sim.rng.chance((1 / 450) * shinyOdds));
   const [bhp, batk, , bspa, , bspe] = sp.base;
   let hp = (4 + bhp * 0.12) * ROLE_HP[role] * sim.spawner.hpMult();
-  let speed = Math.min(105, (36 + bspe * 0.32) * ROLE_SPEED[role]);
+  let speed = Math.min(128, (48 + bspe * 0.42) * ROLE_SPEED[role]);
   let dmg = (3 + Math.max(batk, bspa) * 0.055) * sim.spawner.dmgMult();
   let xp = (role === 'tank' ? 2 : 1) * (1 + m * 0.06);
   let scale = role === 'tank' ? 1.15 : 1;
@@ -173,9 +184,9 @@ export function spawnEnemy(sim: Sim, speciesId: string, x: number, y: number, op
   }
   if (opts.boss) {
     const n = sim.players.length;
-    hp = (60 + bhp * 2) * (opts.boss.final ? 3.2 : 1.6) * (1 + m * 0.35) * sim.stage.difficulty * (1 + 0.8 * (n - 1));
+    hp = (50 + bhp * 1.6) * (opts.boss.final ? 2.4 : 1.1) * (1 + m * 0.3) * sim.stage.difficulty * (1 + 0.8 * (n - 1));
     dmg *= 1.8; xp = 150; scale = opts.boss.final ? 2.4 : 2; radius = opts.boss.final ? 26 : 22; knockResist = 1;
-    speed = Math.min(90, 45 + bspe * 0.25);
+    speed = Math.min(112, 82 + bspe * 0.24);
   }
   if (role === 'treasure') { speed = Math.max(speed, 80); xp = 5; }
   if (shiny) { hp *= 3; xp *= 5; }
@@ -405,7 +416,7 @@ function bossAI(sim: Sim, e: Enemy, target: Player, d: number, dt: number): { x:
   if (pattern === 'charge') {
     const cx = e.aiX - e.x, cy = e.aiY - e.y;
     const cd = Math.hypot(cx, cy) || 1;
-    res = { x: cx / cd, y: cy / cd, speed: cd > 10 ? 4.5 : 0 };
+    res = { x: cx / cd, y: cy / cd, speed: cd > 10 ? 3.4 : 0 };
   } else if (pattern === 'spiral') {
     e.aiY += dt;
     if (e.aiY > 0.09) {

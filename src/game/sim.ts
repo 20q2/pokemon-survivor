@@ -7,7 +7,7 @@ import { Rng, dist2 } from '../engine/math.ts';
 import { SpatialGrid } from '../engine/spatial.ts';
 import type { MetaBonuses } from '../meta/shop.ts';
 import { derivePlayerStats } from './stats.ts';
-import { applyOffer, generateOffers, masteryCandidates } from './levelup.ts';
+import { applyOffer, generateOffers, masteryCandidates, ownedUpgrades } from './levelup.ts';
 import { fireMoves, updateProjectiles, damagePlayer } from './combat.ts';
 import { Spawner, updateEnemies, killEnemy } from './enemies.ts';
 import type {
@@ -84,6 +84,8 @@ export class Sim {
   /** Remote players' positions are authoritative from their clients. */
   remoteControlled = new Set<number>();
   seenSpecies = new Set<string>();
+  /** Dev/testing: players take no damage. */
+  invulnerable = false;
   /** Mirrors every emitted event (network host). */
   eventTap: ((e: GameEvent) => void) | null = null;
   defeatedSpecies = new Map<string, number>();
@@ -400,7 +402,7 @@ export class Sim {
   }
 
   private makeOffers(p: Player) {
-    return generateOffers(p, this.rng, 3 + p.meta.choices, this.tms.get(p.id) ?? []);
+    return generateOffers(p, this.rng, 3 + p.meta.choices, this.tms.get(p.id) ?? [], this.stage.types);
   }
 
   choose(playerId: number, index: number) {
@@ -461,10 +463,23 @@ export class Sim {
       const roll = this.rng.next();
       const n = roll < 0.05 ? 5 : roll < 0.3 ? 3 : 1;
       for (let i = 0; i < n; i++) {
-        const ups = generateOffers(p, this.rng, 1, []).filter((o) => o.kind === 'moveUp' || o.kind === 'itemUp');
+        let ups = ownedUpgrades(p);
+        // Nothing to level? Grant something new instead.
+        if (!ups.length) ups = generateOffers(p, this.rng, 3, this.tms.get(p.id) ?? []).filter((o) => o.kind === 'newMove' || o.kind === 'newItem');
         if (!ups.length) break;
-        applyOffer(p, ups[0]);
-        rewards.push({ kind: ups[0].kind === 'moveUp' ? 'move' : 'item', id: ups[0].id, level: ups[0].level });
+        const o = this.rng.pick(ups);
+        applyOffer(p, o);
+        const lvl = o.kind === 'newMove' || o.kind === 'newItem' ? 1 : o.level;
+        rewards.push({ kind: o.kind === 'moveUp' || o.kind === 'newMove' ? 'move' : 'item', id: o.id, level: lvl });
+        // A chest can complete a mastery chain mid-way: master immediately.
+        const ready = masteryCandidates(p);
+        if (ready.length) {
+          const m = ready[0];
+          const owned = p.moves.find((x) => x.id === m.from)!;
+          owned.id = m.to;
+          p.masteries++;
+          rewards.push({ kind: 'mastery', id: m.to, from: m.from });
+        }
       }
       if (!rewards.length) {
         this.money += 60;

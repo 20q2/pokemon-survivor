@@ -123,8 +123,23 @@ function common(p: Player, def: MoveDef, s: MoveStats, power = s.power): Partial
   };
 }
 
+/** A boss within range, used to bias some shots so bosses don't hide behind crowds. */
+function bossInRange(sim: Sim, p: Player, range: number): Enemy | undefined {
+  for (const e of sim.enemies) {
+    if (e.boss && e.alive && (e.x - p.x) ** 2 + (e.y - p.y) ** 2 < range * range) return e;
+  }
+  return undefined;
+}
+
+function priorityTargets(sim: Sim, p: Player, n: number, range = TARGET_RANGE): Enemy[] {
+  const list = nearestEnemies(sim, p.x, p.y, n, range);
+  const boss = sim.rng.chance(0.4) ? bossInRange(sim, p, range) : undefined;
+  if (boss && !list.includes(boss)) list.unshift(boss);
+  return list.slice(0, Math.max(1, n));
+}
+
 function aimAngle(sim: Sim, p: Player): number {
-  const t = nearestEnemies(sim, p.x, p.y, 1)[0];
+  const t = priorityTargets(sim, p, 1)[0];
   return t ? Math.atan2(t.y - p.y, t.x - p.x) : Math.atan2(p.fy, p.fx);
 }
 
@@ -141,7 +156,7 @@ function fire(sim: Sim, p: Player, m: OwnedMove, def: MoveDef, s: MoveStats) {
   switch (def.behavior) {
     case 'projectile': {
       const n = Math.max(1, Math.round(s.count));
-      const targets = s.spread ? [] : nearestEnemies(sim, p.x, p.y, n);
+      const targets = s.spread ? [] : priorityTargets(sim, p, n);
       const base = aimAngle(sim, p);
       const spreadRad = (s.spread * Math.PI) / 180;
       for (let i = 0; i < n; i++) {
@@ -202,7 +217,7 @@ function fire(sim: Sim, p: Player, m: OwnedMove, def: MoveDef, s: MoveStats) {
     }
     case 'beam': {
       const n = Math.max(1, Math.round(s.count));
-      const targets = nearestEnemies(sim, p.x, p.y, n, s.range);
+      const targets = priorityTargets(sim, p, n, s.range);
       const base = aimAngle(sim, p);
       for (let i = 0; i < n; i++) {
         const t = targets[i];
@@ -217,6 +232,8 @@ function fire(sim: Sim, p: Player, m: OwnedMove, def: MoveDef, s: MoveStats) {
     case 'strike': {
       const n = Math.max(1, Math.round(s.count));
       const targets = randomEnemiesInView(sim, p, n);
+      const boss = bossInRange(sim, p, Math.max(p.viewW, p.viewH) / 2);
+      if (boss && sim.rng.chance(0.5)) targets.unshift(boss);
       for (let i = 0; i < n; i++) {
         const t = targets[i];
         const x = t ? t.x : p.x + sim.rng.range(-200, 200);
@@ -297,7 +314,7 @@ function fire(sim: Sim, p: Player, m: OwnedMove, def: MoveDef, s: MoveStats) {
     }
     case 'lob': {
       const n = Math.max(1, Math.round(s.count));
-      const targets = nearestEnemies(sim, p.x, p.y, n, 340);
+      const targets = priorityTargets(sim, p, n, 340);
       for (let i = 0; i < n; i++) {
         const t = targets[i % Math.max(1, targets.length)];
         const tx = t ? t.x + (i >= targets.length ? sim.rng.range(-40, 40) : 0) : p.x + p.fx * 120 + sim.rng.range(-30, 30);
@@ -522,7 +539,7 @@ export function rawDamageEnemy(sim: Sim, e: Enemy, dmg: number, type: PType, own
 }
 
 export function damagePlayer(sim: Sim, p: Player, raw: number, type: PType, special: boolean) {
-  if (p.fainted || raw <= 0) return;
+  if (p.fainted || raw <= 0 || sim.invulnerable) return;
   const dodge = p.buffs.find((b) => b.kind === 'dodge');
   if (dodge && sim.rng.next() < dodge.amount) return;
   let dmg = incomingDamage(raw, type, p.types, special ? p.stats.projTaken : p.stats.contactTaken);

@@ -59,7 +59,7 @@ export const STAGES: StageDef[] = [
     types: ['rock', 'ground', 'poison', 'fairy'], music: 'cave', difficulty: 1.25, darkness: 0.35,
     ground: ['#5a5068', '#4d445a', '#7a6e8a'], decor: ['rock', 'crystal', 'stalagmite', 'bones'],
     pools: {
-      early: [E('zubat', 4), E('geodude', 3), E('diglett', 2), E('sandshrew', 2)],
+      early: [E('zubat', 4), E('geodude', 1), E('diglett', 2), E('sandshrew', 2), E('paras', 2)],
       mid: [E('zubat', 3), E('geodude', 2), E('ekans', 3), E('clefairy', 2), E('paras', 2), E('sandshrew', 2)],
       late: [E('golbat', 3), E('graveler', 2), E('clefairy', 2), E('ekans', 2), E('sandslash', 1)],
     },

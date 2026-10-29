@@ -1,4 +1,4 @@
-import { TYPE_COLORS, type PType } from '../data/types.ts';
+import { TYPE_COLORS } from '../data/types.ts';
 import { SPECIES } from '../data/pokedex.ts';
 import type { StageDef } from '../data/stages.ts';
 import { dirRow, TAU } from '../engine/math.ts';
@@ -483,8 +483,8 @@ export class Renderer {
       g.globalCompositeOperation = 'lighter';
       g.drawImage(assets.glow.get(pr.type)!, pr.x - r * 2.2, pr.y - r * 2.2, r * 4.4, r * 4.4);
       g.globalCompositeOperation = 'source-over';
-      g.fillStyle = '#2b0a0a';
-      g.beginPath(); g.arc(pr.x, pr.y, r, 0, TAU); g.fill();
+      g.fillStyle = Math.floor(world.time * 8) % 2 ? '#ffffff' : '#2b0a0a';
+      g.beginPath(); g.arc(pr.x, pr.y, r + 0.8, 0, TAU); g.fill();
       g.fillStyle = col;
       g.beginPath(); g.arc(pr.x, pr.y, r - 1.5, 0, TAU); g.fill();
       g.fillStyle = '#ff5050';
@@ -873,4 +873,3 @@ function heart(g: CanvasRenderingContext2D, r: number, color: string) {
   g.fill();
 }
 
-export type { PType };

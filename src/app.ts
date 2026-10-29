@@ -14,7 +14,7 @@ import { loadSave, storeSave, type SaveData } from './meta/save.ts';
 import { metaBonuses } from './meta/shop.ts';
 import { assets } from './render/assets.ts';
 import { Renderer } from './render/renderer.ts';
-import { banner, h, MenuNav, toast } from './ui/dom.ts';
+import { banner, MenuNav, toast } from './ui/dom.ts';
 import { Hud } from './ui/hud.ts';
 import { chestPopup, LevelUpUI } from './ui/runui.ts';
 import * as screens from './ui/menus.ts';
@@ -230,7 +230,7 @@ export class App {
       this.startAttract();
       audio.playMusic('menu');
       this.show(screens.resultsScreen(this, snapshot));
-    }, quit ? 50 : 1600);
+    }, quit ? 50 : 900);
   }
 
   // ─────────────────────────── events ───────────────────────────
@@ -336,8 +336,12 @@ export class App {
         this.levelUp.sync(s);
         const ph = s.phase();
         if (ph === 'over' || ph === 'victory') {
+          if (this.endTimer === 0) {
+            const name = SPECIES[s.world.players[s.localId].speciesId].name.toUpperCase();
+            if (ph === 'over') { banner(s.coop ? 'Your whole team fainted…' : `${name} fainted!`, false, 2400); audio.stopMusic(); }
+          }
           this.endTimer += dt;
-          if (this.endTimer > 0.4) this.finishRun(ph === 'victory');
+          if (this.endTimer > (ph === 'over' ? 2 : 0.6)) this.finishRun(ph === 'victory');
         }
         if (s.lost) {
           this.ended = true;
@@ -371,4 +375,3 @@ export class App {
   }
 }
 
-export { h };

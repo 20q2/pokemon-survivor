@@ -82,7 +82,7 @@ img.px, .px img { image-rendering: pixelated; }
 .mon.sel { border-color: var(--accent); background: #ffe9e6; }
 .mon img { width: 64px; height: 64px; image-rendering: pixelated; display: block; margin: 0 auto; border-radius: 8px; background: rgba(0,0,0,0.06); }
 .mon .nm { font-size: 14px; margin-top: 4px; font-weight: 600; }
-.mon.locked img { filter: brightness(0) opacity(0.55); }
+.mon.locked img { filter: grayscale(1) opacity(0.6); background: transparent; padding: 10px; }
 .mon.locked .nm { color: var(--ink-soft); }
 .mon .shiny-star { position: absolute; top: 4px; right: 6px; color: #e6b800; font-size: 16px; text-shadow: 1px 1px 0 #000; }
 .detail h3 { font-family: var(--head); font-size: 14px; margin: 0 0 8px; }
@@ -102,7 +102,9 @@ img.px, .px img { image-rendering: pixelated; }
 .stage:hover, .stage:focus-visible, .stage.focus { transform: translateY(-3px); }
 .stage .swatch { height: 86px; position: relative; image-rendering: pixelated; }
 .stage .swatch .bosses { position: absolute; bottom: 4px; right: 6px; display: flex; }
-.stage .swatch .bosses img { width: 48px; image-rendering: pixelated; filter: drop-shadow(2px 2px 0 rgba(0,0,0,0.5)); }
+.stage .swatch .bosses { gap: 4px; }
+.stage .swatch .bosses img { width: 44px; image-rendering: pixelated; border-radius: 8px; border: 2px solid rgba(0,0,0,0.6); box-shadow: 2px 2px 0 rgba(0,0,0,0.35); }
+.stage.locked .swatch .bosses img { filter: brightness(0) opacity(0.5); }
 .stage .body { padding: 10px 12px 12px; }
 .stage h3 { font-family: var(--head); font-size: 12px; margin: 0 0 6px; }
 .stage.locked { filter: grayscale(1) brightness(0.7); cursor: not-allowed; }

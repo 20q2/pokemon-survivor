@@ -2,6 +2,7 @@ import type { App } from '../app.ts';
 import { audio } from '../audio/audio.ts';
 import { ABILITIES, LINE, SPECIES, SPECIES_LIST, type Line } from '../data/pokedex.ts';
 import { MOVES } from '../data/moves.ts';
+import { ITEMS } from '../data/items.ts';
 import { STAGES } from '../data/stages.ts';
 import { TYPE_COLORS } from '../data/types.ts';
 import { ACHIEVEMENTS, rewardText, stageUnlocked } from '../meta/achievements.ts';
@@ -142,7 +143,7 @@ export function selectScreen(app: App, onConfirm: (lineId: string) => void, titl
         class: `mon${unlocked ? '' : ' locked'}${l.id === sel ? ' sel' : ''}`, 'data-nav': true,
         onfocus: () => { if (sel !== l.id) { sel = l.id; roster.querySelectorAll('.mon').forEach((m) => m.classList.toggle('sel', m === el)); renderDetail(); } },
         onclick: () => { sel = l.id; audio.sfx('click'); renderRoster(); renderDetail(); if (unlocked) (detail.querySelector('.btn.primary') as HTMLElement)?.focus(); },
-      }, img(assets.portraitUrl(l.stages[0], shinyOn(l.id))), h('div', { class: 'nm' }, unlocked ? l.name : '???'),
+      }, img(unlocked ? assets.portraitUrl(l.stages[0], shinyOn(l.id)) : assets.itemUrl('poke-ball')), h('div', { class: 'nm' }, unlocked ? l.name : '???'),
         app.save.shinyUnlocked.includes(l.id) ? h('span', { class: 'shiny-star' }, '★') : null);
       if (l.id === sel) el.setAttribute('data-autofocus', '');
       roster.append(el);
@@ -409,7 +410,7 @@ export function resultsScreen(app: App, data: { session: RunSession; summary: Ru
           h('td', { class: 'n' }, `${m.kills.toLocaleString()} KO`),
         ))),
         h('b', { class: 'mt' }, 'Held items'),
-        h('div', { class: 'row', style: 'flex-wrap:wrap' }, me.items.map((it) => h('span', { class: 'row', style: 'gap:2px' }, img(assets.itemUrl(it.id)), `Lv${it.level}`))),
+        h('div', { class: 'row', style: 'flex-wrap:wrap' }, me.items.map((it) => h('span', { class: 'row', style: 'gap:2px' }, img(assets.itemUrl(it.id)), `${ITEMS[it.id].name} Lv${it.level}`))),
         rewards.newAchievements.length ? h('b', { class: 'mt' }, 'New achievements') : null,
         ...rewards.newAchievements.map((a) => h('div', null, `✔ ${a.name} — `, h('span', { class: 'hint' }, rewardText(a.reward)))),
       ),

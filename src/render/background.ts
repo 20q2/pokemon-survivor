@@ -45,12 +45,14 @@ export function buildGroundTile(stage: StageDef): HTMLCanvasElement {
   g.fillStyle = base;
   g.fillRect(0, 0, TILE, TILE);
   // large soft mottling (wrapped so the tile is seamless)
-  for (let i = 0; i < 60; i++) {
-    const x = rng.range(0, TILE), y = rng.range(0, TILE), r = rng.int(10, 34);
+  g.globalAlpha = 0.45;
+  for (let i = 0; i < 70; i++) {
+    const x = rng.range(0, TILE), y = rng.range(0, TILE), r = rng.int(8, 26);
     for (const ox of [-TILE, 0, TILE]) for (const oy of [-TILE, 0, TILE]) {
-      ellipse(g, x + ox, y + oy, r, Math.round(r * 0.7), mottle);
+      ellipse(g, x + ox, y + oy, r, Math.round(r * 0.6), mottle);
     }
   }
+  g.globalAlpha = 1;
   // fine speckle texture
   for (let i = 0; i < 1400; i++) {
     g.fillStyle = rng.chance(0.5) ? shade(base, 0.05) : shade(base, -0.05);
