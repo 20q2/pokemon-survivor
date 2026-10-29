@@ -4,7 +4,8 @@ import { autotile, cellPx, cropProp, palette, tileSheet, type Cell, type Sheet }
 /**
  * Per-route look: a base ground material, up to two autotiled terrain layers on top (patches or
  * winding paths, with a rim where they meet the layer below), and props scattered on a tile grid
- * (some in dense groves). All tiles and props are original art painted by pixelart.ts.
+ * (some in dense groves). Tiles and props are painted by pixelart.ts, or cut from the player's
+ * tile sheet when one is present (sheetBuilders below).
  */
 
 export interface Material { variants: Tex[]; weights: number[] }
@@ -622,8 +623,8 @@ const builders: Record<string, () => Biome> = {
 };
 
 // ─────────────────────────── tile-sheet layouts ───────────────────────────
-// Cell coordinates in the player-supplied outdoor sheet (see tilesheet.ts). Routes listed here use
-// the sheet when it is present; the rest keep their painted art.
+// Cell coordinates in the player-supplied FRLG sheet (outdoor and cave sets; see tilesheet.ts).
+// Routes listed here use the sheet when it is present; the rest keep their painted art.
 
 function sheetMaterial(s: Sheet, cells: readonly Cell[], weights: number[]): Material {
   return {
@@ -659,6 +660,66 @@ const sheetBuilders: Record<string, (s: Sheet) => Biome> = {
         { sprites: [P2([0, 34], 3, 4, 24, 58), P2([17, 0], 1, 1, 8, 15)], cell: 2, density: 0.006, on: [0], clear: 72 },
         { sprites: [P2([7, 12], 1, 1, 8, 14, false), P2([7, 16], 1, 1, 8, 14, false), P2([8, 18], 1, 1, 8, 14, false)], cell: 1, density: 0.012, on: [0] },
         { sprites: [P2([7, 2], 1, 1, 8, 14, false), P2([7, 0], 1, 1, 8, 14, false), P2([2, 33], 1, 1, 8, 14, false)], cell: 1, density: 0.03, on: [0] },
+      ],
+    };
+  },
+  // Olive cave set (bottom right): brown dirt floor with raised olive ledges.
+  mtmoon: (s) => {
+    const dirtCells: Cell[] = [[21, 23], [23, 26], [24, 26], [23, 27], [24, 27], [23, 28], [24, 28]];
+    // dominant colours only: the dirt's pebbles are ledge-coloured, like the rocks standing on it
+    const dirtPal = palette(s, dirtCells, 0.02), ledgePal = palette(s, [[19, 23]]);
+    const onDirt = (cell: Cell, w: number, h: number, ax: number, ay: number, tall = true) => sheetProp(s, cell, w, h, dirtPal, ax, ay, tall);
+    const onLedge = (cell: Cell, w: number, h: number, ax: number, ay: number) => sheetProp(s, cell, w, h, ledgePal, ax, ay, false);
+    return {
+      seed: 21,
+      base: sheetMaterial(s, dirtCells, [12, 1, 1, 1, 1, 1, 1]),
+      layers: [
+        { mat: sheetMaterial(s, [[19, 23]], [1]), field: { scale: 9, kind: 'blob', thr: 0.6 }, rim: '#706858', shade: true },
+      ],
+      props: [
+        { sprites: [onDirt([21, 28], 1, 1, 8, 15), onDirt([22, 28], 1, 1, 8, 15)], cell: 2, density: 0.035, on: [0], grove: { scale: 6, thr: 0.68, density: 0.5 }, clear: 64 },
+        { sprites: [onLedge([20, 23], 1, 1, 8, 8), onLedge([21, 26], 2, 1, 16, 8)], cell: 2, density: 0.03, on: [1] },
+        { sprites: [onDirt([20, 28], 1, 1, 8, 8, false), onDirt([19, 27], 1, 2, 8, 24, false)], cell: 2, density: 0.003, on: [0], clear: 64 },
+      ],
+    };
+  },
+  // Blue-grey cave set (bottom left): ice floor with sandy cobble shoals.
+  seafoam: (s) => {
+    const iceCells: Cell[] = [[0, 42]];
+    const cobble: Cell = [2, 42];
+    // rocks sit on cobble; the ice shares their highlight colours, so it isn't keyed out
+    const key = palette(s, [cobble]);
+    const P2 = (cell: Cell, w: number, h: number, ax: number, ay: number, tall = true) => sheetProp(s, cell, w, h, key, ax, ay, tall);
+    return {
+      seed: 31,
+      base: sheetMaterial(s, iceCells, [1]),
+      layers: [
+        { mat: sheetMaterial(s, [cobble], [1]), field: { scale: 10, kind: 'blob', thr: 0.6 }, rim: '#808070', shade: true },
+      ],
+      props: [
+        { sprites: [P2([0, 46], 1, 1, 8, 15), P2([1, 46], 1, 1, 8, 15)], cell: 2, density: 0.03, on: [0, 1], grove: { scale: 6, thr: 0.68, density: 0.45 }, clear: 64 },
+        { sprites: [P2([3, 43], 2, 3, 16, 46)], cell: 2, density: 0.006, on: [1], clear: 72 },
+      ],
+    };
+  },
+  // Mauve cave set (bottom right): mossy cobble floor with autotiled sand drifts.
+  cerulean: (s) => {
+    const floor: Cell[] = [[21, 30]];
+    const floorPal = palette(s, floor);
+    const P2 = (cell: Cell, w: number, h: number, ax: number, ay: number, tall = true) => sheetProp(s, cell, w, h, floorPal, ax, ay, tall);
+    return {
+      seed: 71,
+      base: sheetMaterial(s, floor, [1]),
+      layers: [
+        {
+          mat: sheetMaterial(s, [[24, 35]], [1]),
+          field: { scale: 9, kind: 'blob', thr: 0.68 },
+          auto: autotile(s, [24, 35], [[24, 30], [25, 30], [26, 30], [24, 31], [25, 31], [26, 31], [24, 32], [25, 32], [26, 32], [24, 33], [25, 33], [26, 33]], floorPal),
+        },
+      ],
+      props: [
+        { sprites: [P2([19, 33], 1, 1, 8, 15), P2([19, 34], 1, 1, 8, 15), P2([20, 34], 1, 1, 8, 15), P2([21, 34], 1, 1, 8, 15)], cell: 2, density: 0.035, on: [0], grove: { scale: 6, thr: 0.66, density: 0.5 }, clear: 64 },
+        { sprites: [P2([22, 34], 2, 2, 16, 31)], cell: 2, density: 0.008, on: [0], clear: 72 },
       ],
     };
   },

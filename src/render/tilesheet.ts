@@ -51,10 +51,12 @@ export function cellPx(s: Sheet, [c, r]: Cell): Uint32Array {
   return out;
 }
 
-export function palette(s: Sheet, cells: readonly Cell[]): Set<number> {
-  const p = new Set<number>();
-  for (const cell of cells) for (const v of cellPx(s, cell)) if (v >>> 24) p.add(v);
-  return p;
+/** Colours used by the cells; with `minShare`, only those covering at least that fraction of them. */
+export function palette(s: Sheet, cells: readonly Cell[], minShare = 0): Set<number> {
+  const n = new Map<number, number>();
+  for (const cell of cells) for (const v of cellPx(s, cell)) if (v >>> 24) n.set(v, (n.get(v) ?? 0) + 1);
+  const min = minShare * cells.length * T * T;
+  return new Set([...n].filter(([, k]) => k >= min).map(([v]) => v));
 }
 
 const rgbDist = (a: number, b: number) => {
@@ -90,17 +92,29 @@ export function autotile(s: Sheet, full: Cell, block: readonly Cell[], basePal: 
         cls[i] = dp <= db ? 1 : 0;
       }
     }
-    return { px, cls };
+    // which corners of this tile are patch (majority of a 4×4 block, so dither doesn't flip it)
+    const corners = [0, 1, 2, 3].map((q) => {
+      let n = 0;
+      for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) n += cls[((q >> 1) * 12 + y) * T + (q & 1) * 12 + x];
+      return n >= 8 ? 1 : 0;
+    });
+    return { px, cls, corners };
   });
   const out: Uint32Array[] = [];
   for (let cfg = 0; cfg < 16; cfg++) {
     const c00 = cfg & 1, c10 = (cfg >> 1) & 1, c01 = (cfg >> 2) & 1, c11 = (cfg >> 3) & 1;
+    const want = [c00, c10, c01, c11];
     const tile = new Uint32Array(T * T);
     for (let q = 0; q < 4; q++) {
       const qx = (q & 1) * 8, qy = (q >> 1) * 8;
+      // A quadrant's outer edges are set by its own corner and its two neighbouring corners; only
+      // sources that agree on those join seamlessly with the next tile, wherever their edge sits.
+      const agrees = (k: number) => [q, q ^ 1, q ^ 2].every((c) => (k < 0 ? 0 : sources[k].corners[c]) === want[c]);
+      const strict = agrees(-1) || sources.some((_, k) => agrees(k));
       let best = -1, bestScore = Infinity;
       // candidate -1 = empty (all base)
       for (let k = -1; k < sources.length; k++) {
+        if (strict && !agrees(k)) continue;
         let score = 0;
         for (let y = qy; y < qy + 8; y++) for (let x = qx; x < qx + 8; x++) {
           const fx = S[x], fy = S[y];
@@ -108,6 +122,8 @@ export function autotile(s: Sheet, full: Cell, block: readonly Cell[], basePal: 
           const m = k < 0 ? 0 : sources[k].cls[y * T + x];
           score += t === m ? 0 : 1;
         }
+        // then prefer a source that also agrees on the opposite corner (same tile shape)
+        if (strict && (k < 0 ? 0 : sources[k].corners[q ^ 3]) !== want[q ^ 3]) score += 1000;
         // prefer real art over the empty quadrant on ties
         if (score < bestScore || (score === bestScore && best < 0)) { bestScore = score; best = k; }
       }
@@ -140,14 +156,14 @@ export function cropProp(s: Sheet, [c, r]: Cell, w: number, h: number, ground: S
   for (let x = 0; x < W; x++) edge.push(x, (H - 1) * W + x);
   for (let y = 0; y < H; y++) edge.push(y * W, y * W + W - 1);
   for (const i of edge) border.set(px[i], (border.get(px[i]) ?? 0) + 1);
+  const near = (v: number, list: number[], d: number) => list.some((k) => rgbDist(v, k) <= d);
+  const groundList = [...ground];
   const key = new Set(ground);
-  for (const [v, n] of border) if (n >= 4) key.add(v);
+  // common border colours are ground shades the palette missed — unless they look nothing like
+  // the ground (then they're the art itself touching the crop edge, e.g. a 1×1 rock)
+  for (const [v, n] of border) if (n >= 4 && near(v, groundList, 1200)) key.add(v);
   const keyList = [...key];
-  const isGround = (v: number) => {
-    if (!(v >>> 24) || key.has(v)) return true;
-    for (const k of keyList) if (rgbDist(v, k) <= 700) return true;
-    return false;
-  };
+  const isGround = (v: number) => !(v >>> 24) || key.has(v) || near(v, keyList, 700);
   const cut = new Uint8Array(W * H);
   const stack = edge.filter((i) => isGround(px[i]));
   for (const i of stack) cut[i] = 1;
