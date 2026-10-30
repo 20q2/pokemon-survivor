@@ -691,7 +691,7 @@ export class Renderer {
   private drawWeather(w: WeatherKind, time: number) {
     const g = this.g;
     const W = this.canvas.width, H = this.canvas.height;
-    const tint: Record<WeatherKind, string> = { sun: 'rgba(255,200,90,0.12)', rain: 'rgba(40,70,140,0.16)', sand: 'rgba(200,155,80,0.26)', snow: 'rgba(220,235,255,0.14)' };
+    const tint: Record<WeatherKind, string> = { sun: 'rgba(255,200,90,0.12)', rain: 'rgba(40,70,140,0.16)', sand: 'rgba(200,155,80,0.14)', snow: 'rgba(220,235,255,0.14)' };
     g.fillStyle = tint[w];
     g.fillRect(0, 0, W, H);
     const s = Math.max(1, Math.round(W / 480));
@@ -703,26 +703,40 @@ export class Renderer {
       g.fillRect(0, 0, W, H);
       return;
     }
-    const n = w === 'rain' ? 90 : w === 'snow' ? 70 : 130;
+    g.globalAlpha = this.fxOpacity;
+    if (w === 'sand') {
+      // Sparse drifting dust, not a full-screen sheet of fast streaks: a uniform field
+      // sliding across the whole view reads as self-motion and makes people queasy.
+      // Hashed positions (no lattice), three depth layers at different slow speeds.
+      const hash = (k: number) => { const v = Math.sin(k) * 43758.5453; return v - Math.floor(v); };
+      for (let i = 0; i < 48; i++) {
+        const layer = i % 3;
+        const speed = (22 + layer * 22) * s;
+        const x = (hash(i * 12.9898) * W + time * speed) % W;
+        const y = (hash(i * 78.233) * H + time * speed * 0.12 + Math.sin(time * 0.5 + i) * 4 * s) % H;
+        g.fillStyle = layer === 0 ? 'rgba(150,110,60,0.3)' : layer === 1 ? 'rgba(226,190,128,0.35)' : 'rgba(236,206,150,0.45)';
+        g.fillRect(x, y, (2 + layer) * s, Math.max(1, layer) * s);
+      }
+      g.globalAlpha = 1;
+      return;
+    }
+    const n = w === 'rain' ? 90 : 70;
     for (let i = 0; i < n; i++) {
       const seed = i * 97.13;
-      const speed = w === 'rain' ? 900 : w === 'snow' ? 60 : 500;
+      const speed = w === 'rain' ? 900 : 60;
       const x0 = (seed * 13.7) % W;
       const y0 = (seed * 7.3) % H;
       if (w === 'rain') {
         const y = (y0 + time * speed) % H, x = (x0 - time * 200) % W;
         g.strokeStyle = 'rgba(180,210,255,0.55)'; g.lineWidth = s;
         g.beginPath(); g.moveTo((x + W) % W, y); g.lineTo((x + W) % W - 4 * s, y + 12 * s); g.stroke();
-      } else if (w === 'snow') {
+      } else {
         const y = (y0 + time * speed) % H, x = (x0 + Math.sin(time + i) * 20 + W) % W;
         g.fillStyle = 'rgba(255,255,255,0.8)';
         g.fillRect(x, y, 2 * s, 2 * s);
-      } else {
-        const x = (x0 + time * speed) % W, y = (y0 + Math.sin(time * 2 + i) * 6 + H) % H;
-        g.fillStyle = i % 3 ? 'rgba(226,190,128,0.75)' : 'rgba(150,110,60,0.6)';
-        g.fillRect(x, y, (10 + (i % 4) * 4) * s, Math.max(1, s * 1.2));
       }
     }
+    g.globalAlpha = 1;
   }
 
   private drawTerrain(pr: Projectile, time: number) {
