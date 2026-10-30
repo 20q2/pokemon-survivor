@@ -1,7 +1,7 @@
 // Level-up card quality: node scripts/cards.ts [stageId] [lineId] [seed]
 // Runs the seeded bot for 15 minutes and classifies every offered card:
 //   real = new move/item or an upgrade below the max, limit = move limit break, vitamin, heal, other.
-// Per minute: level-ups, cards by class and level-ups with no real card. A dead card at level 30+ breaks the reward.
+// Per minute: level-ups, cards by class and level-ups with no real card. Zero-real level-ups before 12:00 should stay under 10 %.
 import { Sim, DT } from '../src/game/sim.ts';
 import { metaBonuses } from '../src/meta/shop.ts';
 import { Rng } from '../src/engine/math.ts';
@@ -16,13 +16,17 @@ const SECS = 900;
 const CLASSES = ['real', 'limit', 'vitamin', 'heal', 'other'] as const;
 type Cls = (typeof CLASSES)[number];
 
-export function classify(o: UpgradeOffer): Cls {
+function classify(o: UpgradeOffer): Cls {
   switch (o.kind) {
     case 'newMove': case 'newItem': case 'itemUp': return 'real';
     case 'moveUp': return o.level > MAX_MOVE_LEVEL ? 'limit' : 'real';
     case 'vitamin': return 'vitamin';
     case 'heal': return 'heal';
-    default: return 'other';
+    default: {
+      const _exhaustive: 'forget' | 'keep' = o.kind;
+      void _exhaustive;
+      return 'other';
+    }
   }
 }
 

@@ -104,9 +104,9 @@ describe('data integrity', () => {
     }
   });
 
-  it('the first four minutes are pure chasers (no ranged or bomber species)', () => {
+  it('the first six minutes are pure chasers (no ranged or bomber species)', () => {
     for (const st of STAGES) {
-      for (let i = 0; i < 4; i++) {
+      for (let i = 0; i < 6; i++) {
         for (const e of st.waves[i].species) expect(['ranged', 'bomber'], `${st.id} m${i} ${e.species}`).not.toContain(ENEMY_ROLE[e.species]);
       }
     }

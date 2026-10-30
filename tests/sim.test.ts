@@ -3,8 +3,8 @@ import { Sim, DT, DIG_TIME } from '../src/game/sim.ts';
 import { metaBonuses } from '../src/meta/shop.ts';
 import { botChoose, botSteer } from '../src/game/bot.ts';
 import { LINES } from '../src/data/pokedex.ts';
-import { STAGES, waveAt } from '../src/data/stages.ts';
-import { isSetPiece, spawnEnemy } from '../src/game/spawner.ts';
+import { ENEMY_ROLE, STAGES, waveAt } from '../src/data/stages.ts';
+import { isRegular, isSetPiece, spawnEnemy } from '../src/game/spawner.ts';
 import { AI } from '../src/game/types.ts';
 
 /** `immortal`: the simple bot can still wander into a forest pocket and get swarmed on some
@@ -231,7 +231,7 @@ describe('late-game systems', () => {
 });
 
 describe('playtest regressions', () => {
-  it('a 12-minute no-meta Raichu run (even untouchable) neither floods gold nor runs out of upgrades by 6:00 and 10:00, nor of something to level by 14:00', async () => {
+  it('a 14-minute no-meta Raichu run (even untouchable) neither floods gold nor runs out of upgrades by 6:00 and 10:00, nor of something to level by 14:00', async () => {
     const { generateOffers } = await import('../src/game/levelup.ts');
     const { runBonus } = await import('../src/meta/progression.ts');
     const { MAX_MOVE_LEVEL } = await import('../src/data/moves.ts');
@@ -262,6 +262,41 @@ describe('playtest regressions', () => {
     expect(realAt10, 'real build upgrades still on offer at 10:00').toBeGreaterThan(0);
     expect(levelAt14, 'upgrades or limit breaks still on offer at 14:00').toBeGreaterThan(0);
   }, 240_000); // ~50-70 s now that waves fill their quota; a loaded machine must not turn it into a flake
+});
+
+describe('calm base crowd', () => {
+  const plant = (startTime: number) => new Sim({
+    stageId: 'powerplant', seed: 7, startTime, players: [{ name: 'a', lineId: 'pichu', shiny: false, meta: metaBonuses({}), tms: [] }],
+  });
+  const isShooter = (e: { speciesId: string }) => ENEMY_ROLE[e.speciesId] === 'ranged';
+  /** Stands still for `seconds`; returns enemyShot events and every regular shooter that was alive at some point. */
+  const stand = (sim: Sim, seconds: number) => {
+    sim.invulnerable = true;
+    let shots = 0;
+    const seen = new Set<unknown>();
+    const end = sim.time + seconds;
+    while (sim.time < end) {
+      if (sim.phase === 'levelup') { sim.choose(0, 0); continue; }
+      sim.update(DT);
+      shots += sim.events.filter((e) => e.e === 'enemyShot').length;
+      sim.events.length = 0;
+      for (const e of sim.enemies) if (isRegular(e) && !e.guardian && isShooter(e)) seen.add(e);
+    }
+    return { shots, shooters: seen.size };
+  };
+
+  it('regular shooters fire at most every 3.5 s', () => {
+    const { shots, shooters } = stand(plant(480), 30);
+    expect(shooters, 'a shooter wave is on').toBeGreaterThan(0);
+    expect(shots).toBeLessThanOrEqual((Math.ceil(30 / 3.5) + 1) * shooters);
+  });
+
+  it('no shooters or bombers among the regulars before minute 6', () => {
+    const sim = plant(200);
+    stand(sim, 20);
+    const bad = sim.enemies.filter((e) => isRegular(e) && ['ranged', 'bomber'].includes(ENEMY_ROLE[e.speciesId]));
+    expect(bad.map((e) => e.speciesId)).toEqual([]);
+  });
 });
 
 describe('evolution move learning', () => {

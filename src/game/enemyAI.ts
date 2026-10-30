@@ -5,7 +5,7 @@ import { freshStatus, makeProjectile, rawDamageEnemy } from './combat.ts';
 import { megaOnKill } from './mega.ts';
 import { RAID_MOVES, alphaNextMove, castRaid, guardianMove, markCharge, spawnHazard, type RaidMove } from './hazards.ts';
 import type { Sim } from './sim.ts';
-import { spawnEnemy, isSetPiece } from './spawner.ts';
+import { spawnEnemy, isSetPiece, isRegular } from './spawner.ts';
 import { AI, type Enemy, type Player, type Projectile } from './types.ts';
 import { heal } from './ledger.ts';
 
@@ -115,8 +115,11 @@ export function updateEnemies(sim: Sim, dt: number) {
           case 'ranged': {
             if (d < 140) { mx = -mx; my = -my; } else if (d < 200) { [mx, my] = [-my * 0.6, mx * 0.6]; }
             e.ai -= dt;
-            if (e.ai <= 0 && d < 320) {
-              e.ai = sim.rng.range(2.4, 3.6);
+            // Regular crowd shooters are a texture, not a bullet hell: close range, slow cadence.
+            // Guardians, alphas and elites keep their own timings.
+            const crowd = isRegular(e) && !e.guardian;
+            if (e.ai <= 0 && d < (crowd ? 200 : 320)) {
+              e.ai = crowd ? sim.rng.range(3.5, 4.5) : sim.rng.range(2.4, 3.6);
               enemyShot(sim, e, Math.atan2(dy, dx), 120, e.dmg * 0.9);
             }
             break;
