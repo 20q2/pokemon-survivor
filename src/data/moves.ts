@@ -176,7 +176,9 @@ export function moveStatsAt(def: MoveDef, level: number): MoveStats {
   s.power *= overLevelMult(level);
   // The first six also widen the move, or add a projectile every third break if it has count upgrades.
   const breaks = Math.min(LIMIT_LINEAR, Math.max(0, level - MAX_MOVE_LEVEL));
-  if (ups.some((u) => u.count)) s.count += Math.floor(breaks / 3);
+  // Masteries have no `up` table, so look at the behaviour's tables too: Megahorn gains projectiles, not area.
+  const hasCount = def.stats.count! > 1 || [...ups, ...LATE_UP[def.behavior]].some((u) => u.count);
+  if (hasCount) s.count += Math.floor(breaks / 3);
   else s.area *= 1 + LIMIT_AREA * breaks;
   return s;
 }

@@ -1,4 +1,4 @@
-import { MOVES, MASTERY_OF, MAX_MOVE_LEVEL, moveStatsAt, overLevelMult, type MoveStats } from '../data/moves.ts';
+import { MOVES, MASTERY_OF, MAX_MOVE_LEVEL, moveStatsAt, type MoveStats } from '../data/moves.ts';
 import { ITEMS, VITAMIN, vitaminDesc } from '../data/items.ts';
 import { SPECIES } from '../data/pokedex.ts';
 import { assets } from '../render/assets.ts';
@@ -47,7 +47,7 @@ export function offerCard(o: UpgradeOffer, p: Player, index: number, onPick: () 
       const limit = o.kind === 'moveUp' && o.level > MAX_MOVE_LEVEL;
       tag = o.kind === 'newMove' ? 'NEW MOVE' : limit ? `LIMIT ★${o.level - MAX_MOVE_LEVEL}` : `Lv ${o.level}`;
       desc = o.kind === 'newMove' ? def.desc : limit
-        ? `Limit break: +${Math.round((overLevelMult(o.level) / overLevelMult(o.level - 1) - 1) * 100)}% power.`
+        ? `Limit break: ${upgradeDiff(o.id, o.level)}.`
         : upgradeDiff(o.id, o.level);
       meta = h('div', { class: 'meta' }, typeBadge(def.type), catBadge(def.cat), h('span', { class: 'hint' }, VERB_TEXT[def.verb] ?? BEHAVIOR_TEXT[def.behavior]), ...(o.kind === 'newMove' ? statusLines(def.effect, def.effect2?.kind) : []));
       if (p.types.includes(def.type) && def.cat !== 'status') note = 'STAB ×1.5';

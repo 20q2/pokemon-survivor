@@ -2,7 +2,7 @@ import type { App } from '../app.ts';
 import { audio } from '../audio/audio.ts';
 import { ABILITIES, LINE, LINES, SPECIES, SPECIES_LIST, finalForms, type Line } from '../data/pokedex.ts';
 import { MOVES, MOVE_LIST } from '../data/moves.ts';
-import { ITEMS, ITEM_LIST, MAX_ITEM_LEVEL } from '../data/items.ts';
+import { ITEMS, ITEM_LIST, itemMaxLevel } from '../data/items.ts';
 import { STAGES, waveTimeline, type StageDef } from '../data/stages.ts';
 import { TYPE_COLORS, TYPES, effectiveness, type PType } from '../data/types.ts';
 import { ACHIEVEMENTS, rewardText, stageUnlocked } from '../meta/achievements.ts';
@@ -442,7 +442,7 @@ export function dexScreen(app: App, tab: 'mons' | 'moves' | 'items' = 'mons') {
   } else {
     body = h('div', { class: 'ach-list' });
     for (const it of ITEM_LIST) {
-      body.append(h('div', { class: 'panel ach' }, img(assets.itemUrl(it.id)), h('div', { class: 'nm' }, it.name), h('div', { class: 'ds' }, it.desc(1)), h('div', { class: 'rw' }, `At Lv${MAX_ITEM_LEVEL}: ${it.desc(MAX_ITEM_LEVEL)}`)));
+      body.append(h('div', { class: 'panel ach' }, img(assets.itemUrl(it.id)), h('div', { class: 'nm' }, it.name), h('div', { class: 'ds' }, it.desc(1)), h('div', { class: 'rw' }, `At Lv${itemMaxLevel(it)}: ${it.desc(itemMaxLevel(it))}`)));
     }
   }
   return screen('', topbar(tab === 'mons' ? `Pokédex — seen ${seen}/${SPECIES_LIST.length}` : tab === 'moves' ? `Moves (${MOVE_LIST.length})` : 'Held items', () => app.goTitle()), tabs, body);

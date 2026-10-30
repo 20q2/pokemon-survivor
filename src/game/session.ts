@@ -1,7 +1,7 @@
 import type { StageDef } from '../data/stages.ts';
 import type { RunSummary } from '../meta/achievements.ts';
 import { MOVES, MAX_MOVE_LEVEL } from '../data/moves.ts';
-import { MAX_ITEM_LEVEL } from '../data/items.ts';
+import { ITEMS, itemMaxLevel } from '../data/items.ts';
 import type { WorldView } from '../render/renderer.ts';
 import { Sim, DT, type Phase, type SimConfig } from './sim.ts';
 import type { GameEvent, Player, UpgradeOffer } from './types.ts';
@@ -142,7 +142,7 @@ export function summarize(session: RunSession, p: Player, cleared: boolean, extr
     coop: session.coop,
     firstHit: session.firstHit,
     maxedMoves: p.moves.filter((m) => m.level >= MAX_MOVE_LEVEL || MOVES[m.id].mastery).length,
-    maxedItems: p.items.filter((i) => i.level >= MAX_ITEM_LEVEL).length,
+    maxedItems: p.items.filter((i) => i.level >= itemMaxLevel(ITEMS[i.id])).length,
     stabOnly: moveTypesOk,
     defeatedChansey: extra.defeatedChansey,
     died: extra.died,

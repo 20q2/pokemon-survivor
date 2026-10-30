@@ -8,7 +8,7 @@ import { generateOffers } from '../src/game/levelup.ts';
 import { applyRun } from '../src/meta/progression.ts';
 import { freshSave } from '../src/meta/save.ts';
 import { MAX_MOVE_LEVEL, MOVES } from '../src/data/moves.ts';
-import { MAX_ITEM_LEVEL } from '../src/data/items.ts';
+import { ITEMS, itemMaxLevel } from '../src/data/items.ts';
 import { Rng } from '../src/engine/math.ts';
 import type { RunSummary } from '../src/meta/achievements.ts';
 
@@ -51,7 +51,7 @@ for (let seed = 1; seed <= seeds; seed++) {
     bosses: sim.bossesDefeated, cleared: sim.phase === 'victory', moneyEarned: Math.round(sim.money * p.stats.money), superEff: p.superEff,
     evolutions: p.evolutions, masteries: p.masteries, shinyKills: p.shinyKills, coop: false, firstHit: 0,
     maxedMoves: p.moves.filter((m) => m.level >= MAX_MOVE_LEVEL || MOVES[m.id].mastery).length,
-    maxedItems: p.items.filter((i) => i.level >= MAX_ITEM_LEVEL).length, stabOnly: false, defeatedChansey: false,
+    maxedItems: p.items.filter((i) => i.level >= itemMaxLevel(ITEMS[i.id])).length, stabOnly: false, defeatedChansey: false,
     died: sim.phase === 'over', elite: false, megas: p.megas, alphas: 0,
   };
   const r = applyRun(save, summary, sim.seenSpecies, sim.defeatedSpecies);

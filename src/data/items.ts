@@ -18,9 +18,13 @@ export interface ItemDef {
   name: string;
   stat: ItemStat;
   perLevel: number;
+  /** Highest useful level; defaults to MAX_ITEM_LEVEL. */
+  maxLevel?: number;
   type?: PType;      // for type boosters
   desc: (lvl: number) => string;
 }
+
+export const itemMaxLevel = (def: ItemDef) => def.maxLevel ?? MAX_ITEM_LEVEL;
 
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 
@@ -55,7 +59,8 @@ export const ITEM_LIST: ItemDef[] = [
   { id: 'scope-lens', name: 'Scope Lens', stat: 'crit', perLevel: 0.05, desc: (l) => `+${pct(0.05 * l)} critical-hit chance.` },
   { id: 'razor-claw', name: 'Razor Claw', stat: 'critDmg', perLevel: 0.2, desc: (l) => `Critical hits deal +${pct(0.2 * l)} more damage.` },
   { id: 'wide-lens', name: 'Wide Lens', stat: 'area', perLevel: 0.09, desc: (l) => `Move area +${pct(0.09 * l)}.` },
-  { id: 'loaded-dice', name: 'Loaded Dice', stat: 'count', perLevel: 0.4, desc: (l) => `Multi-target moves fire +${l >= 3 ? 2 : 1} extra${l < 3 ? ' (+2 at Lv3)' : ''}.` },
+  { id: 'loaded-dice', name: 'Loaded Dice', stat: 'count', perLevel: 0.4, maxLevel: 3, // countBonus only changes at Lv3
+    desc: (l) => `Multi-target moves fire +${l >= 3 ? 2 : 1} extra${l < 3 ? ' (+2 at Lv3)' : ''}.` },
   { id: 'metronome', name: 'Metronome', stat: 'duration', perLevel: 0.1, desc: (l) => `Move duration +${pct(0.1 * l)}.` },
   { id: 'leftovers', name: 'Leftovers', stat: 'regen', perLevel: 0.003, desc: (l) => `Restore ${(0.3 * l).toFixed(1)}% max HP per second.` },
   { id: 'shell-bell', name: 'Shell Bell', stat: 'lifesteal', perLevel: 0.008, desc: (l) => `Heal ${(0.8 * l).toFixed(1)}% of damage dealt.` },
@@ -73,19 +78,20 @@ export const ITEM_LIST: ItemDef[] = [
 
 /** Infinite in-run stat boosts offered once the build has nothing left to upgrade ("EV training").
  *  Linear up to rank 8, then each dose is worth a little less than the last (logarithmic). */
-export interface VitaminDef { id: string; name: string; /** Bonus per rank up to `VITAMIN_LINEAR`. */ rank: number; what: string }
+export interface VitaminDef { id: string; name: string; /** Bonus per rank up to `VITAMIN_LINEAR`. */ perRank: number; what: string }
 export const VITAMIN_LINEAR = 8;
 export const VITAMINS: VitaminDef[] = [
-  { id: 'protein', name: 'Protein', rank: 0.06, what: 'Attack' },
-  { id: 'calcium', name: 'Calcium', rank: 0.06, what: 'Sp. Atk' },
-  { id: 'hp-up', name: 'HP Up', rank: 0.06, what: 'max HP' },
-  { id: 'iron', name: 'Iron', rank: 0.05, what: 'contact damage resistance' },
-  { id: 'zinc', name: 'Zinc', rank: 0.05, what: 'projectile damage resistance' },
-  { id: 'carbos', name: 'Carbos', rank: 0.03, what: 'movement speed' },
-  { id: 'pp-up', name: 'PP Up', rank: 0.03, what: 'move recharge speed' },
+  { id: 'protein', name: 'Protein', perRank: 0.06, what: 'Attack' },
+  { id: 'calcium', name: 'Calcium', perRank: 0.06, what: 'Sp. Atk' },
+  { id: 'hp-up', name: 'HP Up', perRank: 0.06, what: 'max HP' },
+  { id: 'iron', name: 'Iron', perRank: 0.06, what: 'contact damage resistance' },
+  { id: 'zinc', name: 'Zinc', perRank: 0.06, what: 'projectile damage resistance' },
+  // Carbos and PP Up stack with Choice Scarf / Quick Claw, so they get half the rank bonus.
+  { id: 'carbos', name: 'Carbos', perRank: 0.03, what: 'movement speed' },
+  { id: 'pp-up', name: 'PP Up', perRank: 0.03, what: 'move recharge speed' },
 ];
 export function vitaminBonus(id: string, doses: number) {
-  const r = VITAMIN[id].rank, lin = Math.min(doses, VITAMIN_LINEAR), extra = Math.max(0, doses - VITAMIN_LINEAR);
+  const r = VITAMIN[id].perRank, lin = Math.min(doses, VITAMIN_LINEAR), extra = Math.max(0, doses - VITAMIN_LINEAR);
   // The first dose past rank 8 is worth one more rank, each later one less.
   return r * lin + (extra > 0 ? (r * Math.log(1 + extra)) / Math.LN2 : 0);
 }

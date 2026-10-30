@@ -1,6 +1,6 @@
 import { LINE } from '../data/pokedex.ts';
 import { MOVES, MASTERY_OF, MAX_MOVE_LEVEL } from '../data/moves.ts';
-import { ITEMS, ITEM_LIST, MAX_ITEM_LEVEL, VITAMIN, VITAMINS } from '../data/items.ts';
+import { ITEMS, ITEM_LIST, itemMaxLevel, VITAMIN, VITAMINS } from '../data/items.ts';
 import type { Rng } from '../engine/math.ts';
 import { effectiveness, type PType } from '../data/types.ts';
 import { heal } from './ledger.ts';
@@ -67,7 +67,7 @@ export function generateOffers(
     }
   }
   for (const it of p.items) {
-    if (it.level < MAX_ITEM_LEVEL && !p.banished.has(it.id))
+    if (it.level < itemMaxLevel(ITEMS[it.id]) && !p.banished.has(it.id))
       cands.push({ o: { kind: 'itemUp', id: it.id, level: it.level + 1 }, w: 7 });
   }
   if (p.items.length < p.itemSlots) {
@@ -86,7 +86,8 @@ export function generateOffers(
     }
   }
 
-  // A finished moveset can limit-break while items still level: the endgame power should not wait on seven item tiers.
+  // Limit breaks enter the main pool (weight 4, under item/move ups at 7-10) once the moveset is full and maxed:
+  // fillers only run when the pool is empty, which would put late power behind every item tier.
   if (p.moves.length >= p.moveSlots && !p.moves.some((m) => m.level < MAX_MOVE_LEVEL && !MOVES[m.id].mastery))
     for (const c of limitBreaks(p)) cands.push({ o: c, w: 4 });
 
@@ -100,7 +101,7 @@ export function generateOffers(
   // Nothing left to upgrade: keep every level meaningful with limit breaks and vitamins
   // (both grow linearly for a while, then logarithmically, so they never run out).
   if (out.length < count && p.hp < p.stats.maxHp * 0.4) out.push({ kind: 'heal', id: 'oran-berry', level: 0 });
-  if (out.length < count) out.push(...pickFillers(p, rng, count - out.length));
+  if (out.length < count) out.push(...pickFillers(p, rng, count - out.length, out));
   return out;
 }
 
@@ -111,8 +112,10 @@ function limitBreaks(p: Player): UpgradeOffer[] {
     .map((m): UpgradeOffer => ({ kind: 'moveUp', id: m.id, level: Math.max(m.level, MAX_MOVE_LEVEL) + 1 }));
 }
 
-function pickFillers(p: Player, rng: Rng, n: number): UpgradeOffer[] {
-  const cands: { o: UpgradeOffer; w: number }[] = limitBreaks(p).map((o) => ({ o, w: 2.2 }));
+function pickFillers(p: Player, rng: Rng, n: number, chosen: readonly UpgradeOffer[] = []): UpgradeOffer[] {
+  // The main pool may already have offered some of these limit breaks.
+  const taken = new Set(chosen.map((o) => `${o.kind}:${o.id}`));
+  const cands: { o: UpgradeOffer; w: number }[] = limitBreaks(p).filter((o) => !taken.has(`${o.kind}:${o.id}`)).map((o) => ({ o, w: 2.2 }));
   for (const o of pickVitamins(p, rng, VITAMINS.length)) cands.push({ o, w: 1 });
   const out: UpgradeOffer[] = [];
   while (out.length < n && cands.length) {
@@ -183,7 +186,7 @@ export function applyOffer(p: Player, o: UpgradeOffer) {
       break;
     case 'itemUp': {
       const it = p.items.find((x) => x.id === o.id);
-      if (it) it.level = Math.min(MAX_ITEM_LEVEL, it.level + 1);
+      if (it) it.level = Math.min(itemMaxLevel(ITEMS[it.id]), it.level + 1);
       break;
     }
     case 'heal':
@@ -210,7 +213,7 @@ export function applyOffer(p: Player, o: UpgradeOffer) {
 export function ownedUpgrades(p: Player): UpgradeOffer[] {
   const out: UpgradeOffer[] = [];
   for (const m of p.moves) if (m.level < MAX_MOVE_LEVEL && !MOVES[m.id].mastery) out.push({ kind: 'moveUp', id: m.id, level: m.level + 1 });
-  for (const it of p.items) if (it.level < MAX_ITEM_LEVEL) out.push({ kind: 'itemUp', id: it.id, level: it.level + 1 });
+  for (const it of p.items) if (it.level < itemMaxLevel(ITEMS[it.id])) out.push({ kind: 'itemUp', id: it.id, level: it.level + 1 });
   return out;
 }
 

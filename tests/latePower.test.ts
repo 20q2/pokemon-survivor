@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_MOVE_LEVEL, MOVE_LIST, moveStatsAt } from '../src/data/moves.ts';
-import { VITAMINS, vitaminBonus } from '../src/data/items.ts';
+import { MAX_MOVE_LEVEL, MOVE_LIST, MOVES, moveStatsAt } from '../src/data/moves.ts';
+import { ITEMS, ITEM_LIST, MAX_ITEM_LEVEL, VITAMINS, itemMaxLevel, vitaminBonus } from '../src/data/items.ts';
+import { generateOffers, ownedUpgrades } from '../src/game/levelup.ts';
+import { Rng } from '../src/engine/math.ts';
 import { Sim } from '../src/game/sim.ts';
 import { metaBonuses } from '../src/meta/shop.ts';
 import { derivePlayerStats } from '../src/game/stats.ts';
@@ -41,8 +43,36 @@ describe('late-game power keeps growing', () => {
 
   it('every vitamin is linear to rank 8, then diminishing', () => {
     for (const v of VITAMINS) {
-      expect(vitaminBonus(v.id, 8)).toBeCloseTo(8 * v.rank, 5);
+      expect(vitaminBonus(v.id, 8)).toBeCloseTo(8 * v.perRank, 5);
       expect(vitaminBonus(v.id, 10) - vitaminBonus(v.id, 9)).toBeLessThan(vitaminBonus(v.id, 9) - vitaminBonus(v.id, 8));
     }
+  });
+
+  it('a finished build never gets the same card twice in one level-up', () => {
+    const p = sim().players[0];
+    const mv = (id: string) => ({ id, level: MAX_MOVE_LEVEL, cd: 1, dmgDealt: 0, kills: 0 });
+    p.moves = ['ember', 'flamethrower', 'substitute', 'metronome'].map(mv);
+    p.items = ['scope-lens', 'wide-lens', 'leftovers', 'quick-claw'].map((id) => ({ id, level: itemMaxLevel(ITEMS[id]) }));
+    for (let seed = 1; seed <= 60; seed++) {
+      const offers = generateOffers(p, new Rng(seed), 3, []);
+      expect(offers).toHaveLength(3);
+      expect(new Set(offers.map((o) => `${o.kind}:${o.id}`)).size, JSON.stringify(offers)).toBe(3);
+    }
+  });
+
+  it('items stop at their own useful level: Loaded Dice is capped at 3', () => {
+    expect(itemMaxLevel(ITEMS['loaded-dice'])).toBe(3);
+    expect(ITEM_LIST.filter((i) => i.id !== 'loaded-dice').every((i) => itemMaxLevel(i) === MAX_ITEM_LEVEL)).toBe(true);
+    const p = sim().players[0];
+    p.items = [{ id: 'loaded-dice', level: 3 }];
+    p.itemSlots = 1;
+    expect(ownedUpgrades(p).some((o) => o.kind === 'itemUp')).toBe(false);
+    for (let seed = 1; seed <= 40; seed++) expect(generateOffers(p, new Rng(seed), 3, []).some((o) => o.kind === 'itemUp')).toBe(false);
+  });
+
+  it('a mastered projectile move gains projectiles from limit breaks, not area', () => {
+    const base = moveStatsAt(MOVES.megahorn, MAX_MOVE_LEVEL), broken = moveStatsAt(MOVES.megahorn, MAX_MOVE_LEVEL + 3);
+    expect(broken.count).toBe(base.count + 1);
+    expect(broken.area).toBe(base.area);
   });
 });
