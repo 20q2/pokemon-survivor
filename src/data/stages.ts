@@ -26,6 +26,8 @@ export interface WaveDef {
   interval: number;
   /** Enemy HP multiplier for this minute (stepwise, replaces a smooth curve). */
   hpTier: number;
+  /** Xp of a regular foe this minute: grows with the minute, eased by the quota so thin and thick minutes pay alike. */
+  xp: number;
   /** Wave boss: spawns 2s into the minute. */
   elite?: string;
   /** Species shown on the minute banner (defaults to the first newcomer). */
@@ -101,6 +103,12 @@ const ELITE_MINUTES = new Set([1, 2, 3, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15]);
  * Spawn weights default to 3 for the first species, 2 for the second and 1 for the rest; write
  * `name:n` to override. Elites rotate through `elites`.
  */
+/** Per-kill xp: +25% a minute, scaled by sqrt(45 / quota) (45 is the minute-2 quota) so xp income per minute stays near-flat. */
+function waveXp(m: number) {
+  const f = Math.min(2.5, Math.max(0.75, Math.sqrt(45 / WAVE_MIN[m])));
+  return Math.round((1 + 0.25 * m) * f * 100) / 100;
+}
+
 function waves(elites: string[], minutes: string[], text: Record<number, string> = {}): WaveDef[] {
   let ei = 0;
   return minutes.map((line, m) => ({
@@ -108,7 +116,7 @@ function waves(elites: string[], minutes: string[], text: Record<number, string>
       const [species, w] = tok.split(':');
       return { species, w: w ? Number(w) : i === 0 ? 3 : i === 1 ? 2 : 1 };
     }),
-    min: WAVE_MIN[m], interval: WAVE_INTERVAL[m], hpTier: WAVE_HP[m],
+    min: WAVE_MIN[m], interval: WAVE_INTERVAL[m], hpTier: WAVE_HP[m], xp: waveXp(m),
     ...(ELITE_MINUTES.has(m) ? { elite: elites[ei++ % elites.length] } : {}),
     ...(text[m] ? { text: text[m] } : {}),
     ...(WAVE_EVENTS[m] ? { events: WAVE_EVENTS[m] } : {}),

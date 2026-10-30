@@ -1,14 +1,17 @@
-// Pacing telemetry for a headless run: node scripts/pacing.ts [stageId] [lineId] [seconds]
+// Pacing telemetry for a headless run: node scripts/pacing.ts [stageId] [lineId] [seconds] [seed] [seed]
 // Every 30 s: level, level-ups and the longest gap between them, enemies alive / in view,
 // kills, hit events per second, warnings, treasures, pauses (level-up + cinematics) and HP.
 import { Sim, DT } from '../src/game/sim.ts';
 import { metaBonuses } from '../src/meta/shop.ts';
+import { Rng } from '../src/engine/math.ts';
 import { botChoose, botSteer } from '../src/game/bot.ts';
 
 const stage = process.argv[2] ?? 'viridian';
 const line = process.argv[3] ?? 'charmander';
 const secs = +(process.argv[4] ?? 900);
-const sim = new Sim({ stageId: stage, seed: 7, players: [{ name: 'bot', lineId: line, shiny: false, meta: metaBonuses({}), tms: [] }] });
+const seed = +(process.argv[5] ?? 7);
+const rng = new Rng(seed);
+const sim = new Sim({ stageId: stage, seed, players: [{ name: 'bot', lineId: line, shiny: false, meta: metaBonuses({}), tms: [] }] });
 let steer = { x: 0, y: 0 }, steerT = 0;
 let lastLevelAt = 0, maxGap = 0, levelups = 0, lastKills = 0, hits = 0, warns = 0, chests = 0, pauses = 0;
 let inView = 0, peakView = 0, tickMs = 0, ticks = 0, samples = 0, alive = 0, hpSum = 0, next = 30;
@@ -22,9 +25,9 @@ while (sim.time < secs) {
   steerT -= DT;
   if (steerT <= 0) {
     // Human-ish: re-decide a few times a second, with some wobble.
-    steerT = 0.25 * (0.6 + Math.random() * 0.8);
+    steerT = 0.25 * (0.6 + rng.next() * 0.8);
     const m = botSteer(sim, sim.players[0]);
-    const a = Math.atan2(m.y, m.x) + (Math.random() - 0.5) * 0.9;
+    const a = Math.atan2(m.y, m.x) + (rng.next() - 0.5) * 0.9;
     steer = m.x || m.y ? { x: Math.cos(a), y: Math.sin(a) } : m;
   }
   sim.players[0].mx = steer.x; sim.players[0].my = steer.y;
@@ -52,5 +55,5 @@ while (sim.time < secs) {
 }
 gaps.sort((a, b) => a - b);
 const pct = (q: number) => gaps.length ? gaps[Math.min(gaps.length - 1, Math.floor(q * gaps.length))].toFixed(0) : '-';
-console.log(`level ${sim.level}  kills ${sim.kills}  level-up gap p50 ${pct(0.5)}s  p90 ${pct(0.9)}s  max ${gaps.length ? gaps[gaps.length - 1].toFixed(0) : '-'}s`);
+console.log(`level ${sim.level}  kills ${sim.kills}  level-up gap p50 ${pct(0.5)}s  p90 ${pct(0.9)}s  max ${gaps.length ? gaps[gaps.length - 1].toFixed(0) : '-'}s  seed ${seed}`);
 console.log('moves', sim.players[0].moves.map((m) => m.id + m.level).join(','), 'items', sim.players[0].items.map((i) => i.id + i.level).join(','));

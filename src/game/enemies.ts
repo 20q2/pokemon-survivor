@@ -301,8 +301,8 @@ export function spawnEnemy(sim: Sim, speciesId: string, x: number, y: number, op
   // Regulars never outrun the slowest starter (~130 px/s) by much, so kiting stays honest all run.
   let speed = Math.min(110, (48 + bspe * 0.42) * ROLE_SPEED[role]);
   let dmg = (3 + Math.max(batk, bspa) * 0.055) * sim.spawner.dmgMult();
-  // Foes pay more as the waves climb (a step each minute), so levels keep coming against thicker hordes.
-  const baseXp = (1 + 0.25 * Math.floor(m)) ;
+  // Per-minute xp from the wave table (see waveXp).
+  const baseXp = waveAt(sim.stage, sim.time).wave.xp;
   let xp = role === 'tank' ? baseXp * 2 : baseXp;
   let scale = role === 'tank' ? 1.15 : 1;
   let radius = 9 * scale;
@@ -789,11 +789,12 @@ export function killEnemy(sim: Sim, e: Enemy, killerId: number) {
   const r = sim.rng;
   dropCandy(sim, e);
   spreadOnDeath(sim, e);
-  if (e.st.coin || r.chance(0.01)) sim.spawnPickup('coin', e.x, e.y, 1 + (e.st.coin ? r.int(1, 2) : 0));
-  if (r.chance(0.006)) sim.spawnPickup('oran', e.x, e.y);
-  if (r.chance(0.0015)) sim.spawnPickup('magnet', e.x, e.y);
-  if (r.chance(0.0008)) sim.spawnPickup('repel', e.x, e.y);
-  if (r.chance(0.0004)) sim.spawnPickup('rare-candy', e.x, e.y);
+  // Per-kill chances assume a few thousand kills a run; the dense waves multiply that, so they are small.
+  if (e.st.coin || r.chance(0.0035)) sim.spawnPickup('coin', e.x, e.y, 1 + (e.st.coin ? r.int(1, 2) : 0));
+  if (r.chance(0.002)) sim.spawnPickup('oran', e.x, e.y);
+  if (r.chance(0.00015)) sim.spawnPickup('magnet', e.x, e.y);
+  if (r.chance(0.00008)) sim.spawnPickup('repel', e.x, e.y);
+  if (r.chance(0.00004)) sim.spawnPickup('rare-candy', e.x, e.y);
   if (e.role === 'treasure') {
     for (let i = 0; i < 6; i++) sim.spawnPickup('coin', e.x, e.y, e.speciesId === 'chansey' ? 4 : 3);
     if (e.speciesId === 'chansey') sim.spawnPickup('chest', e.x, e.y, 2);

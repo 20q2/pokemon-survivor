@@ -115,10 +115,10 @@ export function xpForLevel(level: number): number {
   // Snappy first levels (quadratic up to level 11), then a flatter climb.
   const k = level - 1;
   if (k < 11) return Math.round(6 + 5 * k + 1.2 * k * k);
-  // From level 12 the climb is a gentle parabola (the old cubic made late levels a wall). Enemy xp grows
+  // From level 12 the climb is a parabola (the old cubic made late levels a wall). Enemy xp grows
   // each minute, so costs must rise too or the cadence would speed up as the horde thickens.
   const m = k - 11;
-  return 206 + 70 * m + 12 * m * m;
+  return 206 + 80 * m + 22 * m * m;
 }
 
 /** Crit hit-stop: 2 frames, at most once per half second. */

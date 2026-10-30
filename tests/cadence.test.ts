@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { STAGES } from '../src/data/stages.ts';
 import { Sim, xpForLevel } from '../src/game/sim.ts';
 import { metaBonuses } from '../src/meta/shop.ts';
 import { freshSave, migrate } from '../src/meta/save.ts';
@@ -50,14 +51,23 @@ describe('scripted first treasures', () => {
 });
 
 describe('xp cadence', () => {
-  it('regular enemy xp steps up each minute, tanks pay double', () => {
+  it('regular enemy xp comes from the current wave, tanks pay double', () => {
     const sim = make();
-    expect(spawnEnemy(sim, 'rattata', 100, 0)!.xp).toBe(1);
+    const waves = sim.stage.waves;
+    expect(spawnEnemy(sim, 'rattata', 100, 0)!.xp).toBe(waves[0].xp);
     sim.time = 4 * 60 + 30;
-    expect(spawnEnemy(sim, 'rattata', 100, 0)!.xp).toBe(2);
+    expect(spawnEnemy(sim, 'rattata', 100, 0)!.xp).toBe(waves[4].xp);
     const tank = spawnEnemy(sim, 'geodude', 100, 0)!;
     expect(tank.role).toBe('tank');
-    expect(tank.xp).toBe(4);
+    expect(tank.xp).toBe(waves[4].xp * 2);
+  });
+
+  it('wave xp is eased by the quota: a bare ring minute pays about 2x, a 300-strong horde hits the 0.75x floor', () => {
+    for (const st of STAGES) {
+      for (const w of st.waves) expect(w.xp).toBeGreaterThan(0);
+      expect(st.waves[5].xp / (1 + 0.25 * 5)).toBeCloseTo(Math.sqrt(45 / 10), 1);
+      expect(st.waves[15].xp / (1 + 0.25 * 15)).toBeCloseTo(0.75, 2); // the floor
+    }
   });
 
   it('keeps the early levels snappy, then climbs without a wall', () => {

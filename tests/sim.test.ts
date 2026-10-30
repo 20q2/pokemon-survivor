@@ -505,7 +505,7 @@ describe('minute waves', () => {
     const wall = spawnEnemy(sim, 'caterpie', p.x + 3000, p.y + 40, { wall: { speed: 30, ttl: 1 } })!;
     expect(wall.speed).toBe(30);
     expect(wall.maxHp).toBeCloseTo(reg.maxHp * 2.4 * 3);
-    expect(wall.xp).toBe(2);
+    expect(wall.xp).toBe(sim.stage.waves[0].xp * 2);
     const x0 = wall.x;
     for (let i = 0; i < 30; i++) sim.update(DT);
     expect(x0 - wall.x).toBeGreaterThan(10); // walking at the player
