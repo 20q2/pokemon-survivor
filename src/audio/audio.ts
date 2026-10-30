@@ -64,6 +64,8 @@ interface Rack { buses: TrackBus[]; nodes: AudioNode[]; beat: number }
 
 export class AudioEngine {
   ctx: BaseAudioContext | null = null;
+  /** Offline renders switch this on so level checks are repeatable. */
+  deterministic = false;
   private syn!: Synth;
   private master!: GainNode;
   private musicIn!: GainNode;
@@ -381,9 +383,6 @@ export class AudioEngine {
     this.lastPlay.set(key, now);
     return true;
   }
-
-  /** Offline renders switch this on so level checks are repeatable. */
-  deterministic = false;
 
   jitter(hz: number) { return this.deterministic ? hz : jitterHz(hz, Math.random()); }
 

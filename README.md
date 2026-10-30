@@ -22,6 +22,7 @@ species/items to the data files): `npm run fetch-assets`.
 
 ## How it plays
 
+- **Results screen:** press R or Enter to replay the same run.
 - **Move** with WASD / arrow keys / gamepad stick / touch (drag anywhere).
 - **Level-ups** offer 3 cards: new moves (from your learnset + owned TMs), move
   levels (1–8), held items, item levels (1–5). Once your build is complete, cards
@@ -54,7 +55,7 @@ species/items to the data files): `npm run fetch-assets`.
 ## Meta progression
 
 - **Poké Dollars** from coins + an end-of-run bonus → **Poké Mart** permanent
-  upgrades (vitamins, PP Up, Revive, rerolls/skips/banishes, extra item slot…) and
+  upgrades (vitamins, up to +50% Attack and +80% HP at max rank, PP Up, Revive, rerolls/skips/banishes, extra item slot…) and
   **TMs** that add moves to every Pokémon's pool.
 - **46 achievements** unlock new Pokémon (10 locked lines), TMs and money.
 - **Friendship** per Pokémon line grows with every run and grants perks. Clear a

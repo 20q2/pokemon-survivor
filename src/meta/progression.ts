@@ -40,6 +40,11 @@ export function applyRun(save: SaveData, r: RunSummary, seen: Iterable<string>, 
   save.money += money;
   st.moneyEarned += money;
   for (const s of seen) save.seen[s] = 1;
+  // Your own evolutions count as seen (the Pokédex otherwise only learns species from enemy spawns).
+  const own = LINE[r.lineId].stages;
+  const reached = own.indexOf(r.finalSpecies);
+  for (const s of reached >= 0 ? own.slice(0, reached + 1) : own) save.seen[s] = 1;
+  save.seen[r.finalSpecies] = 1;
   for (const [s, n] of defeated) save.defeated[s] = (save.defeated[s] ?? 0) + n;
 
   const before = save.friendship[r.lineId] ?? 0;

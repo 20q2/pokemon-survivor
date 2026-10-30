@@ -148,7 +148,8 @@ function evoRow(line: Line, shiny: boolean, seen: ReadonlySet<string>) {
   const row = h('div', { class: 'evo' }, portrait(line.stages[0]),
     ...mids.flatMap((id, i) => [arrow(i), portrait(id)]),
     arrow(mids.length), ...finals.map(final));
-  return firstHint ? h('div', null, row, h('div', { class: 'hint evo-hint' }, firstHint)) : row;
+  const unseen = [...mids, ...finals].filter((id) => evoHint(line, id, seen)).length;
+  return firstHint ? h('div', null, row, h('div', { class: 'hint evo-hint' }, firstHint), unseen > 1 ? h('div', { class: 'hint evo-hint' }, 'Hover a silhouette for a clue') : null) : row;
 }
 
 export function selectScreen(app: App, onConfirm: (lineId: string) => void, title = 'Choose your partner', onBack = () => app.goTitle()) {
