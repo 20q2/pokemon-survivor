@@ -318,7 +318,7 @@ export type GameEvent =
   | { e: 'shiny'; x: number; y: number }
   | { e: 'repel' }
   | { e: 'learn'; player: number; move: string }
-  | { e: 'enemyShot'; x: number; y: number }
+  | { e: 'enemyShot'; x: number; y: number; /** Shooter's enemy id. */ by?: number }
   /** A boss, alpha or elite starts a telegraphed ground attack (named move callout). */
   | { e: 'raid'; x: number; y: number; name: string; big: boolean }
   /** A short floating callout (Magnitude roll, fizzles, steals…). */

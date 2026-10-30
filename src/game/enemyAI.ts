@@ -116,8 +116,8 @@ export function updateEnemies(sim: Sim, dt: number) {
             if (d < 140) { mx = -mx; my = -my; } else if (d < 200) { [mx, my] = [-my * 0.6, mx * 0.6]; }
             e.ai -= dt;
             // Regular crowd shooters are a texture, not a bullet hell: close range, slow cadence.
-            // Guardians, alphas and elites keep their own timings.
-            const crowd = isRegular(e) && !e.guardian;
+            // Anything isRegular rejects (bosses, elites, alphas, guardians) keeps the old cadence.
+            const crowd = isRegular(e);
             if (e.ai <= 0 && d < (crowd ? 200 : 320)) {
               e.ai = crowd ? sim.rng.range(3.5, 4.5) : sim.rng.range(2.4, 3.6);
               enemyShot(sim, e, Math.atan2(dy, dx), 120, e.dmg * 0.9);
@@ -266,6 +266,7 @@ function onPlayerContact(sim: Sim, p: Player, e: Enemy) {
 
 function enemyShot(sim: Sim, e: Enemy, a: number, speed: number, dmg: number) {
   if (e.st.weaken > 0) dmg *= 0.7;
+  sim.emit({ e: 'enemyShot', x: e.x, y: e.y, by: e.id });
   makeProjectile(sim, {
     owner: -1, hostile: true, behavior: 'enemy', moveId: 'enemy', fx: 'orb', type: e.types[0], shape: 'circle',
     x: e.x, y: e.y - 6, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, angle: a, speed, r: 5, life: 4,

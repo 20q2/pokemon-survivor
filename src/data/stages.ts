@@ -263,9 +263,9 @@ export const STAGES: StageDef[] = [
       'grimer mareep elekid',
       'mareep elekid electrike',
       'elekid electrike grimer',
-      'grimer mareep elekid',
-      'mareep voltorb koffing electrike',
-      'koffing voltorb elekid grimer',
+      'mareep electrike grimer',
+      'mareep voltorb koffing magnemite',
+      'koffing voltorb magnemite grimer',
       'electrike magnemite electrode mareep',
       'electrode grimer elekid',
       'magneton elekid koffing mareep',
@@ -274,7 +274,7 @@ export const STAGES: StageDef[] = [
       'magneton electrode grimer electrike magnemite',
       'elekid koffing mareep magneton voltorb',
       'electrode magneton elekid koffing mareep electrike'
-    ], {4: 'Magnemite hum into range!', 8: 'Electrode charge up!', 10: 'The generators overload!', 15: 'Total blackout incoming!'}),
+    ], {6: 'Magnemite hum into range!', 8: 'Electrode charge up!', 10: 'The generators overload!', 15: 'Total blackout incoming!'}),
     elites: ['magneton', 'electrode', 'grimer'], swarm: 'voltorb',
     bosses: [
       { species: 'electabuzz', at: 180, patterns: ['charge', 'quake', 'radial'], minions: ['elekid'] },

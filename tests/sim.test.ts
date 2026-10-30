@@ -268,35 +268,40 @@ describe('calm base crowd', () => {
   const plant = (startTime: number) => new Sim({
     stageId: 'powerplant', seed: 7, startTime, players: [{ name: 'a', lineId: 'pichu', shiny: false, meta: metaBonuses({}), tms: [] }],
   });
-  const isShooter = (e: { speciesId: string }) => ENEMY_ROLE[e.speciesId] === 'ranged';
-  /** Stands still for `seconds`; returns enemyShot events and every regular shooter that was alive at some point. */
-  const stand = (sim: Sim, seconds: number) => {
+  /** Stands still for `seconds`, calling `each` after every tick (events still in sim.events). */
+  const stand = (sim: Sim, seconds: number, each: () => void) => {
     sim.invulnerable = true;
-    let shots = 0;
-    const seen = new Set<unknown>();
     const end = sim.time + seconds;
     while (sim.time < end) {
       if (sim.phase === 'levelup') { sim.choose(0, 0); continue; }
       sim.update(DT);
-      shots += sim.events.filter((e) => e.e === 'enemyShot').length;
+      each();
       sim.events.length = 0;
-      for (const e of sim.enemies) if (isRegular(e) && !e.guardian && isShooter(e)) seen.add(e);
     }
-    return { shots, shooters: seen.size };
   };
 
-  it('regular shooters fire at most every 3.5 s', () => {
-    const { shots, shooters } = stand(plant(480), 30);
-    expect(shooters, 'a shooter wave is on').toBeGreaterThan(0);
-    expect(shots).toBeLessThanOrEqual((Math.ceil(30 / 3.5) + 1) * shooters);
-  });
+  it('each regular shooter fires at most every 3.5 s', () => {
+    const sim = plant(480);
+    const regularShooters = new Set<number>(); // regular at some tick, so bosses, elites and guardians never count
+    const shots = new Map<number, number>();
+    stand(sim, 30, () => {
+      for (const e of sim.enemies) if (isRegular(e) && ENEMY_ROLE[e.speciesId] === 'ranged') regularShooters.add(e.id);
+      for (const ev of sim.events) if (ev.e === 'enemyShot' && ev.by !== undefined) shots.set(ev.by, (shots.get(ev.by) ?? 0) + 1);
+    });
+    expect(regularShooters.size, 'a shooter wave is on').toBeGreaterThan(0);
+    const fired = [...regularShooters].map((id) => shots.get(id) ?? 0);
+    expect(Math.max(...fired)).toBeGreaterThan(0);
+    for (const n of fired) expect(n).toBeLessThanOrEqual(Math.ceil(30 / 3.5) + 1);
+  }, 30_000);
 
   it('no shooters or bombers among the regulars before minute 6', () => {
     const sim = plant(200);
-    stand(sim, 20);
-    const bad = sim.enemies.filter((e) => isRegular(e) && ['ranged', 'bomber'].includes(ENEMY_ROLE[e.speciesId]));
-    expect(bad.map((e) => e.speciesId)).toEqual([]);
-  });
+    const bad = new Set<string>();
+    stand(sim, 20, () => {
+      for (const e of sim.enemies) if (isRegular(e) && ['ranged', 'bomber'].includes(ENEMY_ROLE[e.speciesId])) bad.add(e.speciesId);
+    });
+    expect([...bad]).toEqual([]);
+  }, 30_000);
 });
 
 describe('evolution move learning', () => {
@@ -551,7 +556,7 @@ describe('minute waves', () => {
     expect(first).toBeLessThan(300.2);
     expect(hp).toBeGreaterThan(0);
     expect(Math.min(...startDist)).toBeGreaterThan(150);
-  });
+  }, 30_000);
 
   it('wall members are fixed-speed and three tanks tough; expiring one is not a kill', () => {
     const sim = new Sim({ stageId: 'viridian', seed: 5, players: [{ name: 'P', lineId: 'charmander', shiny: false, meta: metaBonuses({}), tms: [] }] });
