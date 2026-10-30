@@ -156,6 +156,12 @@ export interface StatusState {
   robbed: number;
 }
 
+/**
+ * Enemy.aiState doubles as per-role state; these are the shared values. Boss and alpha phases (0/1/2...) are
+ * separate per-role state machines that happen to reuse the same field, so 1 means a lit fuse only for bombers.
+ */
+export const AI = { BOMBER_FUSE: 1, CROSSER: 9, WALL: 10 } as const;
+
 export interface Enemy {
   id: number;
   speciesId: string;

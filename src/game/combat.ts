@@ -7,7 +7,7 @@ import type { Sim } from './sim.ts';
 import { megaOnHurt } from './mega.ts';
 import { creditDamage, heal } from './ledger.ts';
 import { HAZARD, updateHazard } from './hazards.ts';
-import type { Enemy, OwnedMove, Player, Projectile, Shape, StatusState } from './types.ts';
+import { AI, type Enemy, type OwnedMove, type Player, type Projectile, type Shape, type StatusState } from './types.ts';
 
 const HIGH_CRIT = new Set(['razor-leaf', 'karate-chop', 'leaf-blade', 'blaze-kick', 'stone-edge', 'crunch']);
 const COUNT_BEHAVIORS = new Set(['projectile', 'strike', 'zone', 'chain', 'boomerang', 'orbit', 'lob', 'wave', 'mine', 'minion', 'wall']);
@@ -1263,7 +1263,7 @@ function steam(sim: Sim, owner: Player, e: Enemy, dmg: number) {
 function interrupt(e: Enemy) {
   if (e.casting && e.casting > 0) e.casting = 0;
   if (e.role === 'ranged') e.ai = Math.max(e.ai, 1.2);
-  if (e.role === 'bomber' && e.aiState === 1) { e.aiState = 0; e.ai = 0; }
+  if (e.role === 'bomber' && e.aiState === AI.BOMBER_FUSE) { e.aiState = 0; e.ai = 0; }
   if (e.raidCd !== undefined) e.raidCd = Math.max(e.raidCd, 1.5);
   if (e.boss && e.aiState === 0) e.ai += 0.6;
 }

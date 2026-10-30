@@ -8,7 +8,7 @@ function run(d: Director, secs: number, kps: number, snap: Partial<DirectorSnaps
   for (let i = 1; i <= secs * 10; i++) {
     kills += kps / 10;
     const act = d.update(0.1, { minute: 3, hpFrac: 1, standing: true, kills, eventPending: true, ...snap });
-    if (act.pullForward !== undefined || act.pauseTrickle !== undefined) out.push({ t: t0 + i / 10, act });
+    if (act.pullForward !== undefined || act.pauseBackfill !== undefined) out.push({ t: t0 + i / 10, act });
   }
   return out;
 }
@@ -42,10 +42,10 @@ describe('Director surge', () => {
 });
 
 describe('Director reprieve', () => {
-  it('pauses the trickle at low hp, once per minute', () => {
+  it('pauses the backfill at low hp, once per minute', () => {
     const hits = run(make(), 30, 1, { hpFrac: 0.2 });
     expect(hits).toHaveLength(1);
-    expect(hits[0].act.pauseTrickle).toBe(REPRIEVE_FOR);
+    expect(hits[0].act.pauseBackfill).toBe(REPRIEVE_FOR);
   });
 
   it('re-arms on a new minute', () => {

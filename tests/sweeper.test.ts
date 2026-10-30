@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { Sim, DT } from '../src/game/sim.ts';
+import { Sim, DT, MAX_ENEMIES } from '../src/game/sim.ts';
 import { metaBonuses } from '../src/meta/shop.ts';
-import { SWEEPER_SPEED, spawnEnemy } from '../src/game/enemies.ts';
+import { SWEEPER_SPEED, isRegular, spawnEnemy } from '../src/game/enemies.ts';
 import { WAVE_MIN } from '../src/data/stages.ts';
 import { rawDamageEnemy } from '../src/game/combat.ts';
 
@@ -41,7 +41,7 @@ describe('overtime sweeper', () => {
 
   it('takes no damage, no knockback, and walks at the player fast', () => {
     const s = sim();
-    const e = spawnEnemy(s, 'banette', 400, 0, { sweeper: true })!;
+    const e = spawnEnemy(s, 'haunter', 400, 0, { sweeper: true })!;
     rawDamageEnemy(s, e, 1e12, 'fire', 0, 'test');
     expect(e.alive).toBe(true);
     expect(e.hp).toBe(e.maxHp);
@@ -57,7 +57,7 @@ describe('overtime sweeper', () => {
   it('is left out of the quota count', () => {
     const s = sim();
     s.time = 100;
-    for (let i = 0; i < 80; i++) spawnEnemy(s, 'banette', 500 + i, 500, { sweeper: true });
+    for (let i = 0; i < 80; i++) spawnEnemy(s, 'haunter', 500 + i, 500, { sweeper: true });
     s.spawner.update(0.1); // minute 1's quota: 35 for one player
     const filler = s.enemies.filter((e) => e.alive && !e.sweeper && !e.elite && e.role !== 'treasure');
     // 80 sweepers would satisfy the quota if they were counted.
@@ -82,5 +82,20 @@ describe('director reprieve in the spawner', () => {
     s.time += 3;
     s.spawner.update(0.1);
     expect(filler().length).toBeGreaterThan(0);
+  });
+});
+
+describe('co-op quota', () => {
+  it('stays clear of the enemy cap with four players in a thick minute', () => {
+    const s = new Sim({
+      stageId: 'viridian', seed: 7,
+      players: Array.from({ length: 4 }, () => ({ name: 'a', lineId: 'charmander', shiny: false, meta: metaBonuses({}), tms: [] })),
+    });
+    s.phase = 'play';
+    s.offers.clear();
+    s.time = 14 * 60 + 1; // quota 280 x 2.05 would be 574
+    s.spawner.update(0.1);
+    expect(s.enemies.filter(isRegular)).toHaveLength(MAX_ENEMIES - 60);
+    expect(s.enemies.length).toBeLessThan(MAX_ENEMIES);
   });
 });

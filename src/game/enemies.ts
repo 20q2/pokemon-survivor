@@ -8,14 +8,13 @@ import { RAID_MOVES, alphaNextMove, castRaid, eliteMove, markCharge, spawnHazard
 import { Director } from './director.ts';
 import type { Sim } from './sim.ts';
 import { MAX_ENEMIES } from './sim.ts';
-import type { Enemy, Player, Projectile } from './types.ts';
+import { AI, type Enemy, type Player, type Projectile } from './types.ts';
 import { heal } from './ledger.ts';
 
 const ROLE_HP: Record<EnemyRole, number> = { chaser: 1, fast: 0.7, tank: 2.4, ranged: 1, bomber: 0.8, treasure: 6 };
 const ROLE_SPEED: Record<EnemyRole, number> = { chaser: 1, fast: 1.4, tank: 0.7, ranged: 0.95, bomber: 1.15, treasure: 1.25 };
 
-/** aiState doubles as per-role state (bosses, bombers, alphas); these are the shared values. */
-export const AI = { BOMBER_FUSE: 1, CROSSER: 9, WALL: 10 } as const;
+export { AI };
 /** Elites cast raid attacks only after this run time; the first half is pure crowd-shepherding. */
 const ELITE_RAID_FROM = 360;
 /** Raid cooldown (s) for wave elites vs guardians. */
@@ -29,7 +28,9 @@ const RING_OVERTIME_S = 40;
 /** The Reaper arrives this long after the final boss spawned, then another every SWEEPER_PERIOD. */
 const SWEEPER_FROM = RUN_LENGTH + 60;
 const SWEEPER_PERIOD = 60;
-const SWEEPER_SPECIES = 'banette'; // ghost, and no stage's boss
+/** Room left under MAX_ENEMIES for bosses, elites, set pieces and carriers on top of the quota. */
+const QUOTA_HEADROOM = 60;
+const SWEEPER_SPECIES = 'haunter'; // ghost, and in no stage's waves, elites or bosses, so it can't hide in a crowd
 /** About 1.15x the fastest starter. */
 export const SWEEPER_SPEED = 165;
 /** Contact damage as a fraction of the party's biggest maxHp: three hits fell a full-hp player. */
@@ -67,7 +68,7 @@ export class Spawner {
   private nextSweeper = SWEEPER_FROM;
   private director: Director;
   /** The Director's reprieve: no quota backfill until this time (elites, bosses and set pieces carry on). */
-  private trickleResumeAt = 0;
+  private backfillResumeAt = 0;
   private bossIdx = 0;
   /** Far-off treasure on the map (shown on the minimap); guardians appear as you get close. */
   private pois: { kind: 'cache' | 'mega-stone'; id: number; x: number; y: number; guarded: boolean }[] = [];
@@ -151,7 +152,7 @@ export class Spawner {
       this.nextQuota = t; // the new minute's quota lands with its banner
       // A reprieve never leaks into the next minute. It costs 4 s plus at most one interval (nextQuota advances
       // before the early return below); that is deliberate, the breather should be real.
-      this.trickleResumeAt = 0;
+      this.backfillResumeAt = 0;
       this.pendingEvents = eventTimes(idx, w.events);
       if (idx > 0) {
         const species = waveHeadline(sim.stage, idx);
@@ -168,11 +169,12 @@ export class Spawner {
     }
     if (t < this.nextQuota) return;
     this.nextQuota = t + w.interval;
-    if (t < this.trickleResumeAt) return;
+    if (t < this.backfillResumeAt) return;
     // Only filler counts toward the quota; set pieces and carriers have their own pacing.
     let alive = 0;
-    for (const e of sim.enemies) if (e.alive && !e.boss && !e.elite && !e.alpha && !e.sweeper && e.role !== 'treasure' && !isSetPiece(e)) alive++;
-    const min = Math.round(w.min * (1 + 0.35 * (n - 1)) * (sim.elite ? 1.25 : 1));
+    for (const e of sim.enemies) if (isRegular(e)) alive++;
+    // Capped so a 4-player quota doesn't sit on MAX_ENEMIES and hammer the cap every interval.
+    const min = Math.min(MAX_ENEMIES - QUOTA_HEADROOM, Math.round(w.min * (1 + 0.35 * (n - 1)) * (sim.elite ? 1.25 : 1)));
     if (alive < min) {
       // Instant backfill; spawnEnemy stops at MAX_ENEMIES.
       for (; alive < min; alive++) {
@@ -188,9 +190,9 @@ export class Spawner {
     const sim = this.sim;
     const up = sim.players.filter((p) => !p.fainted);
     const hpFrac = up.length ? up.reduce((s, p) => s + p.hp / p.stats.maxHp, 0) / up.length : 0;
-    const act = this.director.update(dt, { minute: this.waveIdx, hpFrac, standing: up.length > 0, kills: sim.kills, eventPending: this.pendingEvents.length > 0 });
+    const act = this.director.update(dt, { minute: Math.floor(t / 60), hpFrac, standing: up.length > 0, kills: sim.kills, eventPending: this.pendingEvents.length > 0 });
     if (act.pullForward) this.pendingEvents[0].at = Math.max(t, this.pendingEvents[0].at - act.pullForward);
-    if (act.pauseTrickle) this.trickleResumeAt = t + act.pauseTrickle;
+    if (act.pauseBackfill) this.backfillResumeAt = t + act.pauseBackfill;
   }
 
   /** Overtime: the final boss still stands a minute after arriving, so the Reaper starts walking. */
@@ -331,7 +333,7 @@ export class Spawner {
 }
 
 export function spawnEnemy(sim: Sim, speciesId: string, x: number, y: number, opts: SpawnOpts = {}): Enemy | undefined {
-  if (sim.enemies.length >= MAX_ENEMIES && !opts.boss && !opts.elite && !opts.alpha && !opts.sweeper) return;
+  if (sim.enemies.length >= MAX_ENEMIES && !isSpecial(opts)) return;
   const sp = SPECIES[speciesId];
   const role: EnemyRole = opts.boss ? 'chaser' : ENEMY_ROLE[speciesId] ?? 'chaser';
   const m = sim.time / 60;
@@ -454,7 +456,7 @@ export function updateEnemies(sim: Sim, dt: number) {
     // Paralysis locks a foe up in random stutters (~35% of the time).
     const stutter = st.paralyze > 0 && ((sim.time * 3.1 + e.id * 0.618) % 1) < 0.35;
     // Can it do anything at all? (frozen, asleep, airborne or stuttering)
-    const helpless = (st.freeze > 0 || st.sleep > 0 || st.air > 0 || stutter);
+    const helpless = st.freeze > 0 || st.sleep > 0 || st.air > 0 || stutter;
     if (st.slow > 0) mult *= 0.55;
     if (st.chill > 0) mult *= 1 - 0.15 * st.chill;
     if (helpless || st.root > 0) mult = 0;
@@ -896,6 +898,16 @@ function spreadOnDeath(sim: Sim, e: Enemy) {
     const next = sim.grid.nearest(e.x, e.y, 150, (o) => o !== e && o.alive && o.st.seed <= 0);
     if (next) { next.st.seed = 5; next.st.seedDmg = st.seedDmg; next.st.seedOwner = st.seedOwner; }
   }
+}
+
+/** Bosses, elites, alphas and the sweeper: sized and paced on their own, never part of the crowd. */
+export function isSpecial(e: { boss?: unknown; elite?: boolean; alpha?: boolean; sweeper?: boolean }) {
+  return !!(e.boss || e.elite || e.alpha || e.sweeper);
+}
+
+/** Filler that counts toward the wave quota: alive, and not special, a treasure carrier or a set piece. */
+export function isRegular(e: Enemy) {
+  return e.alive && !isSpecial(e) && e.role !== 'treasure' && !isSetPiece(e);
 }
 
 /** Swarm crossers (9) and ring walls (10): scripted movers outside the quota, recycling and crowd shoving. */

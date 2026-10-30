@@ -16,7 +16,7 @@ export interface DirectorAction {
   /** Fire the next set piece this many seconds early. */
   pullForward?: number;
   /** Hold the quota backfill for this many seconds. */
-  pauseTrickle?: number;
+  pauseBackfill?: number;
 }
 
 /** A dominant party is above this hp fraction and killing faster than this (per second) for SURGE_AFTER seconds. */
@@ -36,7 +36,7 @@ const KPS_WINDOW = 5;
 
 /**
  * Left 4 Dead-style tension on top of the wave script: it never edits the wave table, only nudges set-piece
- * timing and briefly eases the trickle. Silent on purpose; it should feel like luck.
+ * timing and briefly eases the quota backfill. Silent on purpose; it should feel like luck.
  */
 export class Director {
   private minute = -1;
@@ -45,7 +45,7 @@ export class Director {
   private dominantFor = 0;
   private surged = false;
   private reprieved = false;
-  /** `range` must be the Sim's seeded rng so peers stay in step. */
+  /** Injected (the Sim's seeded rng) so replays and tests are deterministic; guests never run the Spawner. */
   private range: (lo: number, hi: number) => number;
   constructor(range: (lo: number, hi: number) => number) {
     this.range = range;
@@ -70,7 +70,7 @@ export class Director {
     }
     if (!this.reprieved && s.standing && s.hpFrac < REPRIEVE_HP) {
       this.reprieved = true;
-      act.pauseTrickle = REPRIEVE_FOR;
+      act.pauseBackfill = REPRIEVE_FOR;
     }
     return act;
   }
