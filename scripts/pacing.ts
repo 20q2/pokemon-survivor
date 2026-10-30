@@ -1,7 +1,7 @@
 // Pacing telemetry for a headless run: node scripts/pacing.ts [stageId] [lineId] [seconds] [seed] [seed]
 // Every 30 s: level, level-ups and the longest gap between them, enemies alive / in view,
 // kills, hit events per second, warnings, treasures, pauses (level-up + cinematics) and HP.
-import { Sim, DT } from '../src/game/sim.ts';
+import { Sim, DT, xpForLevel } from '../src/game/sim.ts';
 import { metaBonuses } from '../src/meta/shop.ts';
 import { Rng } from '../src/engine/math.ts';
 import { botChoose, botSteer } from '../src/game/bot.ts';
@@ -16,6 +16,11 @@ let steer = { x: 0, y: 0 }, steerT = 0;
 let lastLevelAt = 0, maxGap = 0, levelups = 0, lastKills = 0, hits = 0, warns = 0, chests = 0, pauses = 0;
 let inView = 0, peakView = 0, tickMs = 0, ticks = 0, samples = 0, alive = 0, hpSum = 0, next = 30;
 const gaps: number[] = [];
+// "Potential" level: the level all banked xp plus every candy on the floor would buy, i.e. a player who fetches every pile.
+const cum = [0, 0]; // cum[l] = xp spent reaching level l
+const spent = (l: number) => { while (cum.length <= l) cum.push(cum[cum.length - 1] + xpForLevel(cum.length - 1)); return cum[l]; };
+let potLevel = 1, lastPotAt = 0, potTick = 0;
+const potGaps: number[] = [];
 const col = (v: string | number, w: number) => String(v).padStart(w);
 console.log('time  lvl  lvups  gap(s)  alive  inView  peak  ms/tick  kills/30s  hits/s  warns  chests  pauses  hp%');
 while (sim.time < secs) {
@@ -42,6 +47,12 @@ while (sim.time < secs) {
     if (ev.e === 'chest') chests++;
   }
   sim.events.length = 0;
+  if (++potTick % 3 === 0) {
+    let floor = 0;
+    for (const k of sim.pickups) if (k.kind === 'candy' && !k.dead) floor += k.value;
+    const total = spent(sim.level) + sim.xp + floor * p.stats.exp;
+    while (total >= spent(potLevel + 1)) { potLevel++; potGaps.push(sim.time - lastPotAt); lastPotAt = sim.time; }
+  }
   if (Math.round(sim.time * 60) % 30 === 0) {
     samples++; alive += sim.enemies.length; hpSum += p.hp / p.stats.maxHp;
     let v = 0;
@@ -54,6 +65,10 @@ while (sim.time < secs) {
   }
 }
 gaps.sort((a, b) => a - b);
-const pct = (q: number) => gaps.length ? gaps[Math.min(gaps.length - 1, Math.floor(q * gaps.length))].toFixed(0) : '-';
+const pctOf = (a: number[]) => (q: number) => a.length ? a[Math.min(a.length - 1, Math.floor(q * a.length))].toFixed(0) : '-';
+const pct = pctOf(gaps);
+potGaps.sort((a, b) => a - b);
+const pp = pctOf(potGaps);
 console.log(`level ${sim.level}  kills ${sim.kills}  level-up gap p50 ${pct(0.5)}s  p90 ${pct(0.9)}s  max ${gaps.length ? gaps[gaps.length - 1].toFixed(0) : '-'}s  seed ${seed}`);
+console.log(`potential level ${potLevel}  potential level-up gap p50 ${pp(0.5)}s  p90 ${pp(0.9)}s  max ${potGaps.length ? potGaps[potGaps.length - 1].toFixed(0) : '-'}s`);
 console.log('moves', sim.players[0].moves.map((m) => m.id + m.level).join(','), 'items', sim.players[0].items.map((i) => i.id + i.level).join(','));

@@ -320,8 +320,8 @@ export function spawnEnemy(sim: Sim, speciesId: string, x: number, y: number, op
     hp *= 44; dmg *= 1.8; xp = 80; scale = 2.1; radius = 19; knockResist = 0.95; speed = Math.min(118, speed * 1.1);
   }
   if (opts.wall) {
-    // Pushing through is worth it: three times a tank's hp for tank xp; walls ignore separation shoves.
-    hp = (4 + bhp * 0.12) * ROLE_HP.tank * 3 * sim.spawner.hpMult(); xp = baseXp * 2; knockResist = 0.6; speed = opts.wall.speed;
+    // Pushing through is worth it: three times a tank's hp for three times a tank's xp; walls ignore separation shoves.
+    hp = (4 + bhp * 0.12) * ROLE_HP.tank * 3 * sim.spawner.hpMult(); xp = baseXp * 6; knockResist = 0.6; speed = opts.wall.speed;
   }
   if (role === 'treasure') { speed = Math.max(speed, 80); xp = 5; }
   if (shiny) { hp *= 3; xp *= 5; }

@@ -118,7 +118,7 @@ export function xpForLevel(level: number): number {
   // From level 12 the climb is a parabola (the old cubic made late levels a wall). Enemy xp grows
   // each minute, so costs must rise too or the cadence would speed up as the horde thickens.
   const m = k - 11;
-  return 206 + 80 * m + 22 * m * m;
+  return 206 + 90 * m + 26 * m * m;
 }
 
 /** Crit hit-stop: 2 frames, at most once per half second. */
