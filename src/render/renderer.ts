@@ -178,7 +178,8 @@ export class Renderer {
         this.numbers.label(ev.x, ev.y, ev.text, ev.color, 1.1, 6);
         break;
       case 'raid':
-        this.numbers.label(ev.x, ev.y - (ev.big ? 58 : 34), `${ev.name}!`, ev.big ? '#ffb0a0' : '#ffd0c0', 1.5, ev.big ? 8 : 6);
+        // Hostile telegraphs must always read: the raid name takes priority over effectiveness/roll labels.
+        this.numbers.label(ev.x, ev.y - (ev.big ? 58 : 34), `${ev.name}!`, ev.big ? '#ffb0a0' : '#ffd0c0', 1.5, ev.big ? 8 : 6, true);
         break;
       case 'hurt':
         if (ev.player === this.localId) this.hurtFlash = 0.35;

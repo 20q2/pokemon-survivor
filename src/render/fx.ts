@@ -200,7 +200,7 @@ class BitmapFont {
 }
 
 interface Num { x: number; y: number; text: string; color: FontColor; t: number; life: number; scale: number; crit: boolean }
-interface Label { x: number; y: number; text: string; color: string; t: number; life: number; size: number }
+interface Label { x: number; y: number; text: string; color: string; t: number; life: number; size: number; priority: boolean }
 interface Wipe { x: number; y: number; text: string; t: number; scale: number }
 
 /** Multi-kill pop lifetime (s). */
@@ -231,10 +231,21 @@ export class DamageNumbers {
     this.nums.push({ x, y, text: String(Math.round(value)), color: heal ? 'heal' : 'hurt', t: 0, life: 0.8, scale: 1.5, crit: false });
   }
 
-  label(x: number, y: number, text: string, color: string, life = 0.9, size = 6) {
-    if (this.labels.length > 6) return;
-    this.labels.push({ x, y, text, color, t: 0, life, size });
+  /** Max simultaneous labels; a `priority` label (a hostile attack's name) evicts the oldest ordinary one instead of being dropped. */
+  static readonly LABEL_CAP = 7;
+
+  label(x: number, y: number, text: string, color: string, life = 0.9, size = 6, priority = false) {
+    if (this.labels.length >= DamageNumbers.LABEL_CAP) {
+      if (!priority) return;
+      const i = this.labels.findIndex((l) => !l.priority);
+      if (i < 0) return;
+      this.labels.splice(i, 1);
+    }
+    this.labels.push({ x, y, text, color, t: 0, life, size, priority });
   }
+
+  /** Labels currently on screen (for tests). */
+  get labelTexts() { return this.labels.map((l) => l.text); }
 
   /** A big gold "×N!" for a multi-kill; grows a little with N (capped). */
   wipeout(x: number, y: number, n: number) {
