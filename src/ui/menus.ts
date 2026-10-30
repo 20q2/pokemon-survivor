@@ -15,6 +15,7 @@ import { stageThumbnail } from '../render/background.ts';
 import { dirRow } from '../engine/math.ts';
 import type { RunSession } from '../game/session.ts';
 import type { Player } from '../game/types.ts';
+import { nearMissLines } from './nearMiss.ts';
 import { btn, catBadge, fmtTime, h, img, moveDisc, moveIcon, toast, typeBadge, uiIcon } from './dom.ts';
 import { hideTip, moveInfoTip, tipped } from './tips.ts';
 import { lobbyMenu } from './lobby.ts';
@@ -531,13 +532,16 @@ export function resultsScreen(app: App, data: { session: RunSession; summary: Ru
   const moves = [...me.moves].sort((a, b) => b.dmgDealt - a.dmgDealt);
   const totalDmg = Math.max(1, me.dmgDealt);
   const title = r.cleared ? 'STAGE CLEAR!' : 'You blacked out…';
-  return screen('',
+  const retry = () => void app.startSolo(r.lineId, r.stageId, r.elite);
+  const near = nearMissLines(r);
+  const root = screen('',
     h('div', { class: `big-title ${r.cleared ? 'win' : 'lose'}` }, title, r.elite ? h('div', { class: 'hint', style: 'color:#ffd94a;font-size:12px;margin-top:8px' }, 'ELITE MODE') : null),
+    near.length ? h('div', { class: 'near-miss' }, near.map((l) => h('div', null, l))) : null,
     h('div', { class: 'results' },
       h('div', { class: 'panel col' },
         h('div', { class: 'row' }, img(assets.portraitUrl(me.speciesId, me.shiny)), h('div', null, h('b', null, SPECIES[me.speciesId].name), h('div', { class: 'hint' }, data.session.stage.name))),
         h('div', { class: 'kv' },
-          'Time survived', h('b', null, fmtTime(r.time)),
+          'Time survived', h('b', null, `${fmtTime(r.time)} (minute ${Math.floor(r.time / 60) + 1})`),
           'Level', h('b', null, r.level),
           'Pokémon defeated', h('b', null, r.kills.toLocaleString()),
           'Bosses defeated', h('b', null, r.bosses),
@@ -563,9 +567,26 @@ export function resultsScreen(app: App, data: { session: RunSession; summary: Ru
       ),
     ),
     h('div', { class: 'row mt', style: 'flex-wrap:wrap;justify-content:center' },
-      data.session.coop ? null : btn('Play again', () => void app.startSolo(r.lineId, r.stageId, r.elite), 'primary', { 'data-autofocus': true }),
+      data.session.coop ? null : btn('Play again (R)', retry, 'primary', { 'data-autofocus': true }),
       btn('Poké Mart', () => app.show(shopScreen(app))),
       btn('Main menu', () => app.goTitle(), '', { 'data-back': true }),
     ),
   );
+  if (!data.session.coop) {
+    // R / Enter = Play again. The listener retires itself once the screen is gone, so R can't restart from the title.
+    const onKey = (e: KeyboardEvent) => {
+      if (!root.isConnected) { window.removeEventListener('keydown', onKey); return; }
+      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && ['INPUT', 'TEXTAREA'].includes(t.tagName)) return;
+      // Enter on a focused button activates that button instead (e.g. Poké Mart).
+      if (e.code === 'Enter' && t && t.tagName === 'BUTTON') return;
+      if (e.code !== 'KeyR' && e.code !== 'Enter') return;
+      e.preventDefault();
+      window.removeEventListener('keydown', onKey);
+      retry();
+    };
+    window.addEventListener('keydown', onKey);
+  }
+  return root;
 }

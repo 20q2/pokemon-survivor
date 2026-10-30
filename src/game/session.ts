@@ -15,6 +15,8 @@ export interface HudInfo {
   kills: number;
   /** Elite chests dropped this run (the host's count, replicated to guests). */
   eliteChestsDropped: number;
+  /** Chests opened this run (guests: 0). */
+  chestsOpened: number;
 }
 
 /** Common surface for solo, host and client runs. */
@@ -120,6 +122,7 @@ export class LocalSession implements RunSession {
 /** Build the per-player summary used for saves/achievements. */
 export function summarize(session: RunSession, p: Player, cleared: boolean, extra: { bosses: number; died: boolean; defeatedChansey: boolean; alphas: number }): RunSummary {
   const w = session.world;
+  const nextBoss = session.stage.bosses.find((b) => b.at > w.time) ?? null;
   const moveTypesOk = p.moves.every((m) => p.types.includes(MOVES[m.id].type) || MOVES[m.id].cat === 'status');
   return {
     stageId: session.stage.id,
@@ -148,5 +151,11 @@ export function summarize(session: RunSession, p: Player, cleared: boolean, extr
     alphas: extra.alphas,
     // In co-op the script follows the host's save: guests replicate the host's count.
     eliteChests: w.eliteChestsDropped,
+    xp: w.xp,
+    xpNext: w.xpNext,
+    nextBossAt: nextBoss?.at ?? null,
+    nextBoss: nextBoss?.species ?? null,
+    nextWaveAt: Math.ceil(w.time / 60) * 60,
+    chestsOpened: w.chestsOpened,
   };
 }

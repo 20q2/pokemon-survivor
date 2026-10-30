@@ -138,6 +138,8 @@ export class Sim {
   readonly elite: boolean;
   /** Elite chests dropped this run, and the save's count at run start. */
   eliteChestsDropped = 0;
+  /** Chests opened this run (local count; not replicated to co-op guests). */
+  chestsOpened = 0;
   readonly eliteChestsAtStart: number;
   readonly rng: Rng;
   readonly grid = new SpatialGrid<Enemy>(48);
@@ -632,6 +634,7 @@ export class Sim {
    * first; small balls give only the mastery, Ultra and Master balls give it on top.
    */
   openChest(p: Player, tier: ChestTier = 1) {
+    this.chestsOpened++;
     const rewards: ChestReward[] = [];
     const master = () => {
       const ready = masteryCandidates(p);

@@ -281,6 +281,8 @@ table.dmg td.n { text-align: right; font-variant-numeric: tabular-nums; }
 .big-title { font-family: var(--head); font-size: clamp(20px, 4vw, 40px); text-shadow: 3px 3px 0 #000; margin: 10px 0 18px; }
 .big-title.win { color: var(--accent-2); }
 .big-title.lose { color: #ff7b7b; }
+.near-miss { margin: -8px 0 14px; text-align: center; color: var(--muted, #9aa4b8); font-size: 13px; }
+.near-miss div { white-space: nowrap; }
 
 /* lobby */
 .lobby { width: min(760px, 100%); }

@@ -27,6 +27,13 @@ export interface RunSummary {
   megas: number;          // Mega Evolutions this run
   alphas: number;         // Alpha Pokémon defeated by the team this run
   eliteChests: number;    // elite chests dropped this run, collected or not
+  // Near-miss data for the results screen.
+  xp: number;
+  xpNext: number;
+  nextBossAt: number | null; // seconds; null once the final boss is behind us
+  nextBoss: string | null;   // species of that boss
+  nextWaveAt: number;        // next minute mark
+  chestsOpened: number;      // co-op guests report 0 (not replicated)
 }
 
 export type Reward = { line: string } | { money: number } | { tm: string };
