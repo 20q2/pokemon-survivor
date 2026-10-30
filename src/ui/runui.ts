@@ -6,6 +6,7 @@ import { offerSig } from '../game/levelup.ts';
 import type { Player, UpgradeOffer } from '../game/types.ts';
 import type { RunSession } from '../game/session.ts';
 import { audio } from '../audio/audio.ts';
+import { CascadeTracker, cascadeLabel } from './cascade.ts';
 import { btn, catBadge, h, img, moveDisc, typeBadge } from './dom.ts';
 import { BEHAVIOR_TEXT, hideTip, statusLines } from './tips.ts';
 import { VERB_TEXT } from './verbs.ts';
@@ -119,6 +120,8 @@ export class LevelUpUI {
   private keyHandler = (e: KeyboardEvent) => this.onKey(e);
   private session: RunSession | null = null;
 
+  private cascade = new CascadeTracker();
+
   private root: HTMLElement;
 
   constructor(root: HTMLElement) {
@@ -149,7 +152,7 @@ export class LevelUpUI {
     this.session = session;
     const phase = session.phase();
     const offers = session.offers();
-    if (phase !== 'levelup') return this.close();
+    if (phase !== 'levelup') { this.cascade.reset(); return this.close(); }
     // Offers arrive as fresh arrays every network tick: compare by content.
     if (offers && this.el && this.shownSig === offerSig(offers, session.world.money) && this.shownFor) return;
     if (!offers) {
@@ -169,7 +172,10 @@ export class LevelUpUI {
     const me = session.world.players[session.localId];
     const mart = offers[0]?.cost !== undefined;
     const learning = !mart && (offers[0]?.kind === 'forget' || offers[0]?.kind === 'keep');
-    audio.sfx(learning ? 'evolved' : 'levelup');
+    // Levels left to pick, this one included: pendingLevels only drops in afterChoice, after the pick.
+    const pending = mart || learning ? 0 : me.pendingLevels;
+    // Cascade: the jingle climbs a semitone per card already taken (the audio engine caps it).
+    audio.sfx(learning ? 'evolved' : 'levelup', mart || learning ? 0 : this.cascade.step(pending));
     const cards = h('div', { class: `cards${learning ? ' learn' : ''}` }, offers.map((o, i) => offerCard(o, me, i, () => this.pick(i), session.world.money)));
     if (this.banishMode) cards.querySelectorAll('.card').forEach((c) => c.classList.add('banish-mode'));
     const actions = learning || mart ? null : h('div', { class: 'lu-actions' },
@@ -193,7 +199,9 @@ export class LevelUpUI {
         h('div', { class: 'hint' }, `But ${SPECIES[me.speciesId].name} can't learn more than four moves. Forget one?`));
     } else heading = mart
       ? h('div', { class: 'learn-head' }, h('h2', null, 'Poké Mart stop'), h('div', { class: 'hint' }, `You have ₽${Math.floor(session.world.money)} to spend. Pick one.`))
-      : h('h2', null, this.banishMode ? 'Banish which?' : `Level ${session.world.level}!`);
+      : h('div', { class: 'lu-head' },
+        h('h2', null, this.banishMode ? 'Banish which?' : `Level ${session.world.level}!`),
+        cascadeLabel(pending) ? h('div', { class: 'cascade' }, cascadeLabel(pending)) : null);
     // Your current build and stats stay live in the HUD above this overlay (see Hud 'lifted').
     this.el = h('div', { class: 'levelup' }, heading, cards, actions);
     this.root.appendChild(this.el);
