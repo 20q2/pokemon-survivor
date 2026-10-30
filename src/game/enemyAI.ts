@@ -9,10 +9,7 @@ import { spawnEnemy, isSetPiece } from './spawner.ts';
 import { AI, type Enemy, type Player, type Projectile } from './types.ts';
 import { heal } from './ledger.ts';
 
-/** Elites cast raid attacks only after this run time; the first half is pure crowd-shepherding. */
-const ELITE_RAID_FROM = 360;
-/** Raid cooldown (s) for wave elites vs guardians. */
-const ELITE_RAID_CD: [number, number] = [12, 16];
+/** Raid cooldown (s) for guardians; ordinary elites never cast, they just chase. */
 const GUARDIAN_RAID_CD: [number, number] = [5, 8];
 
 // ─────────────────────────── per-tick AI ───────────────────────────
@@ -111,7 +108,7 @@ export function updateEnemies(sim: Sim, dt: number) {
         if (e.aiState === AI.CROSSER) { mx = e.aiX; my = e.aiY; }
         e.ai -= dt;
         if (e.ai <= 0) { e.alive = false; continue; }
-      } else if (e.elite && st.charm <= 0 && eliteRaid(sim, e, player, d, dt)) {
+      } else if (e.guardian && st.charm <= 0 && guardianRaid(sim, e, player, d, dt)) {
         mult = 0;
       } else if (st.charm <= 0) {
         switch (e.role) {
@@ -357,21 +354,20 @@ function bossAI(sim: Sim, e: Enemy, target: Player, d: number, dt: number): { x:
 }
 
 /**
- * Elites now and then plant themselves and wind up one small telegraphed ground attack when a
- * partner is close. Returns true while they are casting (standing still).
+ * Guardians (elites minding an optional cache) now and then plant themselves and wind up one small
+ * telegraphed ground attack when a partner is close. Returns true while they are casting (standing
+ * still). Ordinary elites never cast: telegraphed hazards belong to bosses and Alphas.
  */
-function eliteRaid(sim: Sim, e: Enemy, target: Player, d: number, dt: number): boolean {
+function guardianRaid(sim: Sim, e: Enemy, target: Player, d: number, dt: number): boolean {
   if (e.casting! > 0) {
     e.casting! -= dt;
     e.flash = e.casting! % 0.2 < 0.1 ? 0.06 : 0;
     return true;
   }
   if (e.role === 'bomber') return false;
-  // The first half of a run is pure crowd-shepherding; guardians keep their old tempo.
-  if (!e.guardian && sim.time < ELITE_RAID_FROM) return false;
   e.raidCd = (e.raidCd ?? sim.rng.range(2, 5)) - dt;
   if (e.raidCd > 0 || d > (e.role === 'ranged' ? 260 : 170) || e.st.freeze > 0 || e.st.flinch > 0) return false;
-  e.raidCd = sim.rng.range(...(e.guardian ? GUARDIAN_RAID_CD : ELITE_RAID_CD));
+  e.raidCd = sim.rng.range(...GUARDIAN_RAID_CD);
   e.casting = castRaid(sim, e, eliteMove(e), target, 'elite');
   return true;
 }

@@ -259,7 +259,7 @@ export function alphaNextMove(e: Enemy): RaidMove | 'shots' {
   return ALPHA_ROTATION[e.patternIdx++ % ALPHA_ROTATION.length];
 }
 
-/** Elites get one move suited to how they fight: bruisers stomp, shooters fire a beam, the rest lunge with a cone. */
+/** Guardians get one move suited to how they fight: bruisers stomp, shooters fire a beam, the rest lunge with a cone. */
 export function eliteMove(e: Enemy): RaidMove {
   if (e.role === 'ranged') return 'beam';
   if (e.role === 'tank') return 'quake';

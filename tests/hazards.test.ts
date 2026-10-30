@@ -90,3 +90,22 @@ describe('raid hazards', () => {
     }
   });
 });
+
+describe('elite ground casts', () => {
+  const run = (guardian: boolean) => {
+    const s = sim();
+    s.time = 500;
+    const p = s.players[0];
+    p.x = 0; p.y = 0; p.hp = 1e9;
+    const e = spawnEnemy(s, 'onix', 120, 0, { elite: true, guardian })!;
+    let raids = 0;
+    for (let i = 0; i < Math.round(30 / DT); i++) {
+      s.update(DT);
+      raids += s.events.filter((ev) => ev.e === 'raid').length;
+      e.x = 120; e.y = 0; // stay within casting range
+    }
+    return raids;
+  };
+  it('ordinary elites never cast a raid', () => expect(run(false)).toBe(0));
+  it('guardians still do', () => expect(run(true)).toBeGreaterThan(0));
+});

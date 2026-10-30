@@ -332,7 +332,7 @@ or alpha kills; peers freeze on the same tick; interpolation pinned), zoom punch
 and heartbeat, options for effects opacity (hostile telegraphs never dim) and a damage-number cap of
 40 / 80 / 160. Deviation: the number thinning is a manual cap, not an auto-thin by hit rate. Co-op
 guests see the freeze through stalled snapshots rather than an explicit flag. The elite ground casts
-are kept (rarer and later); the user decision on removing them is still open.
+were removed for ordinary elites (they chase like big regulars) and kept for guardians.
 
 **Phase 4**: `Director` (surge pulls the next set piece 10-15 s earlier after 20 s of >90% HP and
 >=8 kills/s; reprieve pauses backfill 4 s under 35% HP; each once a minute, silent); an unkillable
