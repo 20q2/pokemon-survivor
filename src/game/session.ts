@@ -13,6 +13,8 @@ export interface HudInfo {
   xpNext: number;
   money: number;
   kills: number;
+  /** Elite chests dropped this run (the host's count, replicated to guests). */
+  eliteChestsDropped: number;
 }
 
 /** Common surface for solo, host and client runs. */
@@ -144,6 +146,7 @@ export function summarize(session: RunSession, p: Player, cleared: boolean, extr
     elite: !!(session.world as { elite?: boolean }).elite,
     megas: p.megas,
     alphas: extra.alphas,
-    eliteChests: (w as { eliteChestsDropped?: number }).eliteChestsDropped ?? 0,
+    // In co-op the script follows the host's save: guests replicate the host's count.
+    eliteChests: w.eliteChestsDropped,
   };
 }

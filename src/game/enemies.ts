@@ -1,4 +1,5 @@
 import { SPECIES } from '../data/pokedex.ts';
+import { ELITE_CHEST_ODDS, ELITE_CHEST_SCRIPT } from '../data/items.ts';
 import { ENEMY_ROLE, RUN_LENGTH, type BossDef, type EnemyRole, type SpawnEntry, type WaveDef, type WaveEvent, eventTimes, waveAt } from '../data/stages.ts';
 import { TAU, dist2 } from '../engine/math.ts';
 import { freshStatus, makeProjectile, rawDamageEnemy } from './combat.ts';
@@ -6,16 +7,13 @@ import { megaOnKill } from './mega.ts';
 import { RAID_MOVES, alphaNextMove, castRaid, eliteMove, markCharge, spawnHazard, type RaidMove } from './hazards.ts';
 import type { Sim } from './sim.ts';
 import { MAX_ENEMIES } from './sim.ts';
-import type { ChestTier, Enemy, Player, Projectile } from './types.ts';
+import type { Enemy, Player, Projectile } from './types.ts';
 import { heal } from './ledger.ts';
 
 const ROLE_HP: Record<EnemyRole, number> = { chaser: 1, fast: 0.7, tank: 2.4, ranged: 1, bomber: 0.8, treasure: 6 };
 const ROLE_SPEED: Record<EnemyRole, number> = { chaser: 1, fast: 1.4, tank: 0.7, ranged: 0.95, bomber: 1.15, treasure: 1.25 };
 
 /** aiState doubles as per-role state (bosses, bombers, alphas); these are the shared values. */
-/** Tiers of a save's first six elite chests: Poké, Poké, Great, Poké, Poké, Ultra. */
-const ELITE_CHEST_SCRIPT: readonly ChestTier[] = [1, 1, 2, 1, 1, 3];
-
 export const AI = { BOMBER_FUSE: 1, CROSSER: 9, WALL: 10 } as const;
 /** Elites cast raid attacks only after this run time; the first half is pure crowd-shepherding. */
 const ELITE_RAID_FROM = 360;
@@ -775,6 +773,12 @@ function dropCandy(sim: Sim, e: Enemy) {
   }
 }
 
+/**
+ * Per-kill pickup chances. A run is now 20-40k kills (dense minute waves), so these are small:
+ * a Magnet or Repel every minute or so, a Rare Candy a few times a run.
+ */
+const DROP = { coin: 0.0035, oran: 0.002, magnet: 0.00015, repel: 0.00008, rareCandy: 0.00004 } as const;
+
 export function killEnemy(sim: Sim, e: Enemy, killerId: number) {
   if (!e.alive) return;
   e.alive = false;
@@ -789,12 +793,11 @@ export function killEnemy(sim: Sim, e: Enemy, killerId: number) {
   const r = sim.rng;
   dropCandy(sim, e);
   spreadOnDeath(sim, e);
-  // Per-kill chances assume a few thousand kills a run; the dense waves multiply that, so they are small.
-  if (e.st.coin || r.chance(0.0035)) sim.spawnPickup('coin', e.x, e.y, 1 + (e.st.coin ? r.int(1, 2) : 0));
-  if (r.chance(0.002)) sim.spawnPickup('oran', e.x, e.y);
-  if (r.chance(0.00015)) sim.spawnPickup('magnet', e.x, e.y);
-  if (r.chance(0.00008)) sim.spawnPickup('repel', e.x, e.y);
-  if (r.chance(0.00004)) sim.spawnPickup('rare-candy', e.x, e.y);
+  if (e.st.coin || r.chance(DROP.coin)) sim.spawnPickup('coin', e.x, e.y, 1 + (e.st.coin ? r.int(1, 2) : 0));
+  if (r.chance(DROP.oran)) sim.spawnPickup('oran', e.x, e.y);
+  if (r.chance(DROP.magnet)) sim.spawnPickup('magnet', e.x, e.y);
+  if (r.chance(DROP.repel)) sim.spawnPickup('repel', e.x, e.y);
+  if (r.chance(DROP.rareCandy)) sim.spawnPickup('rare-candy', e.x, e.y);
   if (e.role === 'treasure') {
     for (let i = 0; i < 6; i++) sim.spawnPickup('coin', e.x, e.y, e.speciesId === 'chansey' ? 4 : 3);
     if (e.speciesId === 'chansey') sim.spawnPickup('chest', e.x, e.y, 2);
@@ -806,9 +809,10 @@ export function killEnemy(sim: Sim, e: Enemy, killerId: number) {
   }
   if (e.elite && !e.guardian) {
     // A save's first elite chests are scripted (a taste of every ball); after that the odds are random.
-    const scripted = ELITE_CHEST_SCRIPT[sim.eliteChestsBase + sim.eliteChestsDropped++];
+    const scripted = ELITE_CHEST_SCRIPT[sim.eliteChestsAtStart + sim.eliteChestsDropped];
+    sim.eliteChestsDropped++;
     const roll = r.next();
-    sim.spawnPickup('chest', e.x, e.y, scripted ?? (roll < 0.02 ? 3 : roll < 0.16 ? 2 : 1));
+    sim.spawnPickup('chest', e.x, e.y, scripted ?? (roll < ELITE_CHEST_ODDS.ultra ? 3 : roll < ELITE_CHEST_ODDS.great ? 2 : 1));
   }
   if (e.alpha) {
     sim.spawnPickup('chest', e.x, e.y, 3);

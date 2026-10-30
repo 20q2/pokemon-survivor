@@ -99,16 +99,23 @@ export function waveAt(stage: StageDef, t: number): { idx: number; wave: WaveDef
 const ELITE_MINUTES = new Set([1, 2, 3, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15]);
 
 /**
+ * Xp of a regular foe in minute `m`: +25% a minute, eased by sqrt(REF_QUOTA / quota) so thin minutes pay more per
+ * kill and thick ones less, keeping xp income per minute roughly flat. Any quota of 80 or more sits on the floor;
+ * the quota-10 ring minutes get about 2.1x.
+ */
+export const REF_QUOTA = 45;
+export const XP_QUOTA_FLOOR = 0.75;
+export const XP_QUOTA_CEIL = 2.5;
+function waveXp(m: number) {
+  const f = Math.min(XP_QUOTA_CEIL, Math.max(XP_QUOTA_FLOOR, Math.sqrt(REF_QUOTA / WAVE_MIN[m])));
+  return Math.round((1 + 0.25 * m) * f * 100) / 100;
+}
+
+/**
  * Builds the 16 waves from one line of species per minute plus optional flavour text per minute.
  * Spawn weights default to 3 for the first species, 2 for the second and 1 for the rest; write
  * `name:n` to override. Elites rotate through `elites`.
  */
-/** Per-kill xp: +25% a minute, scaled by sqrt(45 / quota) (45 is the minute-2 quota) so xp income per minute stays near-flat. */
-function waveXp(m: number) {
-  const f = Math.min(2.5, Math.max(0.75, Math.sqrt(45 / WAVE_MIN[m])));
-  return Math.round((1 + 0.25 * m) * f * 100) / 100;
-}
-
 function waves(elites: string[], minutes: string[], text: Record<number, string> = {}): WaveDef[] {
   let ei = 0;
   return minutes.map((line, m) => ({

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { STAGES } from '../src/data/stages.ts';
+import { REF_QUOTA, STAGES, WAVE_MIN, XP_QUOTA_CEIL, XP_QUOTA_FLOOR } from '../src/data/stages.ts';
 import { Sim, xpForLevel } from '../src/game/sim.ts';
 import { metaBonuses } from '../src/meta/shop.ts';
 import { freshSave, migrate } from '../src/meta/save.ts';
@@ -62,11 +62,17 @@ describe('xp cadence', () => {
     expect(tank.xp).toBe(waves[4].xp * 2);
   });
 
-  it('wave xp is eased by the quota: a bare ring minute pays about 2x, a 300-strong horde hits the 0.75x floor', () => {
+  it('wave xp is eased by the quota: thin minutes pay more per kill, thick ones sit on the floor', () => {
     for (const st of STAGES) {
-      for (const w of st.waves) expect(w.xp).toBeGreaterThan(0);
-      expect(st.waves[5].xp / (1 + 0.25 * 5)).toBeCloseTo(Math.sqrt(45 / 10), 1);
-      expect(st.waves[15].xp / (1 + 0.25 * 15)).toBeCloseTo(0.75, 2); // the floor
+      st.waves.forEach((w, m) => {
+        expect(w.xp).toBeGreaterThan(0);
+        const ease = w.xp / (1 + 0.25 * m);
+        const want = Math.min(XP_QUOTA_CEIL, Math.max(XP_QUOTA_FLOOR, Math.sqrt(REF_QUOTA / w.min)));
+        expect(ease, `${st.id} m${m}`).toBeCloseTo(want, 1);
+        if (w.min >= 80) expect(ease).toBeCloseTo(XP_QUOTA_FLOOR, 1);
+      });
+      const ring = st.waves.find((w) => w.min === Math.min(...WAVE_MIN))!;
+      expect(ring.xp).toBeGreaterThan(st.waves[2].xp);
     }
   });
 

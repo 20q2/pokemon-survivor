@@ -111,14 +111,17 @@ export function newMoveState(hiddenType: PType) {
 /** Candy pickups merge into the nearest candy once the field holds more pickups than this. */
 const CANDY_MERGE_ABOVE = 120;
 
+/** Late xp curve (level 12 on): LATE_BASE + LATE_LINEAR * m + LATE_QUAD * m^2, with m = levels past 12. */
+const LATE_FROM = 11, LATE_BASE = 206, LATE_LINEAR = 90, LATE_QUAD = 26;
+
 export function xpForLevel(level: number): number {
   // Snappy first levels (quadratic up to level 11), then a flatter climb.
   const k = level - 1;
-  if (k < 11) return Math.round(6 + 5 * k + 1.2 * k * k);
-  // From level 12 the climb is a parabola (the old cubic made late levels a wall). Enemy xp grows
-  // each minute, so costs must rise too or the cadence would speed up as the horde thickens.
-  const m = k - 11;
-  return 206 + 90 * m + 26 * m * m;
+  if (k < LATE_FROM) return Math.round(6 + 5 * k + 1.2 * k * k);
+  // From level 12 a parabola continues from xpForLevel(11) = 176 to 206 (the old cubic made late levels a wall);
+  // level 40 costs 23,110. Tuned with the wave xp table so the bot levels every ~20 s: cost must rise as xp income does.
+  const m = k - LATE_FROM;
+  return LATE_BASE + LATE_LINEAR * m + LATE_QUAD * m * m;
 }
 
 /** Crit hit-stop: 2 frames, at most once per half second. */
@@ -132,7 +135,7 @@ export class Sim {
   readonly elite: boolean;
   /** Elite chests dropped this run, and the save's count at run start. */
   eliteChestsDropped = 0;
-  readonly eliteChestsBase: number;
+  readonly eliteChestsAtStart: number;
   readonly rng: Rng;
   readonly grid = new SpatialGrid<Enemy>(48);
   /** Trees, boulders… that block walking and flying shots (generated from the stage). */
@@ -193,7 +196,7 @@ export class Sim {
     this.stage = STAGE[cfg.stageId];
     this.obstacles = new Obstacles(cfg.stageId);
     this.elite = !!cfg.elite;
-    this.eliteChestsBase = cfg.eliteChests ?? 0;
+    this.eliteChestsAtStart = cfg.eliteChests ?? 0;
     this.rng = new Rng(cfg.seed);
     this.spawner = new Spawner(this);
     cfg.players.forEach((pi, slot) => this.addPlayer(pi, slot));

@@ -1,7 +1,11 @@
+import { Rng } from '../engine/math.ts';
 import type { Sim } from './sim.ts';
 import type { Player, UpgradeOffer } from './types.ts';
 import { MOVES, MASTERY_OF } from '../data/moves.ts';
 import { HAZARD, hazardEscape } from './hazards.ts';
+
+/** Picks break ties with noise; a fixed own stream keeps bot runs repeatable and the game's RNG untouched. */
+const botRng = new Rng(0xb07);
 
 /** Per bot: where it last was, how long it has barely moved, and an escape heading. */
 const unstick = new WeakMap<Player, { x: number; y: number; still: number; t: number; ex: number; ey: number }>();
@@ -145,7 +149,7 @@ export function autoChoice(s: { offers(): UpgradeOffer[] | null; world: { player
     if (o.kind === 'heal') v = me.hp < me.stats.maxHp * 0.35 ? 60 : 5;
     if (o.kind === 'newMove' && me.types.includes(MOVES[o.id].type)) v += 8;
     if ((o.kind === 'newItem' || o.kind === 'itemUp') && me.moves.some((m) => MASTERY_OF[m.id]?.mastery?.item === o.id)) v += 25;
-    return v + Math.random() * 6;
+    return v + botRng.next() * 6;
   };
   let bi = 0;
   offers.forEach((o, i) => { if (score(o) > score(offers[bi])) bi = i; });

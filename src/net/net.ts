@@ -24,7 +24,7 @@ interface PlayerState {
 type HostMsg =
   | { t: 'lobby'; players: LobbyPlayer[]; stage: string; you: number; elite: boolean }
   | { t: 'start'; cfg: SimConfig; you: number }
-  | { t: 'tick'; ph: Phase; cine: Cinematic | null; lv: number; xp: number; xn: number; m: number; k: number; b: number; tm: number;
+  | { t: 'tick'; ph: Phase; cine: Cinematic | null; lv: number; xp: number; xn: number; m: number; k: number; b: number; ec: number; tm: number;
       of: UpgradeOffer[] | null; wait: string[]; ev: GameEvent[]; np: unknown[][]; dp: number[]; nk: unknown[][]; dk: [number, number][]; ps?: PlayerState[] }
   | { t: 'full'; reason: string }
   | { t: 'bye' };
@@ -245,7 +245,7 @@ export class NetHost {
       const ev = events.filter((e) => e.e !== 'hit' || ((e.x - p.x) ** 2 + (e.y - p.y) ** 2 < R * R));
       this.send(r, {
         t: 'tick', ph: sim.phase, cine: sim.cine, lv: sim.level, xp: sim.xp, xn: sim.xpNext, m: sim.money, k: sim.kills,
-        b: sim.bossesDefeated, tm: sim.time, of: sim.offers.get(r.slot) ?? null,
+        b: sim.bossesDefeated, ec: sim.eliteChestsDropped, tm: sim.time, of: sim.offers.get(r.slot) ?? null,
         wait: [...sim.offers.keys()].filter((id) => id !== r.slot).map((id) => sim.players[id]?.name ?? '?'),
         ev: ev.map(roundEvent), np, dp, nk, dk, ps,
       });
@@ -428,6 +428,7 @@ export class ClientSession implements RunSession {
     sim.money = m.m;
     sim.kills = m.k;
     sim.bossesDefeated = m.b;
+    sim.eliteChestsDropped = m.ec;
     if (Math.abs(sim.time - m.tm) > 0.5) sim.time = m.tm;
     // Ignore stale copies of offers we've already answered.
     const sig = m.of ? JSON.stringify(m.of) : '';

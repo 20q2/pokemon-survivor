@@ -1,6 +1,12 @@
 import type { PType } from './types.ts';
+import type { ChestTier } from '../game/types.ts';
 
 export const MAX_ITEM_LEVEL = 5;
+
+/** Tiers of a save's first six elite chests (Poké, Poké, Great, Poké, Poké, Ultra), then the odds below. */
+export const ELITE_CHEST_SCRIPT: readonly ChestTier[] = [1, 1, 2, 1, 1, 3];
+/** Cumulative roll thresholds for an elite chest past the script: under `ultra` Ultra, under `great` Great, else Poké. */
+export const ELITE_CHEST_ODDS = { ultra: 0.02, great: 0.16 } as const;
 
 export type ItemStat =
   | 'typeDmg' | 'physDmg' | 'specDmg' | 'cooldown' | 'crit' | 'critDmg' | 'area'
