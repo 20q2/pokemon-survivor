@@ -1,4 +1,3 @@
-import { offerSig } from '../game/levelup.ts';
 import Peer, { type DataConnection } from 'peerjs';
 import { LINE, SPECIES } from '../data/pokedex.ts';
 import { freshStatus, stepProjectileMotion } from '../game/combat.ts';
@@ -7,6 +6,7 @@ import { Sim, stepDig, type Phase, type PlayerInit, type SimConfig, type Cinemat
 import { animOffsetFor, type Enemy, type GameEvent, type Player, type UpgradeOffer } from '../game/types.ts';
 import type { Ledger } from '../game/ledger.ts';
 import { decodeSnapshot, encodeSnapshot, EXTRA_STATUS, MV, PICKUP_KINDS, projFromWire, projToWire, PROTOCOL, ROOM_PREFIX, SNAP_HZ } from './protocol.ts';
+import { offerSig } from '../game/levelup.ts';
 
 export interface LobbyPlayer { slot: number; name: string; lineId: string; shiny: boolean; ready: boolean }
 
