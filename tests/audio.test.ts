@@ -112,6 +112,11 @@ describe('sound effects', async () => {
         if (!src) continue;
         const t = parseMml(src, {}, ch === 'noise');
         longest = Math.max(longest, t.length);
+        // Octaves persist across bars; a phrase that only climbs goes ultrasonic (older sparkle sfx are high on purpose).
+        if (name.startsWith('reveal') && (ch === 'p1' || ch === 'p2')) {
+          const top = Math.max(...t.notes.flatMap((n) => n.midi));
+          expect(top, `${name} ${ch} top note`).toBeLessThanOrEqual(96);
+        }
       }
       const seconds = longest * (60 / def.bpm / (TICKS_PER_WHOLE / 4));
       expect(longest).toBeGreaterThan(0);

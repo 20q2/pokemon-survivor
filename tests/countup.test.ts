@@ -10,6 +10,10 @@ describe('countUpValue', () => {
     }
   });
 
+  it('eases out: past halfway after half the time', () => {
+    expect(countUpValue(0.5, 100)).toBeGreaterThan(50);
+  });
+
   it('is an integer and never decreases', () => {
     for (const to of [3, 250, 99999]) {
       let prev = 0;

@@ -535,7 +535,8 @@ export function resultsScreen(app: App, data: { session: RunSession; summary: Ru
   const title = r.cleared ? 'STAGE CLEAR!' : 'You blacked out…';
   // Totals count up in a stagger once the screen is up.
   const counter = (to: number, delay: number, format?: (n: number) => string) => {
-    const b = h('b', null, (format ?? ((n: number) => n.toLocaleString()))(to));
+    // Start at 0 so the total never flashes before the staggered count begins.
+    const b = h('b', null, (format ?? ((n: number) => n.toLocaleString()))(0));
     setTimeout(() => countUp(b, to, 900, format), delay);
     return b;
   };

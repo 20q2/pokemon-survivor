@@ -100,16 +100,17 @@ export const SFX: Record<string, SfxDef> = {
   reveal1: { bpm: 170, p1: 'o5 l32 @2 E2 v10 c e g > c8', p2: 'o4 l32 @1 E2 v6 g > c e g8', noise: 'v10 x8', vol: 1.4 },
   reveal3: {
     bpm: 170,
-    p1: 'o5 l32 @2 E2 v10 c e g > c8 | < g > c e g8 | c e g > c e g > c4',
-    p2: 'o4 l32 @1 E2 v6 g > c e g8 | c e g > c8 | g > c e g > c e g4',
+    // Octaves persist across bars, so each bar restates its own (a drifting phrase goes ultrasonic).
+    p1: 'o5 l32 @2 E2 v10 c e g > c8 | o5 g > c e g8 | o5 c e g > c e g > c4',
+    p2: 'o4 l32 @1 E2 v6 g > c e g8 | o4 c e g > c8 | o4 g > c e g > c e g4',
     noise: 'v10 x8 r8 r8 v10 x4',
     vol: 1.4,
   },
   reveal5: {
     bpm: 210,
-    p1: 'o5 l16 @2 E2 v11 c e g > c8 | < g > c e g8 | c e g > c e g > c8 | e g > c e g > c e c2',
-    p2: 'o4 l16 @1 E2 v7 g > c e g8 | c e g > c8 | g > c e g > c e g8 | c e g > c e g > c e g2',
-    tri: 'o3 l8 c c c c | g g > c c | c e g > c | c1',
+    p1: 'o5 l16 @2 E2 v11 c e g > c8 | o5 g > c e g8 | o5 c e g > c e g > c8 | o5 e g > c e g < c > e g > c2',
+    p2: 'o4 l16 @1 E2 v7 g > c e g8 | o4 c e g > c8 | o4 g > c e g > c e g8 | o4 c e g > c e g < c > e g > c2',
+    tri: 'o3 l8 c c c c | o3 g g > c c | o3 c e g > c | o4 c1',
     noise: 'v9 k8 h8 k8 h8 | s8 h8 s8 h8 | s16 s16 s16 s16 s8 x8 | v11 x1',
     vol: 1.4,
   },

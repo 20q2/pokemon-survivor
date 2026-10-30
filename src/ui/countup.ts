@@ -7,6 +7,9 @@ export function countUpValue(t01: number, to: number): number {
   return Math.round(to * (1 - Math.pow(1 - t01, 3)));
 }
 
+// Shared so overlapping counters tick as one voice, not three.
+let lastTick = -Infinity;
+
 const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /** Animate `el`'s text up to `to` over `ms`, ticking at most every 80 ms. Snaps when motion is reduced or ms is 0. */
@@ -14,7 +17,7 @@ export function countUp(el: HTMLElement, to: number, ms: number, format: (n: num
   if (ms <= 0 || to <= 0 || reducedMotion()) { el.textContent = format(to); return; }
   el.textContent = format(0);
   const t0 = performance.now();
-  let lastTick = -Infinity, frames = 0;
+  let frames = 0;
   const frame = (now: number) => {
     // The element is built before it is attached; only give up once it has had a few frames to appear.
     if (++frames > 3 && !el.isConnected) return;
