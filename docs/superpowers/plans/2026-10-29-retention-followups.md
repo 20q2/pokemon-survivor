@@ -159,6 +159,8 @@
 - [ ] **Step 4: Tests:** an elite-mode Sim killing the 3:00 boss enters the mart with four offers; a non-elite Sim does not; choosing an unaffordable card is a no-op; money is deducted on a purchase; two same-seed runs match.
 - [ ] **Step 5:** commit `elite: Poké Mart stop after every boss`.
 
+*Deliberate deviations as built:* the heal card is the existing Oran Berry (30 % HP) rather than a new Sitrus item, and the tests live in `tests/mart.test.ts`, not `tests/sim.test.ts`.
+
 ---
 
 ## Self-review

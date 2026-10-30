@@ -228,6 +228,10 @@ export function masteryCandidates(p: Player): { from: string; to: string }[] {
   return out;
 }
 
+/** Identity of the cards on screen; at a mart stop it includes the money, since that decides which are buyable. */
+export const offerSig = (offers: readonly UpgradeOffer[], money: number) =>
+  JSON.stringify(offers) + (offers[0]?.cost !== undefined ? `|${Math.floor(money)}` : '');
+
 /** Mart price: base ₽ x1.5 per earlier visit, in tens. */
 export const martPrice = (base: number, visit: number) => Math.round((base * 1.5 ** visit) / 10) * 10;
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Sim, DT } from '../src/game/sim.ts';
 import { metaBonuses } from '../src/meta/shop.ts';
 import { killEnemy } from '../src/game/enemyAI.ts';
-import { martOffers, martPrice } from '../src/game/levelup.ts';
+import { martOffers, martPrice, offerSig } from '../src/game/levelup.ts';
 import { Rng } from '../src/engine/math.ts';
 import type { UpgradeOffer } from '../src/game/types.ts';
 
@@ -91,5 +91,15 @@ describe('Elite Mode mart stop', () => {
     expect(cost(1)).toEqual([60, 120, 180, 0]);
     expect(cost(2)).toEqual([90, 180, 270, 0]);
     expect(martPrice(40, 1)).toBe(60);
+  });
+});
+
+describe('offer signature', () => {
+  const plain: UpgradeOffer[] = [{ kind: 'heal', id: 'oran-berry', level: 0 }];
+  const priced: UpgradeOffer[] = [{ kind: 'heal', id: 'oran-berry', level: 0, cost: 40 }];
+  it('ignores money for ordinary cards but not at a mart stop, so a money change un-hides stale cards', () => {
+    expect(offerSig(plain, 10)).toBe(offerSig(plain, 99));
+    expect(offerSig(priced, 10)).not.toBe(offerSig(priced, 99));
+    expect(offerSig(priced, 10.4)).toBe(offerSig(priced, 10));
   });
 });

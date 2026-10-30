@@ -2,6 +2,7 @@ import { MOVES, MASTERY_OF, MAX_MOVE_LEVEL, moveStatsAt, type MoveStats } from '
 import { ITEMS, VITAMIN, vitaminDesc } from '../data/items.ts';
 import { SPECIES } from '../data/pokedex.ts';
 import { assets } from '../render/assets.ts';
+import { offerSig } from '../game/levelup.ts';
 import type { Player, UpgradeOffer } from '../game/types.ts';
 import type { RunSession } from '../game/session.ts';
 import { audio } from '../audio/audio.ts';
@@ -109,9 +110,6 @@ export function offerCard(o: UpgradeOffer, p: Player, index: number, onPick: () 
   return card;
 }
 
-/** Cards change with the offers, and at a mart stop with the money in hand. */
-const sigOf = (offers: UpgradeOffer[], money: number) => JSON.stringify(offers) + (offers[0]?.cost !== undefined ? `|${Math.floor(money)}` : '');
-
 /** Level-up overlay; rebuilt whenever the offers change. */
 export class LevelUpUI {
   el: HTMLElement | null = null;
@@ -132,7 +130,8 @@ export class LevelUpUI {
     if (!this.el || !this.session || !this.shownFor) return;
     const n = Number(e.key);
     if (n >= 1 && n <= this.shownFor.length && this.affordable(n - 1)) this.pick(n - 1);
-    if (e.code === 'KeyR') this.session.reroll();
+    // The mart has no rerolls.
+    if (e.code === 'KeyR' && this.shownFor[0]?.cost === undefined) this.session.reroll();
   }
 
   private affordable(i: number) {
@@ -152,7 +151,7 @@ export class LevelUpUI {
     const offers = session.offers();
     if (phase !== 'levelup') return this.close();
     // Offers arrive as fresh arrays every network tick: compare by content.
-    if (offers && this.el && this.shownSig === sigOf(offers, session.world.money) && this.shownFor) return;
+    if (offers && this.el && this.shownSig === offerSig(offers, session.world.money) && this.shownFor) return;
     if (!offers) {
       // waiting for teammates
       const waiting = session.waitingOn();
@@ -166,7 +165,7 @@ export class LevelUpUI {
     }
     this.close();
     this.shownFor = offers;
-    this.shownSig = sigOf(offers, session.world.money);
+    this.shownSig = offerSig(offers, session.world.money);
     const me = session.world.players[session.localId];
     const mart = offers[0]?.cost !== undefined;
     const learning = !mart && (offers[0]?.kind === 'forget' || offers[0]?.kind === 'keep');

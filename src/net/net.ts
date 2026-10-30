@@ -1,3 +1,4 @@
+import { offerSig } from '../game/levelup.ts';
 import Peer, { type DataConnection } from 'peerjs';
 import { LINE, SPECIES } from '../data/pokedex.ts';
 import { freshStatus, stepProjectileMotion } from '../game/combat.ts';
@@ -242,7 +243,7 @@ export class NetHost {
       const p = sim.players[r.slot];
       if (!p) continue;
       const R = Math.max(p.viewW, p.viewH) * 0.75 + 120;
-      const ev = events.filter((e) => e.e !== 'hit' || ((e.x - p.x) ** 2 + (e.y - p.y) ** 2 < R * R));
+      const ev = events.filter((e) => e.e !== 'enemyShot' && (e.e !== 'hit' || ((e.x - p.x) ** 2 + (e.y - p.y) ** 2 < R * R)));
       this.send(r, {
         t: 'tick', ph: sim.phase, cine: sim.cine, lv: sim.level, xp: sim.xp, xn: sim.xpNext, m: sim.money, k: sim.kills,
         b: sim.bossesDefeated, ec: sim.eliteChestsDropped, tm: sim.time, of: sim.offers.get(r.slot) ?? null,
@@ -431,7 +432,7 @@ export class ClientSession implements RunSession {
     sim.eliteChestsDropped = m.ec;
     if (Math.abs(sim.time - m.tm) > 0.5) sim.time = m.tm;
     // Ignore stale copies of offers we've already answered.
-    const sig = m.of ? JSON.stringify(m.of) : '';
+    const sig = m.of ? offerSig(m.of, m.m) : '';
     this.hostOffers = sig && sig === this.answered ? null : m.of;
     if (!m.of) this.answered = '';
     this.wait = m.wait;
@@ -601,13 +602,19 @@ export class ClientSession implements RunSession {
   offers() { return this.hostOffers; }
   waitingOn() { return this.wait; }
   private answer() {
-    this.answered = this.hostOffers ? JSON.stringify(this.hostOffers) : '';
+    this.answered = this.hostOffers ? offerSig(this.hostOffers, this.sim.money) : '';
     this.hostOffers = null;
   }
-  choose(i: number) { if (!this.hostOffers) return; this.net.send({ t: 'choose', i }); this.answer(); }
-  reroll() { if (!this.hostOffers) return; this.net.send({ t: 'reroll' }); this.answer(); }
-  skip() { if (!this.hostOffers) return; this.net.send({ t: 'skip' }); this.answer(); }
-  banish(i: number) { if (!this.hostOffers) return; this.net.send({ t: 'banish', i }); this.answer(); }
+  choose(i: number) {
+    const cost = this.hostOffers?.[i]?.cost;
+    if (!this.hostOffers || (cost !== undefined && cost > this.sim.money)) return;
+    this.net.send({ t: 'choose', i }); this.answer();
+  }
+  // Rerolls, skips and banishes do not exist at a mart stop.
+  private inMart() { return this.hostOffers?.[0]?.cost !== undefined; }
+  reroll() { if (!this.hostOffers || this.inMart()) return; this.net.send({ t: 'reroll' }); this.answer(); }
+  skip() { if (!this.hostOffers || this.inMart()) return; this.net.send({ t: 'skip' }); this.answer(); }
+  banish(i: number) { if (!this.hostOffers || this.inMart()) return; this.net.send({ t: 'banish', i }); this.answer(); }
   seen() { return this.seenSet; }
   defeated() { return this.defeatedMap; }
   dispose() { this.net.close(); }

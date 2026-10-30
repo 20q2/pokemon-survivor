@@ -25,9 +25,9 @@ species/items to the data files): `npm run fetch-assets`.
 - **Results screen:** press R or Enter to replay the same run.
 - **Move** with WASD / arrow keys / gamepad stick / touch (drag anywhere).
 - **Level-ups** offer 3 cards: new moves (from your learnset + owned TMs), move
-  levels (1–8), held items, item levels (1–5). Once your build is complete, cards
+  levels (1–8), held items, item levels (1–7; Loaded Dice stops at 3, where it stops improving). Once your build is complete, cards
   become **limit breaks** (moves past Lv8) and **vitamins** (Protein, HP Up, …), both
-  with logarithmic returns, so levelling never runs dry. Hover any HUD slot to see what
+  growing linearly (limit breaks to +6, vitamins to rank 8) and then logarithmically, so levelling never runs dry. Hover any HUD slot to see what
   it does. Number keys 1–4 pick; R rerolls. Turn on *Options → Auto-pick upgrades* for
   a pure movement-only experience.
 - **Types matter everywhere**: the real 18-type chart applies to every hit (immunity
@@ -52,7 +52,9 @@ species/items to the data files): `npm run fetch-assets`.
   you Mega Evolve for 20 seconds: real Mega sprites where PMD Sprite Collab has them
   (Charizard X, Gengar, Alakazam, Tyranitar, Gardevoir, Sceptile), a Mega aura otherwise.
 
-In Elite Mode every non-final boss is followed by a Poké Mart stop: the run pauses on four priced cards (a berry, an upgrade, something new, or "Leave the mart") paid for from the team's ₽; each stop costs 1.5x the last.
+In Elite Mode every non-final boss is followed by a Poké Mart stop: the run pauses on four priced cards (a berry, an upgrade, something new, or "Leave the mart") paid for from the team's ₽ (purchases come out of the run's banked ₽); each stop costs 1.5x the last.
+
+Shooters and bombers only join the crowd from minute 6, and regular shooters fire from close range and no faster than every 3.5 s; bosses and elites keep their own patterns.
 
 ## Meta progression
 

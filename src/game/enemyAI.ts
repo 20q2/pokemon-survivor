@@ -120,6 +120,7 @@ export function updateEnemies(sim: Sim, dt: number) {
             const crowd = isRegular(e);
             if (e.ai <= 0 && d < (crowd ? 200 : 320)) {
               e.ai = crowd ? sim.rng.range(3.5, 4.5) : sim.rng.range(2.4, 3.6);
+              if (crowd) sim.emit({ e: 'enemyShot', x: e.x, y: e.y, by: e.id }); // local telemetry, not sent to guests
               enemyShot(sim, e, Math.atan2(dy, dx), 120, e.dmg * 0.9);
             }
             break;
@@ -266,7 +267,6 @@ function onPlayerContact(sim: Sim, p: Player, e: Enemy) {
 
 function enemyShot(sim: Sim, e: Enemy, a: number, speed: number, dmg: number) {
   if (e.st.weaken > 0) dmg *= 0.7;
-  sim.emit({ e: 'enemyShot', x: e.x, y: e.y, by: e.id });
   makeProjectile(sim, {
     owner: -1, hostile: true, behavior: 'enemy', moveId: 'enemy', fx: 'orb', type: e.types[0], shape: 'circle',
     x: e.x, y: e.y - 6, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, angle: a, speed, r: 5, life: 4,
