@@ -704,39 +704,34 @@ export class Renderer {
       g.fillRect(0, 0, W, H);
       return;
     }
+    // Sparse, slow and layered: a uniform field sliding across the whole view reads as
+    // self-motion and makes people queasy. Hashed positions (no lattice), three depth
+    // layers at different speeds so nothing moves as one sheet.
+    const hash = (k: number) => { const v = Math.sin(k) * 43758.5453; return v - Math.floor(v); };
+    const wrap = (v: number, m: number) => ((v % m) + m) % m;
+    const n = w === 'rain' ? 60 : w === 'snow' ? 54 : 48;
     g.globalAlpha = this.fxOpacity;
-    if (w === 'sand') {
-      // Sparse drifting dust, not a full-screen sheet of fast streaks: a uniform field
-      // sliding across the whole view reads as self-motion and makes people queasy.
-      // Hashed positions (no lattice), three depth layers at different slow speeds.
-      const hash = (k: number) => { const v = Math.sin(k) * 43758.5453; return v - Math.floor(v); };
-      for (let i = 0; i < 48; i++) {
-        const layer = i % 3;
-        const speed = (22 + layer * 22) * s;
-        const x = (hash(i * 12.9898) * W + time * speed) % W;
-        const y = (hash(i * 78.233) * H + time * speed * 0.12 + Math.sin(time * 0.5 + i) * 4 * s) % H;
-        g.fillStyle = layer === 0 ? 'rgba(150,110,60,0.3)' : layer === 1 ? 'rgba(226,190,128,0.35)' : 'rgba(236,206,150,0.45)';
+    if (w === 'rain') { g.lineWidth = s; g.lineCap = 'round'; }
+    for (let i = 0; i < n; i++) {
+      const layer = i % 3;
+      const x0 = hash(i * 12.9898) * W, y0 = hash(i * 78.233) * H;
+      if (w === 'rain') {
+        const v = (200 + layer * 90) * s;
+        const x = wrap(x0 - time * v * 0.12, W), y = wrap(y0 + time * v, H);
+        g.strokeStyle = WEATHER_INK.rain[layer];
+        g.beginPath(); g.moveTo(x, y); g.lineTo(x - (1 + layer * 0.5) * s, y + (5 + layer * 3) * s); g.stroke();
+      } else if (w === 'snow') {
+        const x = wrap(x0 + Math.sin(time * 0.6 + i) * 10 * s, W), y = wrap(y0 + time * (14 + layer * 12) * s, H);
+        g.fillStyle = WEATHER_INK.snow[layer];
+        g.fillRect(x, y, (1 + layer * 0.5) * s, (1 + layer * 0.5) * s);
+      } else {
+        const v = (22 + layer * 22) * s;
+        const x = wrap(x0 + time * v, W), y = wrap(y0 + time * v * 0.12 + Math.sin(time * 0.5 + i) * 4 * s, H);
+        g.fillStyle = WEATHER_INK.sand[layer];
         g.fillRect(x, y, (2 + layer) * s, Math.max(1, layer) * s);
       }
-      g.globalAlpha = 1;
-      return;
     }
-    const n = w === 'rain' ? 90 : 70;
-    for (let i = 0; i < n; i++) {
-      const seed = i * 97.13;
-      const speed = w === 'rain' ? 900 : 60;
-      const x0 = (seed * 13.7) % W;
-      const y0 = (seed * 7.3) % H;
-      if (w === 'rain') {
-        const y = (y0 + time * speed) % H, x = (x0 - time * 200) % W;
-        g.strokeStyle = 'rgba(180,210,255,0.55)'; g.lineWidth = s;
-        g.beginPath(); g.moveTo((x + W) % W, y); g.lineTo((x + W) % W - 4 * s, y + 12 * s); g.stroke();
-      } else {
-        const y = (y0 + time * speed) % H, x = (x0 + Math.sin(time + i) * 20 + W) % W;
-        g.fillStyle = 'rgba(255,255,255,0.8)';
-        g.fillRect(x, y, 2 * s, 2 * s);
-      }
-    }
+    g.lineCap = 'butt';
     g.globalAlpha = 1;
   }
 
@@ -1665,6 +1660,12 @@ const EVO_ZOOM = [1, 0.9, 0.8];
 const PUNCH_ZOOM = 0.04;
 /** Seconds for that punch to settle back. */
 const PUNCH_LIFE = 0.25;
+/** Weather particle colours, far → near layer. */
+const WEATHER_INK = {
+  rain: ['rgba(180,210,255,0.22)', 'rgba(180,210,255,0.32)', 'rgba(200,222,255,0.42)'],
+  snow: ['rgba(255,255,255,0.45)', 'rgba(255,255,255,0.6)', 'rgba(255,255,255,0.75)'],
+  sand: ['rgba(150,110,60,0.3)', 'rgba(226,190,128,0.35)', 'rgba(236,206,150,0.45)'],
+};
 /** Partners draw larger as they evolve (cosmetic; hitboxes are unchanged). With EVO_ZOOM the
  * partner keeps roughly its on-screen size while the world around it shrinks. */
 const growth = (p: Player) => [1, 1.15, 1.3][Math.min(p.stage, 2)];

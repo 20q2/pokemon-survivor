@@ -175,6 +175,11 @@ function updateWeather(sim: Sim, dt: number) {
   if (sim.weatherTick > 0) return;
   sim.weatherTick = 1;
   const owner = sim.players[sim.weatherOwner];
+  const power = owner ? sim.weatherPower * POWER_SCALE * Math.max(owner.stats.atk, owner.stats.spa) * (1 + sim.level * 0.04) : 0;
+  // Rain is the support weather: the whole team heals a little every second.
+  if (sim.weather === 'rain' && owner) {
+    for (const p of sim.players) if (!p.fainted && p.connected) heal(p, p.stats.maxHp * sim.weatherPower * 0.001, 'rain-dance', owner);
+  }
   const seen = new Set<number>();
   for (const p of sim.players) {
     if (!p.connected) continue;
@@ -182,10 +187,10 @@ function updateWeather(sim: Sim, dt: number) {
       if (seen.has(e.id)) continue;
       seen.add(e.id);
       if (sim.weather === 'rain') e.st.wet = Math.max(e.st.wet, 2);
-      else if (sim.weather === 'snow' && owner && sim.rng.chance(0.5)) applyStatus(sim, e, 'chill', 0, owner);
+      else if (sim.weather === 'snow' && owner && sim.rng.chance(Math.min(0.9, 0.4 + sim.weatherPower * 0.02))) applyStatus(sim, e, 'chill', 0, owner);
+      else if (sim.weather === 'sun' && owner && !e.types.includes('fire') && sim.rng.chance(0.35)) applyStatus(sim, e, 'burn', power, owner);
       else if (sim.weather === 'sand' && owner && !e.types.some((t) => t === 'rock' || t === 'ground' || t === 'steel')) {
-        const d = sim.weatherPower * POWER_SCALE * Math.max(owner.stats.atk, owner.stats.spa) * (1 + sim.level * 0.04);
-        rawDamageEnemy(sim, e, d, 'rock', owner.id, owner.ability === 'sand-stream' && !owner.moves.some((m) => m.id === 'sandstorm') ? 'sand-stream' : 'sandstorm');
+        rawDamageEnemy(sim, e, power, 'rock', owner.id, owner.ability === 'sand-stream' && !owner.moves.some((m) => m.id === 'sandstorm') ? 'sand-stream' : 'sandstorm');
       }
     }
   }

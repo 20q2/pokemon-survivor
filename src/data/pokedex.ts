@@ -197,22 +197,22 @@ export const LINES: Line[] = [
   {
     id: 'bulbasaur', name: 'Bulbasaur', stages: ['bulbasaur', 'ivysaur', 'venusaur'], evoLevels: [12, 26],
     ability: 'overgrow', starter: 'vine-whip', blurb: 'Sturdy all-rounder that drains and poisons.',
-    learnset: [L('vine-whip'), L('tackle'), L('leech-seed'), L('razor-leaf'), L('poison-sting'), L('sleep-powder'), L('bullet-seed'), L('toxic'), L('sludge-bomb', 1), L('petal-dance', 1), L('venoshock', 1), L('solar-beam', 2), L('sunny-day', 2)],
+    learnset: [L('vine-whip'), L('tackle'), L('leech-seed'), L('razor-leaf'), L('poison-sting'), L('sleep-powder'), L('bullet-seed'), L('toxic'), L('sludge-bomb', 1), L('petal-dance', 1), L('venoshock', 1), L('solar-beam', 2), L('sunny-day', 1)],
   },
   {
     id: 'charmander', name: 'Charmander', stages: ['charmander', 'charmeleon', 'charizard'], evoLevels: [12, 26],
     ability: 'blaze', starter: 'ember', blurb: 'Glass-cannon fire breather. Takes flight at full power.',
-    learnset: [L('ember'), L('metal-claw'), L('dragon-rage'), L('fire-spin'), L('flame-wheel'), L('will-o-wisp'), L('flamethrower', 1), L('dragon-breath', 1), L('blaze-kick', 1), L('heat-wave', 2), L('sunny-day', 2), L('air-slash', 2), L('dragon-pulse', 2)],
+    learnset: [L('ember'), L('metal-claw'), L('dragon-rage'), L('fire-spin'), L('flame-wheel'), L('will-o-wisp'), L('flamethrower', 1), L('dragon-breath', 1), L('blaze-kick', 1), L('heat-wave', 2), L('sunny-day', 1), L('air-slash', 2), L('dragon-pulse', 2)],
   },
   {
     id: 'squirtle', name: 'Squirtle', stages: ['squirtle', 'wartortle', 'blastoise'], evoLevels: [12, 26],
     ability: 'rain-dish', starter: 'water-gun', blurb: 'Tanky shell with crowd-pushing water and slow.',
-    learnset: [L('water-gun'), L('tackle'), L('bubble'), L('rapid-spin'), L('water-pulse'), L('bite'), L('aqua-ring'), L('whirlpool', 1), L('surf', 1), L('ice-beam', 1), L('iron-defense', 1), L('rain-dance', 2), L('flash-cannon', 2)],
+    learnset: [L('water-gun'), L('tackle'), L('bubble'), L('rapid-spin'), L('water-pulse'), L('bite'), L('aqua-ring'), L('whirlpool', 1), L('surf', 1), L('ice-beam', 1), L('iron-defense', 1), L('rain-dance', 1), L('flash-cannon', 2)],
   },
   {
     id: 'pichu', name: 'Pichu', stages: ['pichu', 'pikachu', 'raichu'], evoLevels: [8, 22],
     ability: 'static', starter: 'thunder-shock', blurb: 'Fragile at first, evolves early into a lightning storm.',
-    learnset: [L('thunder-shock'), L('quick-attack'), L('spark'), L('thunder-wave'), L('electro-ball'), L('swift'), L('fairy-wind'), L('discharge', 1), L('thunderbolt', 1), L('agility', 1), L('electric-terrain', 1), L('magnet-bomb', 2)],
+    learnset: [L('thunder-shock'), L('quick-attack'), L('spark'), L('thunder-wave'), L('electro-ball'), L('swift'), L('fairy-wind'), L('discharge', 1), L('thunderbolt', 1), L('agility', 1), L('electric-terrain', 1), L('rain-dance', 1), L('magnet-bomb', 2)],
   },
   {
     id: 'gastly', name: 'Gastly', stages: ['gastly', 'haunter', 'gengar'], evoLevels: [12, 26],
@@ -232,7 +232,7 @@ export const LINES: Line[] = [
   {
     id: 'dratini', name: 'Dratini', stages: ['dratini', 'dragonair', 'dragonite'], evoLevels: [14, 30],
     ability: 'multiscale', starter: 'twister', blurb: 'Slow to mature, but a dragon of legend once grown.',
-    learnset: [L('twister'), L('dragon-rage'), L('thunder-wave'), L('dragon-breath'), L('whirlwind'), L('ice-beam', 1), L('dragon-pulse', 1), L('outrage', 1), L('dragon-dance', 1), L('wing-attack', 2), L('tailwind', 2), L('thunderbolt', 2)],
+    learnset: [L('twister'), L('dragon-rage'), L('thunder-wave'), L('dragon-breath'), L('whirlwind'), L('ice-beam', 1), L('dragon-pulse', 1), L('outrage', 1), L('dragon-dance', 1), L('snowscape', 1), L('wing-attack', 2), L('tailwind', 2), L('thunderbolt', 2)],
   },
   {
     id: 'eevee', name: 'Eevee', stages: ['eevee'], evoLevels: [14],
@@ -257,7 +257,7 @@ export const LINES: Line[] = [
   {
     id: 'treecko', name: 'Treecko', stages: ['treecko', 'grovyle', 'sceptile'], evoLevels: [12, 26],
     ability: 'unburden', starter: 'bullet-seed', blurb: 'Lightning-quick blade master. Rewards clean dodging.',
-    learnset: [L('bullet-seed'), L('quick-attack'), L('pursuit'), L('vine-whip'), L('razor-leaf'), L('leech-seed'), L('fury-cutter', 1), L('leaf-blade', 1), L('night-slash', 1), L('agility', 1), L('infestation', 1), L('dragon-pulse', 2), L('solar-beam', 2)],
+    learnset: [L('bullet-seed'), L('quick-attack'), L('pursuit'), L('vine-whip'), L('razor-leaf'), L('leech-seed'), L('fury-cutter', 1), L('leaf-blade', 1), L('night-slash', 1), L('agility', 1), L('infestation', 1), L('dragon-pulse', 2), L('solar-beam', 2), L('sunny-day', 2)],
   },
   {
     id: 'torchic', name: 'Torchic', stages: ['torchic', 'combusken', 'blaziken'], evoLevels: [12, 26],
@@ -267,7 +267,7 @@ export const LINES: Line[] = [
   {
     id: 'mudkip', name: 'Mudkip', stages: ['mudkip', 'marshtomp', 'swampert'], evoLevels: [12, 26],
     ability: 'torrent', starter: 'water-gun', blurb: 'Hardy mud-slinger with earthshaking power.',
-    learnset: [L('water-gun'), L('tackle'), L('mud-slap'), L('rock-smash'), L('whirlpool'), L('aqua-ring'), L('bonemerang', 1), L('bulldoze', 1), L('surf', 1), L('magnitude', 1), L('dig', 1), L('earth-power', 2), L('rain-dance', 2), L('rock-slide', 2)],
+    learnset: [L('water-gun'), L('tackle'), L('mud-slap'), L('rock-smash'), L('whirlpool'), L('aqua-ring'), L('bonemerang', 1), L('bulldoze', 1), L('surf', 1), L('magnitude', 1), L('dig', 1), L('earth-power', 2), L('rain-dance', 1), L('rock-slide', 2)],
   },
   {
     id: 'larvitar', name: 'Larvitar', stages: ['larvitar', 'pupitar', 'tyranitar'], evoLevels: [14, 30],
