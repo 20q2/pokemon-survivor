@@ -6,7 +6,7 @@ describe('danger cues', () => {
   it('vignette is off above 30% HP and ramps to 0.55 at 10%', () => {
     expect(dangerStrength(1)).toBe(0);
     expect(dangerStrength(0.3)).toBe(0);
-    expect(dangerStrength(0.2)).toBeCloseTo(0.225);
+    expect(dangerStrength(0.2)).toBeCloseTo(0.275);
     expect(dangerStrength(0.1)).toBeCloseTo(0.55);
     expect(dangerStrength(0.02)).toBeCloseTo(0.55);
   });
