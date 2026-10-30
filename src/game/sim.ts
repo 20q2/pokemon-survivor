@@ -132,6 +132,11 @@ const CRIT_STOP = 2 / 60;
 const CRIT_STOP_GAP = 0.5;
 /** Elite / alpha kill hit-stop: 7 frames. Bosses have their own cinematic. */
 const ELITE_STOP = 7 / 60;
+/** Team kill totals that earn a quiet "N Pokémon defeated!" notice, once each per run. */
+export const KILL_MILESTONES: readonly number[] = [100, 250, 500, 1_000, 2_500, 5_000, 10_000, 25_000, 50_000, 100_000];
+/** One tick felling at least this many foes pops a gold "×N!" over them, at most every WIPEOUT_GAP sim seconds. */
+export const WIPEOUT_MIN = 10;
+const WIPEOUT_GAP = 1.5;
 
 export class Sim {
   readonly stage: StageDef;
@@ -170,6 +175,13 @@ export class Sim {
   /** A non-final boss just fell in Elite Mode: open the mart once its cinematics are out. */
   private martDue = false;
   kills = 0;
+  /** Index of the next KILL_MILESTONES entry to announce. */
+  private milestoneIdx = 0;
+  /** This tick's kills and the sum of their positions (for the wipeout pop), and when the next pop may fire. */
+  private tickKills = 0;
+  private tickKx = 0;
+  private tickKy = 0;
+  private wipeoutReady = 0;
   /** Weather (one at a time, shared by the team): kind, seconds left, who cast it and how hard it hits. */
   weather: WeatherKind | null = null;
   weatherT = 0;
@@ -288,6 +300,31 @@ export class Sim {
   // ───────────────────────────── main loop ─────────────────────────────
 
   update(dt: number) {
+    this.step(dt);
+    this.flushKills();
+  }
+
+  /** Counts one kill toward the team total, milestones and this tick's wipeout tally. */
+  countKill(x: number, y: number) {
+    this.kills++;
+    while (this.milestoneIdx < KILL_MILESTONES.length && this.kills >= KILL_MILESTONES[this.milestoneIdx])
+      this.emit({ e: 'milestone', kills: KILL_MILESTONES[this.milestoneIdx++] });
+    this.tickKills++;
+    this.tickKx += x;
+    this.tickKy += y;
+  }
+
+  /** End of tick: one wipeout pop if enough foes fell together, then reset the tally. */
+  private flushKills() {
+    const n = this.tickKills;
+    if (n >= WIPEOUT_MIN && this.time >= this.wipeoutReady) {
+      this.emit({ e: 'wipeout', n, x: this.tickKx / n, y: this.tickKy / n });
+      this.wipeoutReady = this.time + WIPEOUT_GAP;
+    }
+    this.tickKills = this.tickKx = this.tickKy = 0;
+  }
+
+  private step(dt: number) {
     if (this.phase === 'cine') return this.updateCine(dt);
     if (this.phase !== 'play') return;
     if (this._hitStop > 1e-9) {

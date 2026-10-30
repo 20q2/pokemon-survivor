@@ -322,7 +322,11 @@ export type GameEvent =
   /** A boss, alpha or elite starts a telegraphed ground attack (named move callout). */
   | { e: 'raid'; x: number; y: number; name: string; big: boolean }
   /** A short floating callout (Magnitude roll, fizzles, steals…). */
-  | { e: 'callout'; x: number; y: number; text: string; color: string };
+  | { e: 'callout'; x: number; y: number; text: string; color: string }
+  /** The team's run kill total reached one of KILL_MILESTONES: a quiet reward notice. */
+  | { e: 'milestone'; kills: number }
+  /** One tick felled `n` (10+) foes: a gold "×N!" pops at their average position. */
+  | { e: 'wipeout'; n: number; x: number; y: number };
 
 /** Treasure rarity, shown by the Poké Ball it comes in. Stored as a chest pickup's `value`. */
 export type ChestTier = 1 | 2 | 3 | 4;

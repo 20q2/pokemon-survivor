@@ -170,6 +170,10 @@ export class Renderer {
       case 'chain':
         this.chains.push({ pts: ev.pts, color: TYPE_COLORS[ev.type], t: 0 });
         break;
+      case 'wipeout':
+        // Cosmetic like the pops: drawn with the damage numbers, centred above the felled crowd.
+        this.numbers.wipeout(ev.x, ev.y - 24, ev.n);
+        break;
       case 'callout':
         this.numbers.label(ev.x, ev.y, ev.text, ev.color, 1.1, 6);
         break;

@@ -373,6 +373,13 @@ export class App {
         notice(ev.text);
         audio.sfx('tick');
         break;
+      case 'milestone': // a reward beat, not a danger: the quiet notice, never the red banner
+        notice(`${ev.kills.toLocaleString()} Pokémon defeated!`);
+        audio.sfx('milestone');
+        break;
+      case 'wipeout':
+        audio.sfx('crit');
+        break;
       case 'faint':
         audio.sfx('faint');
         if (ev.player === me && s.coop) banner('You fainted! Stand by a teammate to be revived.', false, 3500);

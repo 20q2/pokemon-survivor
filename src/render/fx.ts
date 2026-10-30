@@ -131,7 +131,7 @@ export class Particles {
 
 // ─────────────────────────── damage numbers ───────────────────────────
 
-/** Hand-drawn 5×7 pixel glyphs (digits plus "!"), outlined at build time. */
+/** Hand-drawn 5×7 pixel glyphs (digits, "!" and "×"), outlined at build time. */
 const GLYPHS: Record<string, string[]> = {
   '0': ['.###.', '#...#', '#..##', '#.#.#', '##..#', '#...#', '.###.'],
   '1': ['..#..', '.##..', '..#..', '..#..', '..#..', '..#..', '.###.'],
@@ -144,9 +144,10 @@ const GLYPHS: Record<string, string[]> = {
   '8': ['.###.', '#...#', '#...#', '.###.', '#...#', '#...#', '.###.'],
   '9': ['.###.', '#...#', '#...#', '.####', '....#', '....#', '.###.'],
   '!': ['..#..', '..#..', '..#..', '..#..', '..#..', '.....', '..#..'],
+  '×': ['.....', '#...#', '.#.#.', '..#..', '.#.#.', '#...#', '.....'],
 };
 const CHARS = Object.keys(GLYPHS);
-type FontColor = 'white' | 'super' | 'weak' | 'crit' | 'heal' | 'hurt';
+type FontColor = 'white' | 'super' | 'weak' | 'crit' | 'heal' | 'hurt' | 'gold';
 /** [top fill, bottom fill, outline] — a two-tone fill gives the numbers a little depth. */
 const FONT_COLORS: Record<FontColor, [string, string, string]> = {
   white: ['#ffffff', '#d6dbe8', '#1b1b24'],
@@ -155,6 +156,7 @@ const FONT_COLORS: Record<FontColor, [string, string, string]> = {
   crit: ['#fff27a', '#ff5a2a', '#3a0600'],
   heal: ['#a6ffaf', '#3fd457', '#0b3412'],
   hurt: ['#ff8a8a', '#e02f2f', '#2e0000'],
+  gold: ['#fff6b0', '#ffc21f', '#3a2400'],
 };
 
 class BitmapFont {
@@ -199,11 +201,16 @@ class BitmapFont {
 
 interface Num { x: number; y: number; text: string; color: FontColor; t: number; life: number; scale: number; crit: boolean }
 interface Label { x: number; y: number; text: string; color: string; t: number; life: number; size: number }
+interface Wipe { x: number; y: number; text: string; t: number; scale: number }
+
+/** Multi-kill pop lifetime (s). */
+const WIPE_LIFE = 0.7;
 
 export class DamageNumbers {
   private font = new BitmapFont();
   private nums: Num[] = [];
   private labels: Label[] = [];
+  private wipes: Wipe[] = [];
   /** Max simultaneous damage numbers (the numberCap setting). */
   cap = 160;
 
@@ -229,7 +236,15 @@ export class DamageNumbers {
     this.labels.push({ x, y, text, color, t: 0, life, size });
   }
 
+  /** A big gold "×N!" for a multi-kill; grows a little with N (capped). */
+  wipeout(x: number, y: number, n: number) {
+    if (this.wipes.length > 2) this.wipes.shift();
+    this.wipes.push({ x, y, text: `×${n}!`, t: 0, scale: Math.min(3.5, 2.2 + (n - 10) / 25) });
+  }
+
   update(dt: number) {
+    for (const w of this.wipes) w.t += dt;
+    if (this.wipes.length) this.wipes = this.wipes.filter((w) => w.t < WIPE_LIFE);
     for (const n of this.nums) n.t += dt;
     for (const l of this.labels) l.t += dt;
     if (this.nums.length && this.nums[0].t > this.nums[0].life) this.nums = this.nums.filter((n) => n.t < n.life);
@@ -257,6 +272,13 @@ export class DamageNumbers {
       }
       const pop = k < 0.15 ? 1 + (0.15 - k) * 3 : 1;
       this.font.draw(g, n.text, n.x, n.y - k * 14, n.color, n.scale * pop);
+    }
+    // Multi-kill pops: slam in, rise and fade. Kept a touch translucent so a telegraph under one still reads.
+    for (const w of this.wipes) {
+      const k = w.t / WIPE_LIFE;
+      const pop = k < 0.15 ? 1.5 - k * (0.5 / 0.15) : 1;
+      g.globalAlpha = 0.9 * (k > 0.55 ? 1 - (k - 0.55) / 0.45 : 1);
+      this.font.draw(g, w.text, w.x, w.y - k * 18 - 4 * w.scale * (pop - 1), 'gold', w.scale * pop);
     }
     g.globalAlpha = 1;
     g.textAlign = 'center';

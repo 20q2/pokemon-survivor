@@ -460,7 +460,7 @@ export function killEnemy(sim: Sim, e: Enemy, killerId: number) {
   if (!e.alive) return;
   e.alive = false;
   e.hp = 0;
-  sim.kills++;
+  sim.countKill(e.x, e.y);
   const killer = sim.players[killerId];
   if (killer) killer.kills++;
   megaOnKill(sim, killer, e.elite, e.boss);
