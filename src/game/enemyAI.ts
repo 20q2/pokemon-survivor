@@ -9,6 +9,9 @@ import { spawnEnemy, isSetPiece, isRegular } from './spawner.ts';
 import { AI, type Enemy, type Player, type Projectile } from './types.ts';
 import { heal } from './ledger.ts';
 
+/** Toxic's per-tick ramp stops climbing after this many ticks. */
+const TOXIC_RAMP_CAP = 12;
+
 /** Raid cooldown (s) for guardians; ordinary elites never cast, they just chase. */
 const GUARDIAN_RAID_CD: [number, number] = [5, 8];
 
@@ -57,7 +60,8 @@ export function updateEnemies(sim: Sim, dt: number) {
         if (st.burn > 0) rawDamageEnemy(sim, e, st.burnDmg, 'fire', st.dotOwner, 'burn');
         if (st.poison > 0 && e.alive) {
           // Badly poisoned: each tick hits harder than the last.
-          const ramp = st.toxic ? 1 + 0.35 * st.toxic++ : 1;
+          // Ramp caps so permanent poison (Soul Badge) tops out at about 5x instead of growing forever.
+          const ramp = st.toxic ? 1 + 0.35 * Math.min(TOXIC_RAMP_CAP, st.toxic++) : 1;
           rawDamageEnemy(sim, e, st.poisonDmg * st.poisonStacks * ramp, 'poison', st.dotOwner, st.toxic ? 'toxic' : 'poison');
         }
         if (st.seed > 0 && e.alive) {
