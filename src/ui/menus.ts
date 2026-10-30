@@ -536,8 +536,28 @@ export function pauseScreen(app: App, resume: () => void, quit: () => void) {
   return root;
 }
 
-export function resultsScreen(app: App, data: { session: RunSession; summary: RunSummary; rewards: RunRewards; me: Player }) {
+/** "New discoveries" block for the results screen: Pokédex entries and moves first seen this run. */
+function discoveries(species: string[], moves: string[]): HTMLElement | null {
+  const known = moves.filter((m) => MOVES[m]);
+  if (!species.length && !known.length) return null;
+  const shown = species.slice(0, 12);
+  return h('div', { class: 'discoveries col' },
+    h('b', { class: 'mt' }, 'New discoveries'),
+    shown.length ? h('div', { class: 'row', style: 'flex-wrap:wrap;gap:4px' },
+      ...shown.map((id, i) => tipped(
+        h('span', { class: 'disc-mon', style: `animation-delay:${i * 60}ms` }, img(assets.portraitUrl(id, false), 'px')),
+        () => h('div', null, h('b', null, SPECIES[id].name), h('div', { class: 'hint' }, 'Added to the Pokédex')),
+      )),
+      species.length > shown.length ? h('span', { class: 'hint' }, `+${species.length - shown.length} more`) : null,
+    ) : null,
+    known.length ? h('div', { class: 'row', style: 'flex-wrap:wrap;gap:4px 10px' },
+      ...known.map((id) => h('span', null, typeBadge(MOVES[id].type), ` ${MOVES[id].name}`))) : null,
+  );
+}
+
+export function resultsScreen(app: App, data: { session: RunSession; summary: RunSummary; rewards: RunRewards; me: Player; newMoves?: string[] }) {
   const { summary: r, rewards, me } = data;
+  const newMoves = data.newMoves ?? [];
   app.announce(rewards.newAchievements);
   if (rewards.shinyUnlocked) toast('Shiny unlocked!', `${LINE[r.lineId].name} can now appear as a Shiny!`, assets.portraitUrl(LINE[r.lineId].stages[0], true));
   const moves = [...me.moves].sort((a, b) => b.dmgDealt - a.dmgDealt);
@@ -590,6 +610,7 @@ export function resultsScreen(app: App, data: { session: RunSession; summary: Ru
         h('div', { class: 'row', style: 'flex-wrap:wrap' }, me.items.map((it) => h('span', { class: 'row', style: 'gap:2px' }, img(assets.itemUrl(it.id)), `${ITEMS[it.id].name} Lv${it.level}`))),
         rewards.newAchievements.length ? h('b', { class: 'mt' }, 'New achievements') : null,
         ...rewards.newAchievements.map((a) => h('div', null, `✔ ${a.name} — `, h('span', { class: 'hint' }, rewardText(a.reward)))),
+        discoveries(rewards.newSeen, newMoves),
       ),
     ),
     h('div', { class: 'row mt', style: 'flex-wrap:wrap;justify-content:center' },

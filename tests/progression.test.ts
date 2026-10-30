@@ -30,3 +30,19 @@ describe('applyRun marks your own evolutions as seen', () => {
     expect(save.seen.charizard).toBeUndefined();
   });
 });
+
+describe('applyRun reports new Pokédex discoveries', () => {
+  it('lists only species not seen before, enemies first then own forms, deduped', () => {
+    const save = freshSave();
+    save.seen.pidgey = 1;
+    const r = applyRun(save, summary('charmander', 'charmeleon'), ['pidgey', 'rattata', 'zubat', 'rattata'], new Map());
+    expect(r.newSeen).toEqual(['rattata', 'zubat', 'charmander', 'charmeleon']);
+  });
+
+  it('is empty when nothing is new', () => {
+    const save = freshSave();
+    for (const s of ['pidgey', 'charmander', 'charmeleon']) save.seen[s] = 1;
+    const r = applyRun(save, summary('charmander', 'charmeleon'), ['pidgey'], new Map());
+    expect(r.newSeen).toEqual([]);
+  });
+});

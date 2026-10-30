@@ -53,8 +53,14 @@ export class App {
   /** Reveal moves in a line's move pool (shown on the partner select screen). */
   private discover(lineId: string, moves: string[]) {
     const seen = (this.save.movesSeen[lineId] ??= []);
-    for (const m of moves) if (!seen.includes(m)) seen.push(m);
+    for (const m of moves) {
+      if (seen.includes(m)) continue;
+      seen.push(m);
+      this.newMoves.push(m);
+    }
   }
+  /** Moves first revealed to the move pool during the current run (for the results screen). */
+  private newMoves: string[] = [];
   /** Last chosen Elite-mode toggle. */
   eliteMode = false;
   net: NetHost | NetClient | null = null;
@@ -205,6 +211,7 @@ export class App {
     const me = s.world.players[s.localId];
     banner(`Go! ${SPECIES[me.speciesId].name.toUpperCase()}!`, false, 1800);
     this.alphasDown = 0;
+    this.newMoves = [];
     this.heartT = 0;
     preloadChestFaces();
     this.tutorial = this.save.stats.runs === 0 ? [
@@ -288,7 +295,7 @@ export class App {
     this.persist();
     audio.stopMusic();
     audio.sfx(cleared ? 'victory' : 'gameover');
-    const snapshot = { session: s, summary, rewards, me };
+    const snapshot = { session: s, summary, rewards, me, newMoves: this.newMoves };
     this.hud.hide();
     setTimeout(() => {
       this.endRun();

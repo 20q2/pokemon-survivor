@@ -11,6 +11,8 @@ export interface RunRewards {
   newAchievements: Achievement[];
   shinyUnlocked: boolean;
   newBest: boolean;
+  /** Species that entered the Pokédex this run: enemies first (in sighting order), then your own forms. */
+  newSeen: string[];
 }
 
 export function friendshipGain(r: RunSummary): number {
@@ -39,12 +41,17 @@ export function applyRun(save: SaveData, r: RunSummary, seen: Iterable<string>, 
   const money = Math.round((r.moneyEarned + runBonus(r)) * (r.elite ? 1.75 : 1));
   save.money += money;
   st.moneyEarned += money;
-  for (const s of seen) save.seen[s] = 1;
+  const newSeen: string[] = [];
+  const see = (s: string) => {
+    if (!save.seen[s]) newSeen.push(s);
+    save.seen[s] = 1;
+  };
+  for (const s of seen) see(s);
   // Your own evolutions count as seen (the Pokédex otherwise only learns species from enemy spawns).
   const own = LINE[r.lineId].stages;
   const reached = own.indexOf(r.finalSpecies);
-  for (const s of reached >= 0 ? own.slice(0, reached + 1) : own) save.seen[s] = 1;
-  save.seen[r.finalSpecies] = 1;
+  for (const s of reached >= 0 ? own.slice(0, reached + 1) : own) see(s);
+  see(r.finalSpecies);
   for (const [s, n] of defeated) save.defeated[s] = (save.defeated[s] ?? 0) + n;
 
   const before = save.friendship[r.lineId] ?? 0;
@@ -76,7 +83,7 @@ export function applyRun(save: SaveData, r: RunSummary, seen: Iterable<string>, 
     shinyUnlocked = true;
   }
   const newAchievements = checkAchievements(save, r);
-  return { money, friendship: save.friendship[r.lineId] - before, newAchievements, shinyUnlocked, newBest };
+  return { money, friendship: save.friendship[r.lineId] - before, newAchievements, shinyUnlocked, newBest, newSeen };
 }
 
 export function checkAchievements(save: SaveData, r?: RunSummary): Achievement[] {
