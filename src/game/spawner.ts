@@ -5,7 +5,7 @@ import { freshStatus } from './combat.ts';
 import { Director } from './director.ts';
 import type { Sim } from './sim.ts';
 import { MAX_ENEMIES } from './sim.ts';
-import { AI, type Enemy, type Player } from './types.ts';
+import { AI, animOffsetFor, type Enemy, type Player } from './types.ts';
 
 const ROLE_HP: Record<EnemyRole, number> = { chaser: 1, fast: 0.7, tank: 2.4, ranged: 1, bomber: 0.8, treasure: 6 };
 const ROLE_SPEED: Record<EnemyRole, number> = { chaser: 1, fast: 1.4, tank: 0.7, ranged: 0.95, bomber: 1.15, treasure: 1.25 };
@@ -388,14 +388,15 @@ export function spawnEnemy(sim: Sim, speciesId: string, x: number, y: number, op
   }
   if (role === 'treasure') { speed = Math.max(speed, 80); xp = 5; }
   if (shiny) { hp *= 3; xp *= 5; }
+  const id = sim.id();
   const e: Enemy = {
-    id: sim.id(), speciesId, types: sp.types, role, x, y, radius, vx: 0, vy: 0, dirX: 0, dirY: 1,
+    id, speciesId, types: sp.types, role, x, y, radius, vx: 0, vy: 0, dirX: 0, dirY: 1,
     hp, maxHp: hp, speed, dmg, special: bspa > batk, xp, elite: !!opts.elite, boss: !!opts.boss,
     final: !!opts.boss?.final, shiny, alpha: !!opts.alpha, guardian: !!opts.guardian, sweeper: opts.sweeper, homeX: x, homeY: y, alive: true, flash: 0,
     st: freshStatus(),
     contactCd: 0, ai: sim.rng.range(0, 2), aiState: opts.swarmDir ? AI.CROSSER : opts.wall ? AI.WALL : 0, aiX: opts.swarmDir?.x ?? 0, aiY: opts.swarmDir?.y ?? 0,
     patterns: opts.boss?.patterns ?? [], patternIdx: 0, minions: opts.boss?.minions ?? [], knockResist, scale,
-    lastHitBy: 0, animOffset: sim.rng.range(0, 10),
+    lastHitBy: 0, animOffset: animOffsetFor(id),
   };
   if (opts.swarmDir) { e.speed = Math.max(e.speed, 85); e.ai = 14; }
   if (opts.wall) e.ai = opts.wall.ttl;

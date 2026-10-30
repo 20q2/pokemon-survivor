@@ -162,6 +162,9 @@ export interface StatusState {
  */
 export const AI = { BOMBER_FUSE: 1, CROSSER: 9, WALL: 10 } as const;
 
+/** Walk-cycle phase of an enemy, derived from its id so host, guests and the death pop all agree (no rng). */
+export const animOffsetFor = (id: number) => (id % 97) / 10;
+
 export interface Enemy {
   id: number;
   speciesId: string;

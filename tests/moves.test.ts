@@ -8,7 +8,7 @@ import { Obstacles } from '../src/game/obstacles.ts';
 
 /** A partner holding one move (at Lv5) in a ring of tough foes, circling slowly. */
 function arena(moveId: string, extra: string[] = [], seconds = 8, watch?: (sim: Sim, p: Player) => boolean) {
-  const sim = new Sim({ stageId: 'viridian', seed: 7, players: [{ name: 'a', lineId: 'charmander', shiny: false, meta: metaBonuses({}), tms: [] }] });
+  const sim = new Sim({ stageId: 'viridian', seed: 1, players: [{ name: 'a', lineId: 'charmander', shiny: false, meta: metaBonuses({}), tms: [] }] });
   // open ground: these check what each move does, not how it meets the scenery
   Object.assign(sim, { obstacles: new Obstacles('') });
   const p = sim.players[0];

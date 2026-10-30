@@ -3,7 +3,7 @@ import { LINE, SPECIES } from '../data/pokedex.ts';
 import { freshStatus, stepProjectileMotion } from '../game/combat.ts';
 import { LocalSession, type RunSession } from '../game/session.ts';
 import { Sim, stepDig, type Phase, type PlayerInit, type SimConfig, type Cinematic } from '../game/sim.ts';
-import type { Enemy, GameEvent, Player, UpgradeOffer } from '../game/types.ts';
+import { animOffsetFor, type Enemy, type GameEvent, type Player, type UpgradeOffer } from '../game/types.ts';
 import type { Ledger } from '../game/ledger.ts';
 import { decodeSnapshot, encodeSnapshot, EXTRA_STATUS, MV, PICKUP_KINDS, projFromWire, projToWire, PROTOCOL, ROOM_PREFIX, SNAP_HZ } from './protocol.ts';
 
@@ -619,7 +619,7 @@ function makeReplicaEnemy(id: number, species: string, x: number, y: number): En
     speed: 0, dmg: 0, special: false, xp: 0, elite: false, boss: false, final: false, shiny: false, alpha: false, homeX: x, homeY: y, alive: true, flash: 0,
     st: freshStatus(),
     contactCd: 0, ai: 0, aiState: 0, aiX: 0, aiY: 0, patterns: [], patternIdx: 0, minions: [], knockResist: 0, scale: 1, lastHitBy: 0,
-    animOffset: (id % 97) / 10,
+    animOffset: animOffsetFor(id),
   };
 }
 

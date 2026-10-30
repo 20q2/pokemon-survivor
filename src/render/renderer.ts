@@ -439,8 +439,6 @@ export class Renderer {
   }
 
   // Known limitation: a pop ignores slow/freeze (frame) and Sky Uppercut lift (height) of the live enemy.
-  // On co-op guests the pop's walk frame uses the host's animOffset while the guest's live sprites use
-  // (id % 97) / 10, so the frame can differ by a step.
   private drawPops(L: number, T: number, W: number, H: number) {
     const P = this.pops;
     for (let k = 0; k < P.n; k++) {
