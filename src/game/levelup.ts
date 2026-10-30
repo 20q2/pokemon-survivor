@@ -4,6 +4,7 @@ import { ITEMS, ITEM_LIST, itemMaxLevel, VITAMIN, VITAMINS } from '../data/items
 import type { Rng } from '../engine/math.ts';
 import { effectiveness, type PType } from '../data/types.ts';
 import { heal } from './ledger.ts';
+import { BADGE } from '../data/badges.ts';
 import type { Player, UpgradeOffer } from './types.ts';
 
 /** Move ids already represented (mastered moves also block their base move). */
@@ -202,6 +203,9 @@ export function applyOffer(p: Player, o: UpgradeOffer) {
     case 'keep':
       p.pendingLearn = undefined;
       break;
+    case 'badge':
+      if (!p.badges.includes(o.id)) p.badges.push(o.id);
+      break;
     case 'vitamin':
       p.vitamins[o.id] = (p.vitamins[o.id] ?? 0) + 1;
       if (o.id === 'hp-up') heal(p, p.stats.maxHp * 0.25, 'hp-up');
@@ -262,6 +266,7 @@ export function offerLabel(o: UpgradeOffer): string {
     case 'newMove': case 'moveUp': return MOVES[o.id].name;
     case 'newItem': case 'itemUp': return ITEMS[o.id].name;
     case 'heal': return 'Oran Berry';
+    case 'badge': return BADGE[o.id]?.name ?? o.id;
     case 'vitamin': return VITAMIN[o.id].name;
     case 'forget': return `Learn ${MOVES[o.id].name}`;
     case 'keep': return o.cost !== undefined ? 'Leave the mart' : `Don't learn ${MOVES[o.id].name}`;

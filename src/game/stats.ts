@@ -1,5 +1,6 @@
 import { SPECIES } from '../data/pokedex.ts';
 import { ITEMS, vitaminBonus } from '../data/items.ts';
+import { hasBadge } from '../data/badges.ts';
 import type { DerivedStats, Player } from './types.ts';
 
 /** Maps a base stat (~20..160) into a gentle multiplier so every Pokémon stays viable. */
@@ -79,6 +80,11 @@ export function derivePlayerStats(p: Player, level: number, time: number, weathe
   s.projTaken /= 1 + vit('zinc');
   s.speed *= 1 + vit('carbos');
   s.cooldown /= 1 + vit('pp-up');
+
+  // Gym Badges
+  if (hasBadge(p, 'boulder')) { s.maxHp *= 1.3; s.speed *= 0.92; }
+  if (hasBadge(p, 'thunder')) s.crit += 0.15;
+  if (hasBadge(p, 'cascade')) s.pickup *= 1.5;
 
   // Run-long growth from Metal Claw and Ancient Power.
   if (p.clawStacks) s.atk *= 1 + 0.01 * p.clawStacks;

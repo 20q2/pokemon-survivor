@@ -8,6 +8,7 @@ import { Rng, dist2 } from '../engine/math.ts';
 import { SpatialGrid } from '../engine/spatial.ts';
 import type { MetaBonuses } from '../meta/shop.ts';
 import { derivePlayerStats } from './stats.ts';
+import { BADGES, hasBadge } from '../data/badges.ts';
 import { applyOffer, generateOffers, martOffers, masteryCandidates, randomFiller, evolutionMove, learnOffers, ownedUpgrades } from './levelup.ts';
 import { fireMoves, updateProjectiles, damagePlayer, updatePlayerMoves } from './combat.ts';
 import { activateMega, updateMega } from './mega.ts';
@@ -174,6 +175,8 @@ export class Sim {
   martVisits = 0;
   /** A non-final boss just fell in Elite Mode: open the mart once its cinematics are out. */
   private martDue = false;
+  /** A non-final boss fell: Gym Badge picks come up before anything else. */
+  private badgeDue = false;
   kills = 0;
   /** Index of the next KILL_MILESTONES entry to announce. */
   private milestoneIdx = 0;
@@ -262,7 +265,7 @@ export class Sim {
       moveSlots: 4, itemSlots: 4 + pi.meta.itemSlots,
       rerolls: pi.meta.rerolls, skips: pi.meta.skips, banishes: pi.meta.banishes, banished: new Set(),
       revives: pi.meta.revives, fainted: false, reviveProgress: 0, hurtT: 0, lastHit: -99,
-      pendingLevels: 0, kills: 0, dmgDealt: 0, dmgTaken: 0, bossKills: 0, superEff: 0, shinyKills: 0,
+      pendingLevels: 0, badges: [], kills: 0, dmgDealt: 0, dmgTaken: 0, bossKills: 0, superEff: 0, shinyKills: 0,
       vitamins: {}, ledger: newLedger(), evolutions: 0, masteries: 0, connected: true, viewW: 960, viewH: 540, mega: 0, megaT: 0, megas: 0,
       ...newMoveState(this.rng.pick(TYPES.filter((t) => t !== 'normal'))),
     };
@@ -503,7 +506,7 @@ export class Sim {
         break;
       case 'chest':
       case 'dig':
-        this.openChest(p, Math.max(1, Math.min(4, Math.round(pk.value))) as ChestTier);
+        this.openChest(p, Math.max(1, Math.min(4, Math.round(pk.value) + (hasBadge(p, 'marsh') ? 1 : 0))) as ChestTier);
         break;
       case 'mega-stone':
         this.megaStone = true;
@@ -596,15 +599,45 @@ export class Sim {
     if (c.kind === 'evolve') this.applyEvolution(this.players[c.player], c.to!);
     if (c.kind === 'mega') activateMega(this, this.players[c.player]);
     this.cine = null;
-    if (c.kind === 'bossDown' && this.elite && !this.finalDefeated) this.martDue = true;
+    if (c.kind === 'bossDown' && !this.finalDefeated) {
+      this.badgeDue = true;
+      if (this.elite) this.martDue = true;
+    }
     if (this.cineQueue.length) return this.startNextCine();
     if (this.finalDefeated) {
       this.phase = 'victory';
       return;
     }
+    this.resume();
+  }
+
+  /** What follows a cinematic or a finished choice: Gym Badges, then the mart, then pending level-ups, then play. */
+  private resume() {
+    if (this.badgeDue && this.beginBadges()) return;
     if (this.martDue && this.beginMart()) return;
     if (this.players.some(needsChoice)) this.beginLevelUp();
     else this.phase = 'play';
+  }
+
+  /** After a non-final boss: each player picks 1 of up to 3 Gym Badges they don't hold. False if nobody can pick. */
+  private beginBadges(): boolean {
+    this.badgeDue = false;
+    this.offers.clear();
+    for (const p of this.players) {
+      if (p.fainted || !p.connected) continue;
+      const pool = BADGES.filter((b) => !hasBadge(p, b.id)).map((b) => b.id);
+      const picks: string[] = [];
+      while (picks.length < 3 && pool.length) picks.push(pool.splice(this.rng.int(0, pool.length - 1), 1)[0]);
+      if (picks.length) this.offers.set(p.id, picks.map((id): UpgradeOffer => ({ kind: 'badge', id, level: 1 })));
+    }
+    if (!this.offers.size) return false;
+    this.phase = 'levelup';
+    return true;
+  }
+
+  /** True while the offers on screen are Gym Badge picks. */
+  inBadges() {
+    return this.phase === 'levelup' && [...this.offers.values()].some((o) => o[0]?.kind === 'badge');
   }
 
   queueCine(c: Cinematic) {
@@ -651,13 +684,12 @@ export class Sim {
     this.offers.delete(p.id);
     this.refreshStats();
     if (this.offers.size) return;
-    if (this.players.some(needsChoice)) this.beginLevelUp();
-    else this.phase = 'play';
+    this.resume();
   }
 
   private makeOffers(p: Player) {
     if (p.pendingLearn) return learnOffers(p, p.pendingLearn);
-    return generateOffers(p, this.rng, 3, this.tms.get(p.id) ?? [], this.stage.types);
+    return generateOffers(p, this.rng, hasBadge(p, 'rainbow') ? 4 : 3, this.tms.get(p.id) ?? [], this.stage.types);
   }
 
   choose(playerId: number, index: number) {
@@ -668,14 +700,14 @@ export class Sim {
     if (o.cost !== undefined) return this.buy(p, o);
     applyOffer(p, o);
     if (o.kind === 'forget') this.emit({ e: 'learn', player: p.id, move: o.id });
-    if (o.kind === 'forget' || o.kind === 'keep') return this.afterChoice(p, false);
+    if (o.kind === 'forget' || o.kind === 'keep' || o.kind === 'badge') return this.afterChoice(p, false);
     if (o.kind === 'newMove') this.emit({ e: 'learn', player: p.id, move: o.id });
     this.afterChoice(p);
   }
 
   skip(playerId: number) {
     const p = this.players[playerId];
-    if (!p || p.skips <= 0 || !this.offers.has(playerId) || p.pendingLearn || this.inMart()) return;
+    if (!p || p.skips <= 0 || !this.offers.has(playerId) || p.pendingLearn || this.inMart() || this.inBadges()) return;
     p.skips--;
     heal(p, p.stats.maxHp * 0.1, 'skip');
     this.afterChoice(p);
@@ -683,7 +715,7 @@ export class Sim {
 
   reroll(playerId: number) {
     const p = this.players[playerId];
-    if (!p || p.rerolls <= 0 || !this.offers.has(playerId) || p.pendingLearn || this.inMart()) return;
+    if (!p || p.rerolls <= 0 || !this.offers.has(playerId) || p.pendingLearn || this.inMart() || this.inBadges()) return;
     p.rerolls--;
     this.offers.set(playerId, this.makeOffers(p));
   }
@@ -691,7 +723,7 @@ export class Sim {
   banish(playerId: number, index: number) {
     const p = this.players[playerId];
     const offers = this.offers.get(playerId);
-    if (!p || !offers || p.banishes <= 0 || !offers[index] || this.inMart()) return;
+    if (!p || !offers || p.banishes <= 0 || !offers[index] || this.inMart() || this.inBadges()) return;
     const o = offers[index];
     if (o.kind === 'heal' || o.kind === 'vitamin') return;
     p.banishes--;
@@ -703,8 +735,8 @@ export class Sim {
     if (levelUsed) p.pendingLevels--;
     this.offers.delete(p.id);
     this.refreshStats();
-    if (needsChoice(p)) this.offers.set(p.id, this.makeOffers(p));
-    if (this.offers.size === 0) this.phase = 'play';
+    if (needsChoice(p) && this.phase === 'levelup' && !this.inBadges()) this.offers.set(p.id, this.makeOffers(p));
+    if (this.offers.size === 0) this.resume();
   }
 
   /**

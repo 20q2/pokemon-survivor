@@ -10,6 +10,12 @@ import { CascadeTracker, cascadeLabel } from './cascade.ts';
 import { btn, catBadge, h, img, moveDisc, typeBadge } from './dom.ts';
 import { BEHAVIOR_TEXT, hideTip, statusLines } from './tips.ts';
 import { VERB_TEXT } from './verbs.ts';
+import { BADGE } from '../data/badges.ts';
+
+/** A Gym Badge drawn as a small octagon in its colour (no badge sprites in the repo yet). */
+export function badgeIcon(id: string, cls = 'badge-icon') {
+  return h('span', { class: cls, style: `background:${BADGE[id]?.color ?? '#ccc'}` });
+}
 
 
 const STAT_LABEL: Partial<Record<keyof MoveStats, string>> = {
@@ -91,6 +97,12 @@ export function offerCard(o: UpgradeOffer, p: Player, index: number, onPick: () 
       icon = h('div', { class: 'ic item' }, img(assets.itemUrl('oran-berry')));
       name = 'Oran Berry'; tag = 'HEAL'; desc = 'Restore 30% of your max HP.';
       break;
+    case 'badge': {
+      const def = BADGE[o.id];
+      icon = h('div', { class: 'ic item' }, badgeIcon(o.id));
+      name = def.name; tag = 'GYM BADGE'; desc = def.desc;
+      break;
+    }
     default:
       icon = h('div', { class: 'ic item' }, img(assets.itemUrl(o.id)));
       name = VITAMIN[o.id].name; tag = o.level > 1 ? `×${o.level}` : 'VITAMIN'; desc = vitaminDesc(o.id, o.level);
@@ -172,16 +184,18 @@ export class LevelUpUI {
     const me = session.world.players[session.localId];
     const mart = offers[0]?.cost !== undefined;
     const learning = !mart && (offers[0]?.kind === 'forget' || offers[0]?.kind === 'keep');
+    const badge = offers[0]?.kind === 'badge';
+    const special = mart || learning || badge;
     // Levels left to pick, this one included: pendingLevels only drops in afterChoice, after the pick.
-    const pending = mart || learning ? 0 : me.pendingLevels;
+    const pending = special ? 0 : me.pendingLevels;
     // Cascade: the jingle climbs a semitone per card already taken (the audio engine caps it).
-    const step = mart || learning ? 0 : this.cascade.step(pending);
-    audio.sfx(learning ? 'evolved' : 'levelup', step);
+    const step = special ? 0 : this.cascade.step(pending);
+    audio.sfx(learning || badge ? 'evolved' : 'levelup', step);
     // The label names the whole cascade on every card of it, so "×3 LEVEL UP!" stays up through all three picks.
-    const label = mart || learning ? null : cascadeLabel(this.cascade.size);
+    const label = special ? null : cascadeLabel(this.cascade.size);
     const cards = h('div', { class: `cards${learning ? ' learn' : ''}` }, offers.map((o, i) => offerCard(o, me, i, () => this.pick(i), session.world.money)));
     if (this.banishMode) cards.querySelectorAll('.card').forEach((c) => c.classList.add('banish-mode'));
-    const actions = learning || mart ? null : h('div', { class: 'lu-actions' },
+    const actions = special ? null : h('div', { class: 'lu-actions' },
       me.rerolls > 0 ? btn(`Reroll (${me.rerolls})`, () => session.reroll(), 'small') : null,
       me.skips > 0 ? btn(`Skip (${me.skips})`, () => session.skip(), 'small') : null,
       me.banishes > 0 ? btn(this.banishMode ? 'Cancel banish' : `Banish (${me.banishes})`, () => {
@@ -200,7 +214,9 @@ export class LevelUpUI {
             h('div', { class: 'meta' }, typeBadge(nd.type), catBadge(nd.cat), h('span', { class: 'hint' }, BEHAVIOR_TEXT[nd.behavior])),
             h('div', { class: 'ds' }, nd.desc))),
         h('div', { class: 'hint' }, `But ${SPECIES[me.speciesId].name} can't learn more than four moves. Forget one?`));
-    } else heading = mart
+    } else heading = badge
+      ? h('div', { class: 'learn-head' }, h('h2', null, 'Gym Badge!'), h('div', { class: 'hint' }, 'Choose a rule for the rest of the run.'))
+      : mart
       ? h('div', { class: 'learn-head' }, h('h2', null, 'Poké Mart stop'), h('div', { class: 'hint' }, `You have ₽${Math.floor(session.world.money)} to spend. Pick one.`))
       : h('div', { class: 'lu-head' },
         h('h2', null, this.banishMode ? 'Banish which?' : `Level ${session.world.level}!`),

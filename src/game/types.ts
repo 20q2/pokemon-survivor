@@ -85,6 +85,8 @@ export interface Player {
   hurtT: number;          // flash timer
   lastHit: number;        // sim time of last damage taken
   pendingLevels: number;  // level-ups waiting for a choice
+  /** Gym Badge ids held (rule changes for the rest of the run; see data/badges.ts). */
+  badges: string[];
   /** A move the partner wants to learn after evolving, while all move slots are full. */
   pendingLearn?: string;
   kills: number;
@@ -339,7 +341,7 @@ export interface ChestReward { kind: 'mastery' | 'move' | 'item' | 'vitamin' | '
 
 export interface UpgradeOffer {
   /** forget: learn `id` in place of move slot `level`; keep: don't learn `id`. */
-  kind: 'newMove' | 'moveUp' | 'newItem' | 'itemUp' | 'heal' | 'vitamin' | 'forget' | 'keep';
+  kind: 'newMove' | 'moveUp' | 'newItem' | 'itemUp' | 'heal' | 'vitamin' | 'forget' | 'keep' | 'badge';
   id: string;
   level: number; // resulting level
   /** Poké Mart stop price in ₽ (shared team money); absent for ordinary level-up cards. */

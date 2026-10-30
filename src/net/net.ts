@@ -19,7 +19,7 @@ type ClientMsg =
 interface PlayerState {
   id: number; sp: string; st: number; ty: Player['types']; mv: [string, number, number, number, number][]; it: [string, number][];
   bf: Player['buffs']; rr: number; sk: number; bn: number; nm: string; con: boolean; k: number; dd: number; se: number;
-  ev: number; ma: number; sh: number; pk: number; vt: Record<string, number>; mg: number; mt: number; lg: Ledger;
+  ev: number; ma: number; sh: number; pk: number; bg?: string[]; vt: Record<string, number>; mg: number; mt: number; lg: Ledger;
 }
 
 type HostMsg =
@@ -293,7 +293,7 @@ function playerState(p: Player): PlayerState {
   return {
     id: p.id, sp: p.speciesId, st: p.stage, ty: p.types, mv: p.moves.map((m) => [m.id, m.level, Math.round(m.cd * 100) / 100, Math.round(m.dmgDealt), m.kills]),
     it: p.items.map((i) => [i.id, i.level]), bf: p.buffs, rr: p.rerolls, sk: p.skips, bn: p.banishes, nm: p.name, con: p.connected,
-    k: p.kills, dd: Math.round(p.dmgDealt), se: p.superEff, ev: p.evolutions, ma: p.masteries, sh: p.shinyKills, pk: p.pendingLevels,
+    k: p.kills, dd: Math.round(p.dmgDealt), se: p.superEff, ev: p.evolutions, ma: p.masteries, sh: p.shinyKills, pk: p.pendingLevels, bg: p.badges,
     vt: p.vitamins, mg: Math.round(p.mega * 100) / 100, mt: Math.round(p.megaT * 10) / 10, lg: roundLedger(p.ledger),
   };
 }
@@ -471,6 +471,7 @@ export class ClientSession implements RunSession {
         p.buffs = s.bf; p.rerolls = s.rr; p.skips = s.sk; p.banishes = s.bn; p.name = s.nm; p.connected = s.con;
         p.kills = s.k; p.dmgDealt = s.dd; p.superEff = s.se; p.evolutions = s.ev; p.masteries = s.ma; p.shinyKills = s.sh;
         p.pendingLevels = s.pk;
+        p.badges = s.bg ?? [];
         p.vitamins = s.vt; p.mega = s.mg; p.ledger = s.lg;
         // Mega time is counted down locally between updates; resync on bigger drift.
         if (Math.abs(p.megaT - s.mt) > 0.5) p.megaT = s.mt;

@@ -5,6 +5,7 @@ import { baseDamage, incomingDamage, resolveHit, POWER_SCALE } from './damage.ts
 import { killEnemy } from './enemyAI.ts';
 import type { Sim } from './sim.ts';
 import { megaOnHurt } from './mega.ts';
+import { hasBadge } from '../data/badges.ts';
 import { creditDamage, heal } from './ledger.ts';
 import { HAZARD, updateHazard } from './hazards.ts';
 import { AI, type Enemy, type OwnedMove, type Player, type Projectile, type Shape, type StatusState } from './types.ts';
@@ -595,7 +596,7 @@ function fire(sim: Sim, p: Player, def: MoveDef, s: MoveStats, m?: OwnedMove): b
         const a = base + (i - (n - 1) / 2) * (0.9 / Math.max(1, n - 1) + 0.25);
         makeProjectile(sim, {
           ...c, shape: 'circle', x: p.x + Math.cos(a) * s.range, y: p.y + Math.sin(a) * s.range, r: s.area,
-          life: s.duration, pierce: -1, tick: 0,
+          life: s.duration * (hasBadge(p, 'earth') ? 2 : 1), pierce: -1, tick: 0,
         });
       }
       break;
@@ -618,7 +619,7 @@ function fire(sim: Sim, p: Player, def: MoveDef, s: MoveStats, m?: OwnedMove): b
         makeProjectile(sim, {
           ...c, shape: 'circle', x: p.x + Math.cos(a) * r, y: p.y + Math.sin(a) * r, r: s.area,
           vx: drift ? Math.cos(da) * s.speed : 0, vy: drift ? Math.sin(da) * s.speed : 0, speed: drift ? s.speed : 0,
-          life: s.duration, pierce: s.pierce, tick: 0.6, delay: drift ? 0 : 0.2,
+          life: s.duration * (hasBadge(p, 'earth') ? 2 : 1), pierce: s.pierce, tick: 0.6, delay: drift ? 0 : 0.2,
           flags: def.id === 'stealth-rock' ? PF_PERCENT : 0,
         });
       }
@@ -1272,11 +1273,11 @@ export function applyStatus(sim: Sim, e: Enemy, kind: StatusKind, dmg: number, o
   const k = e.boss ? 0.3 : e.elite ? 0.6 : 1;
   const st = e.st;
   switch (kind) {
-    case 'burn': st.burn = 3 * durMult; st.burnDmg = Math.max(st.burnDmg, Math.max(1, dmg * 0.15)); st.dotOwner = owner.id; break;
+    case 'burn': st.burn = 3 * durMult * (hasBadge(owner, 'volcano') ? 2 : 1); st.burnDmg = Math.max(st.burnDmg, Math.max(1, dmg * 0.15)); st.dotOwner = owner.id; break;
     case 'toxic':
     case 'poison':
       if (kind === 'toxic') st.toxic = Math.max(1, st.toxic);
-      st.poison = 4; st.poisonStacks = Math.min(5, st.poisonStacks + 1);
+      st.poison = hasBadge(owner, 'soul') ? 1e9 : 4; st.poisonStacks = Math.min(5, st.poisonStacks + 1);
       st.poisonDmg = Math.max(st.poisonDmg, Math.max(1, dmg * 0.08)); st.dotOwner = owner.id; break;
     case 'paralyze': st.paralyze = 2.5 * k; break;
     case 'freeze': st.freeze = 1.2 * k; st.chill = 0; break;
