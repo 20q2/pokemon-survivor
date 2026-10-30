@@ -41,6 +41,8 @@ export interface StageDef {
   id: string;
   name: string;
   subtitle: string;
+  /** Vague pointer to this place for undiscovered evolutions ("Evolves <hint>"). */
+  hint: string;
   types: PType[];
   music: string;
   difficulty: number;
@@ -163,7 +165,7 @@ function waves(elites: string[], minutes: string[], text: Record<number, string>
 
 export const STAGES: StageDef[] = [
   {
-    id: 'viridian', name: 'Viridian Forest', subtitle: 'A sun-dappled maze of trees and Bug Pokémon.',
+    id: 'viridian', name: 'Viridian Forest', subtitle: 'A sun-dappled maze of trees and Bug Pokémon.', hint: 'somewhere leafy',
     types: ['bug', 'grass', 'normal', 'flying'], music: 'forest', difficulty: 0.9,
     waves: waves(['pidgeotto', 'metapod', 'parasect'], [
       'caterpie weedle',
@@ -193,7 +195,7 @@ export const STAGES: StageDef[] = [
     ],
   },
   {
-    id: 'mtmoon', name: 'Mt. Moon', subtitle: 'Moonlit caverns echoing with Zubat wings.',
+    id: 'mtmoon', name: 'Mt. Moon', subtitle: 'Moonlit caverns echoing with Zubat wings.', hint: 'deep in a cave',
     types: ['rock', 'ground', 'poison', 'fairy'], music: 'cave', difficulty: 1.25, darkness: 0.35,
     waves: waves(['golbat', 'graveler', 'sandslash'], [
       'zubat diglett',
@@ -223,7 +225,7 @@ export const STAGES: StageDef[] = [
     ],
   },
   {
-    id: 'seafoam', name: 'Seafoam Islands', subtitle: 'Frozen tide caves where the ice never melts.',
+    id: 'seafoam', name: 'Seafoam Islands', subtitle: 'Frozen tide caves where the ice never melts.', hint: 'somewhere cold',
     types: ['water', 'ice'], music: 'ice', difficulty: 1.5,
     waves: waves(['dewgong', 'jynx', 'slowpoke'], [
       'seel shellder',
@@ -253,7 +255,7 @@ export const STAGES: StageDef[] = [
     ],
   },
   {
-    id: 'powerplant', name: 'Power Plant', subtitle: 'Humming generators crackle with stray voltage.',
+    id: 'powerplant', name: 'Power Plant', subtitle: 'Humming generators crackle with stray voltage.', hint: 'somewhere charged',
     types: ['electric', 'steel', 'poison'], music: 'factory', difficulty: 1.8,
     waves: waves(['magneton', 'electrode', 'grimer'], [
       'electrike grimer',
@@ -283,7 +285,7 @@ export const STAGES: StageDef[] = [
     ],
   },
   {
-    id: 'tower', name: 'Pokémon Tower', subtitle: 'Restless spirits drift between the graves.',
+    id: 'tower', name: 'Pokémon Tower', subtitle: 'Restless spirits drift between the graves.', hint: 'somewhere haunted',
     types: ['ghost', 'poison', 'psychic', 'dark'], music: 'tower', difficulty: 2.2, darkness: 0.5,
     waves: waves(['banette', 'dusclops', 'hypno'], [
       'shuppet zubat',
@@ -313,7 +315,7 @@ export const STAGES: StageDef[] = [
     ],
   },
   {
-    id: 'cinnabar', name: 'Cinnabar Volcano', subtitle: 'Magma flows and fierce fighters.',
+    id: 'cinnabar', name: 'Cinnabar Volcano', subtitle: 'Magma flows and fierce fighters.', hint: 'somewhere volcanic',
     types: ['fire', 'fighting', 'dragon', 'rock'], music: 'volcano', difficulty: 2.7,
     waves: waves(['magmar', 'hitmonlee', 'shelgon'], [
       'growlithe mankey',
@@ -343,7 +345,7 @@ export const STAGES: StageDef[] = [
     ],
   },
   {
-    id: 'cerulean', name: 'Cerulean Cave', subtitle: 'Where the strongest wild Pokémon gather.',
+    id: 'cerulean', name: 'Cerulean Cave', subtitle: 'Where the strongest wild Pokémon gather.', hint: 'where the strongest gather',
     types: ['psychic', 'normal', 'dragon'], music: 'finale', difficulty: 3.3, darkness: 0.4,
     waves: waves(['kangaskhan', 'wobbuffet', 'arcanine'], [
       'golbat raticate',

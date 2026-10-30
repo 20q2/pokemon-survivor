@@ -113,6 +113,8 @@ describe('sound effects', async () => {
         const t = parseMml(src, {}, ch === 'noise');
         longest = Math.max(longest, t.length);
         // Octaves persist across bars; a phrase that only climbs goes ultrasonic (older sparkle sfx are high on purpose).
+        // Global ceiling: the drift bug reached 115-139; the highest intended sparkle is 108.
+        if (ch !== 'noise') expect(Math.max(...t.notes.flatMap((n) => n.midi)), `${name} ${ch} ceiling`).toBeLessThanOrEqual(110);
         if (name.startsWith('reveal') && (ch === 'p1' || ch === 'p2')) {
           const top = Math.max(...t.notes.flatMap((n) => n.midi));
           expect(top, `${name} ${ch} top note`).toBeLessThanOrEqual(96);

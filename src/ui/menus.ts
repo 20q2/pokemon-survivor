@@ -16,6 +16,7 @@ import { dirRow } from '../engine/math.ts';
 import type { RunSession } from '../game/session.ts';
 import type { Player } from '../game/types.ts';
 import { countUp } from './countup.ts';
+import { evoHint } from './evoHints.ts';
 import { nearMissLines } from './nearMiss.ts';
 import { btn, catBadge, fmtTime, h, img, moveDisc, moveIcon, toast, typeBadge, uiIcon } from './dom.ts';
 import { hideTip, moveInfoTip, tipped } from './tips.ts';
@@ -124,8 +125,13 @@ function movePool(app: App, line: Line) {
 }
 
 /** Base → middle stages → every possible final form; alternate forms say where they evolve. */
-function evoRow(line: Line, shiny: boolean) {
-  const portrait = (id: string) => img(assets.portraitUrl(id, shiny));
+function evoRow(line: Line, shiny: boolean, seen: ReadonlySet<string>) {
+  const portrait = (id: string) => {
+    const hint = evoHint(line, id, seen);
+    const p = img(assets.portraitUrl(id, shiny), hint ? 'px unseen' : 'px');
+    // Undiscovered forms are silhouettes that say roughly where they evolve.
+    return hint ? tipped(p, () => h('div', null, h('b', null, '???'), h('p', null, hint))) : p;
+  };
   const arrow = (i: number) => h('span', { class: 'arrow' }, `Lv${line.evoLevels[i]} →`);
   const finals = finalForms(line);
   const where = (id: string) => STAGES.filter((st) => line.envForms?.[st.id]?.includes(id)).map((st) =>
@@ -133,13 +139,16 @@ function evoRow(line: Line, shiny: boolean) {
   const final = (id: string) => {
     if (finals.length === 1) return portrait(id);
     const at = where(id);
+    if (evoHint(line, id, seen)) return portrait(id);
     return tipped(portrait(id), () => h('div', null, h('b', null, SPECIES[id].name),
       h('p', null, at.length ? `Evolves in ${at.join(' or ')}.` : 'Evolves anywhere else.')));
   };
   const mids = line.stages.slice(1, line.evoLevels.length);
-  return h('div', { class: 'evo' }, portrait(line.stages[0]),
+  const firstHint = [...mids, ...finals].map((id) => evoHint(line, id, seen)).find((x) => x);
+  const row = h('div', { class: 'evo' }, portrait(line.stages[0]),
     ...mids.flatMap((id, i) => [arrow(i), portrait(id)]),
     arrow(mids.length), ...finals.map(final));
+  return firstHint ? h('div', null, row, h('div', { class: 'hint evo-hint' }, firstHint)) : row;
 }
 
 export function selectScreen(app: App, onConfirm: (lineId: string) => void, title = 'Choose your partner', onBack = () => app.goTitle()) {
@@ -166,7 +175,7 @@ export function selectScreen(app: App, onConfirm: (lineId: string) => void, titl
       h('div', null, h('b', null, 'Starts with: '), MOVES[line.starter].name, ' ', typeBadge(MOVES[line.starter].type)),
       movePool(app, line),
       statBars(sp.id),
-      evoRow(line, shinyOn(sel)),
+      evoRow(line, shinyOn(sel), new Set(Object.keys(app.save.seen).filter((k) => app.save.seen[k] > 0))),
       h('div', null, h('b', null, 'Friendship '), h('span', { class: 'hearts' }, '♥'.repeat(hearts) + '♡'.repeat(5 - hearts)), h('span', { class: 'hint' }, ` ${fr}/${FRIENDSHIP_MAX}`)),
       h('div', { class: 'hint' }, FRIENDSHIP_PERKS.map((p) => (fr >= p.at ? '✔ ' : '• ') + p.text).join(' · ')),
       app.save.shinyUnlocked.includes(sel)

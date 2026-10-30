@@ -94,6 +94,8 @@ img.px, .px img { image-rendering: pixelated; }
 .statbar .bar > div { height: 100%; }
 .evo { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .evo img { width: 40px; image-rendering: pixelated; }
+.evo img.unseen { filter: brightness(0); opacity: 0.55; }
+.evo-hint { margin-top: 2px; }
 .evo .arrow { font-size: 12px; color: var(--ink-soft); }
 .hearts { color: #e0457b; letter-spacing: 2px; font-size: 18px; }
 .hint { color: var(--ink-soft); font-size: 15px; }
