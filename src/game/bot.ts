@@ -71,7 +71,7 @@ export function botSteer(sim: Sim, p: Player): { x: number; y: number } {
     // Head for map treasure and (above all) the Mega Stone when healthy.
     let bd = Infinity;
     for (const pk of sim.pickups) {
-      if (pk.kind !== 'chest' && pk.kind !== 'mega-stone') continue;
+      if (pk.kind !== 'chest' && pk.kind !== 'dig' && pk.kind !== 'mega-stone') continue;
       const dx = pk.x - p.x, dy = pk.y - p.y;
       const d2 = (dx * dx + dy * dy) * (pk.kind === 'mega-stone' ? 0.1 : 1);
       if (d2 < bd && d2 < 1400 ** 2) { bd = d2; gx = dx; gy = dy; }

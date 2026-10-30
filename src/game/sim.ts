@@ -65,6 +65,29 @@ export function chestTiming(n: number) {
   return { open, reveal, autoClose: reveal + 6 };
 }
 
+/** Buried treasure: seconds one player must stand on the spot, and how close counts as "on it". */
+export const DIG_TIME = 3;
+export const DIG_RADIUS = 30;
+
+/**
+ * Advance a dig spot's progress. Each extra player on the spot adds half a digger; stepping off
+ * loses progress at a third of the digging rate, so dodging away briefly doesn't cost the dig.
+ * Returns the nearest digger (the one credited when it completes), shared by host and replicas.
+ */
+export function stepDig(pk: Pickup, players: Player[], dt: number): Player | undefined {
+  let n = 0, best: Player | undefined, bd = DIG_RADIUS * DIG_RADIUS;
+  for (const p of players) {
+    if (p.fainted || !p.connected) continue;
+    const d = dist2(p.x, p.y, pk.x, pk.y);
+    if (d >= DIG_RADIUS * DIG_RADIUS) continue;
+    n++;
+    if (d < bd) { bd = d; best = p; }
+  }
+  pk.diggers = n;
+  pk.dig = n ? Math.min(1, pk.dig + ((1 + 0.5 * (n - 1)) * dt) / DIG_TIME) : Math.max(0, pk.dig - dt / (DIG_TIME * 3));
+  return best;
+}
+
 export const MAX_ENEMIES = 520;
 
 /** Hidden Power's status for each rolled type. */
@@ -326,9 +349,9 @@ export class Sim {
       }
       if (best) { best.value += value; return best; }
     }
-    const pk: Pickup = { id: this.id(), kind, x, y, value, vacuum: 0, vx: 0, vy: 0, t: 0, dead: false };
+    const pk: Pickup = { id: this.id(), kind, x, y, value, vacuum: 0, vx: 0, vy: 0, t: 0, dead: false, dig: 0, diggers: 0 };
     this.obstacles.pushOut(pk, 6);
-    if (kind !== 'candy') {
+    if (kind !== 'candy' && kind !== 'dig') {
       const a = this.rng.range(0, Math.PI * 2);
       pk.vx = Math.cos(a) * 60;
       pk.vy = Math.sin(a) * 60;
@@ -342,6 +365,11 @@ export class Sim {
     for (const pk of this.pickups) {
       if (pk.dead) continue;
       pk.t += dt;
+      if (pk.kind === 'dig') {
+        const p = stepDig(pk, this.players, dt);
+        if (p && pk.dig >= 1) this.collect(pk, p);
+        continue;
+      }
       if (pk.vx || pk.vy) {
         pk.x += pk.vx * dt;
         pk.y += pk.vy * dt;
@@ -402,6 +430,7 @@ export class Sim {
         this.xp += this.xpNext - this.xp + 0.01;
         break;
       case 'chest':
+      case 'dig':
         this.openChest(p, Math.max(1, Math.min(4, Math.round(pk.value))) as ChestTier);
         break;
       case 'mega-stone':

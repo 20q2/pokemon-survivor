@@ -4,12 +4,12 @@ import type { WeatherKind } from '../data/moves.ts';
 
 const WEATHERS: (WeatherKind | null)[] = [null, 'sun', 'rain', 'sand', 'snow'];
 
-export const PROTOCOL = 5;
-export const ROOM_PREFIX = 'pkmnsurv-v5-';
+export const PROTOCOL = 6;
+export const ROOM_PREFIX = 'pkmnsurv-v6-';
 export const SNAP_HZ = 20;
 
 const SPECIES_INDEX = new Map(SPECIES_LIST.map((s, i) => [s.id, i]));
-export const PICKUP_KINDS: PickupKind[] = ['candy', 'coin', 'oran', 'sitrus', 'magnet', 'repel', 'chest', 'rare-candy', 'mega-stone'];
+export const PICKUP_KINDS: PickupKind[] = ['candy', 'coin', 'oran', 'sitrus', 'magnet', 'repel', 'chest', 'rare-candy', 'mega-stone', 'dig'];
 
 export interface SnapPlayer { x: number; y: number; hp: number; fx: number; fy: number; moving: boolean; fainted: boolean; connected: boolean; hurt: boolean; revive: number; mv: number }
 

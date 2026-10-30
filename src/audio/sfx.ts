@@ -26,6 +26,8 @@ export const SFX: Record<string, SfxDef> = {
   // ── pickups ──
   coin: { bpm: 220, p1: 'o6 l64 @2 E1 v9 b > e8', p2: 'o6 l64 @1 E1 v4 r32 b > e16', vol: 2.0 },
   heal: { bpm: 180, p1: 'o5 l32 @1 E2 v9 c e g > c e8', p2: 'o4 l32 @2 E1 v5 r32 g > c e g8', tri: 'o3 l8 c' },
+  // A short scrape of earth, repeated by the caller while the player is digging up treasure.
+  dig: { bpm: 220, noise: 'v7 s32 r64 v4 h32', tri: 'o2 l64 c', vol: 0.9 },
   repel: { bpm: 160, p1: 'o6 l64 @3 E1 v10 c < b a g f e d c < b a g f e d c', noise: 'v11 x4', tri: 'o2 l8 c' },
 
   // ── combat ──

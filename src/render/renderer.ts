@@ -2,7 +2,7 @@ import { TYPE_COLORS } from '../data/types.ts';
 import { MEGA, SPECIES } from '../data/pokedex.ts';
 import type { StageDef } from '../data/stages.ts';
 import { dirRow, TAU } from '../engine/math.ts';
-import type { Cinematic, Phase } from '../game/sim.ts';
+import { DIG_RADIUS, type Cinematic, type Phase } from '../game/sim.ts';
 import { CHEST_BALL, CHEST_COLOR, type ChestTier, type Enemy, type GameEvent, type Pickup, type Player, type Projectile } from '../game/types.ts';
 import { assets, type Anim } from './assets.ts';
 import { Background, type DecorSprite } from './background.ts';
@@ -207,7 +207,8 @@ export class Renderer {
         break;
       case 'pickup': {
         const p = world.players[ev.player];
-        if (p && ev.kind === 'chest') { P.burst(p.x, p.y - 10, 28, 160, '#fff1a8', 0.8, 4, true, 0, Shape.SPARK); P.ring(p.x, p.y - 10, 34, '#fff1a8', 0.4); this.screenFlash('#fff', 0.3); }
+        if (p && ev.kind === 'dig') P.burst(p.x, p.y, 26, 150, '#7a5434', 0.6, 3, false, 260, Shape.DOT);
+        if (p && (ev.kind === 'chest' || ev.kind === 'dig')) { P.burst(p.x, p.y - 10, 28, 160, '#fff1a8', 0.8, 4, true, 0, Shape.SPARK); P.ring(p.x, p.y - 10, 34, '#fff1a8', 0.4); this.screenFlash('#fff', 0.3); }
         if (p && (ev.kind === 'oran' || ev.kind === 'sitrus')) for (let i = 0; i < 10; i++) P.spawn(p.x + (Math.random() - 0.5) * 22, p.y - Math.random() * 16, 0, -30 - Math.random() * 30, 0.7, 2, '#7dff8a', 0, true, Shape.DOT);
         break;
       }
@@ -955,6 +956,7 @@ export class Renderer {
       g.fillRect(Math.round(pk.x - w / 2), Math.round(pk.y - 4 + bob), Math.round(w), 6);
       return;
     }
+    if (pk.kind === 'dig') return this.drawDigSpot(pk, time);
     const tier = pk.kind === 'chest' ? chestTier(pk.value) : 1;
     const icon = pk.kind === 'chest' ? CHEST_BALL[tier] : PICKUP_ICON[pk.kind];
     const img = icon ? assets.itemImage(icon) : undefined;
@@ -983,6 +985,71 @@ export class Renderer {
       }
     }
     if (img) g.drawImage(img, Math.round(pk.x - 15), Math.round(pk.y - 22 + bob), 30, 30);
+  }
+
+  /** Buried treasure: a churned dirt patch with the ball's top peeking out, rising as it's dug up. */
+  private drawDigSpot(pk: Pickup, time: number) {
+    const g = this.g;
+    const tier = chestTier(pk.value);
+    const col = CHEST_COLOR[tier];
+    const x = Math.round(pk.x), y = Math.round(pk.y);
+    // the "on it" circle, so players know where to stand
+    g.globalAlpha = 0.35 + 0.15 * Math.sin(time * 4);
+    g.strokeStyle = col;
+    g.lineWidth = 1;
+    g.setLineDash([4, 4]);
+    g.beginPath(); g.ellipse(x, y, DIG_RADIUS, DIG_RADIUS * 0.55, 0, 0, TAU); g.stroke();
+    g.setLineDash([]);
+    g.globalAlpha = 1;
+    // dirt mound: dark rim, lighter churned top, a few clods
+    g.fillStyle = '#4a3220';
+    g.beginPath(); g.ellipse(x, y, 17, 9, 0, 0, TAU); g.fill();
+    g.fillStyle = '#7a5434';
+    g.beginPath(); g.ellipse(x, y - 1, 14, 7, 0, 0, TAU); g.fill();
+    g.fillStyle = '#9b6e45';
+    for (let i = 0; i < 5; i++) g.fillRect(x - 10 + ((pk.id * 7 + i * 5) % 20), y - 4 + ((pk.id + i * 3) % 6), 2, 2);
+    // a short beam in the ball's colour, so it reads as treasure (a dug-up chest gets the tall one)
+    g.globalCompositeOperation = 'lighter';
+    g.globalAlpha = 0.22 + 0.1 * Math.sin(time * 5);
+    g.fillStyle = col;
+    g.fillRect(x - 3, y - 34 - tier * 6, 6, 30 + tier * 6);
+    g.globalAlpha = 1;
+    g.globalCompositeOperation = 'source-over';
+    // the ball: half-buried, rising out of the ground as progress builds
+    const img = assets.itemImage(CHEST_BALL[tier]);
+    const rise = 11 + pk.dig * 11;
+    const shake = pk.diggers ? Math.round(Math.sin(time * 40) * 1.2) : 0;
+    if (img) {
+      g.save();
+      g.beginPath(); g.rect(x - 16, y - 40, 32, 38); g.clip();
+      g.drawImage(img, x - 12 + shake, Math.round(y - 2 - rise), 24, 24);
+      g.restore();
+    }
+    // glint so it reads as treasure from a distance
+    const gl = (time * 0.7 + pk.id * 0.13) % 1;
+    if (gl < 0.12) {
+      const k = 1 - Math.abs(gl / 0.06 - 1);
+      g.fillStyle = '#fff';
+      g.globalAlpha = k;
+      g.fillRect(x + 3, y - rise - 1 - 4 * k, 1, 8 * k + 1);
+      g.fillRect(x + 3 - 4 * k, y - rise + 3 - 4, 8 * k + 1, 1);
+      g.globalAlpha = 1;
+    }
+    // progress ring
+    if (pk.dig > 0) {
+      g.strokeStyle = '#000';
+      g.lineWidth = 4;
+      g.beginPath(); g.arc(x, y - 14, 22, 0, TAU); g.stroke();
+      g.strokeStyle = col;
+      g.lineWidth = 2;
+      g.beginPath(); g.arc(x, y - 14, 22, -Math.PI / 2, -Math.PI / 2 + pk.dig * TAU); g.stroke();
+    }
+    // dirt kicked up while someone digs
+    if (pk.diggers && Math.random() < 0.5) {
+      const a = -Math.PI / 2 + (Math.random() - 0.5) * 2.2;
+      const sp = 50 + Math.random() * 60;
+      this.particles.spawn(x + (Math.random() - 0.5) * 16, y - 2, Math.cos(a) * sp, Math.sin(a) * sp, 0.45, 2 + Math.random() * 2, Math.random() < 0.5 ? '#7a5434' : '#4a3220', 260, false, Shape.DOT);
+    }
   }
 
   // ─────────────────────────── projectiles ───────────────────────────
@@ -1461,7 +1528,7 @@ export class Renderer {
       g.restore();
     };
     for (const e of world.enemies) if (e.boss && e.alive) mark(e.x, e.y, '#ff4b4b', 14 * u);
-    for (const pk of world.pickups) if (pk.kind === 'chest') mark(pk.x, pk.y, CHEST_COLOR[chestTier(pk.value)], (9 + chestTier(pk.value)) * u);
+    for (const pk of world.pickups) if (pk.kind === 'chest' || pk.kind === 'dig') mark(pk.x, pk.y, CHEST_COLOR[chestTier(pk.value)], (9 + chestTier(pk.value)) * u);
     for (const pk of world.pickups) if (pk.kind === 'mega-stone') mark(pk.x, pk.y, `hsl(${Math.floor((world.time * 120) % 360)},100%,65%)`, 12 * u);
     for (const p of world.players) if (p.id !== this.localId && p.connected) mark(p.x, p.y, SLOT_COLORS[p.slot], 10 * u);
   }

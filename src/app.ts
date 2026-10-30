@@ -6,7 +6,7 @@ import { MOVES } from './data/moves.ts';
 import { Input } from './engine/input.ts';
 import { botChoose, botSteer, autoChoice } from './game/bot.ts';
 import { LocalSession, summarize, type RunSession } from './game/session.ts';
-import type { PlayerInit } from './game/sim.ts';
+import { DIG_RADIUS, type PlayerInit } from './game/sim.ts';
 import type { GameEvent } from './game/types.ts';
 import { applyRun, checkAchievements, type RunRewards } from './meta/progression.ts';
 import type { RunSummary } from './meta/achievements.ts';
@@ -44,6 +44,7 @@ export class App {
   private bossMusic = false;
   private autoT = 0;
   private heartT = 0;
+  private digT = 0;
   private tutorial: { at: number; text: string }[] = [];
   private alphasDown = 0;
   private offersSeen: unknown = null;
@@ -221,6 +222,16 @@ export class App {
     if (this.heartT <= 0) { audio.sfx('heartbeat'); this.heartT = every; }
   }
 
+  /** Scraping sounds while the local player stands on buried treasure. */
+  private updateDigSound(s: RunSession, dt: number) {
+    const me = s.world.players[s.localId];
+    const digging = !!me && !me.fainted && s.phase() === 'play' && !s.paused &&
+      s.world.pickups.some((pk) => pk.kind === 'dig' && !pk.dead && (pk.x - me.x) ** 2 + (pk.y - me.y) ** 2 < DIG_RADIUS * DIG_RADIUS);
+    if (!digging) { this.digT = 0; return; }
+    this.digT -= dt;
+    if (this.digT <= 0) { audio.sfx('dig'); this.digT = 0.3; }
+  }
+
   endRun() {
     this.session?.dispose();
     this.session = null;
@@ -393,7 +404,7 @@ export class App {
         break;
       }
       case 'poi':
-        if (ev.kind === 'cache') toast('Itemfinder', 'Something is buried nearby. Check the map!', assets.itemUrl('dowsing-machine'));
+        if (ev.kind === 'cache') toast('Itemfinder', 'Something is buried nearby! Find it on the map and stand on the spot to dig it up.', assets.itemUrl('dowsing-machine'));
         else if (ev.kind === 'mega-stone') { banner('A MEGA STONE is shining somewhere! Check the map!', false, 3200); audio.sfx('shiny'); }
         else notice(`Alpha ${SPECIES[ev.species!].name} spotted nearby!`);
         break;
@@ -429,6 +440,7 @@ export class App {
       for (const ev of s.drainEvents()) this.handleEvent(ev, s);
       if (this.tutorial.length && s.world.time >= this.tutorial[0].at && s.phase() === 'play') banner(this.tutorial.shift()!.text, false, 3600);
       this.updateHeartbeat(s, dt);
+      this.updateDigSound(s, dt);
       if (this.bossMusic && !s.world.enemies.some((e) => e.boss && e.alive)) {
         this.bossMusic = false;
         audio.playMusic(STAGE[s.stage.id].music);

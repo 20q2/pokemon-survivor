@@ -2,7 +2,7 @@ import Peer, { type DataConnection } from 'peerjs';
 import { LINE, SPECIES } from '../data/pokedex.ts';
 import { freshStatus, stepProjectileMotion } from '../game/combat.ts';
 import { LocalSession, type RunSession } from '../game/session.ts';
-import { Sim, type Phase, type PlayerInit, type SimConfig, type Cinematic } from '../game/sim.ts';
+import { Sim, stepDig, type Phase, type PlayerInit, type SimConfig, type Cinematic } from '../game/sim.ts';
 import type { Enemy, GameEvent, Player, UpgradeOffer } from '../game/types.ts';
 import type { Ledger } from '../game/ledger.ts';
 import { decodeSnapshot, encodeSnapshot, EXTRA_STATUS, MV, PICKUP_KINDS, projFromWire, projToWire, PROTOCOL, ROOM_PREFIX, SNAP_HZ } from './protocol.ts';
@@ -449,11 +449,12 @@ export class ClientSession implements RunSession {
       sim.projectiles = sim.projectiles.filter((p) => !dead.has(p.id));
     }
     for (const [id, k, x, y, v] of m.nk as [number, number, number, number, number][]) {
-      sim.pickups.push({ id, kind: PICKUP_KINDS[k], x, y, value: v, vacuum: 0, vx: 0, vy: 0, t: 0, dead: false });
+      sim.pickups.push({ id, kind: PICKUP_KINDS[k], x, y, value: v, vacuum: 0, vx: 0, vy: 0, t: 0, dead: false, dig: 0, diggers: 0 });
     }
     if (m.dk.length) {
       const by = new Map(m.dk);
-      for (const p of sim.pickups) if (by.has(p.id)) { p.vacuum = by.get(p.id)! + 1; p.t = 0; p.dead = true; }
+      // A finished dig spot just disappears (the chest show takes over); everything else flies to its collector.
+      for (const p of sim.pickups) if (by.has(p.id)) { p.vacuum = p.kind === 'dig' ? -1 : by.get(p.id)! + 1; p.t = 0; p.dead = true; }
     }
     if (m.ps) {
       for (const s of m.ps) {
@@ -565,7 +566,9 @@ export class ClientSession implements RunSession {
       // pickups: fly to the collecting player, or drift toward nearby players
       for (const pk of sim.pickups) {
         pk.t += dt;
-        const target = pk.vacuum ? sim.players[pk.vacuum - 1] : undefined;
+        // Dig progress is cosmetic here (same rule as the host, capped short of done): the host decides when it pops.
+        if (pk.kind === 'dig' && !pk.dead) { stepDig(pk, sim.players, dt); pk.dig = Math.min(pk.dig, 0.98); continue; }
+        const target = pk.vacuum > 0 ? sim.players[pk.vacuum - 1] : undefined;
         if (target) {
           const dx = target.x - pk.x, dy = target.y - pk.y;
           const d = Math.hypot(dx, dy) || 1;

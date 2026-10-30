@@ -261,7 +261,8 @@ export interface Projectile {
   flags: number;            // per-move bit flags (see combat PF_*)
 }
 
-export type PickupKind = 'candy' | 'coin' | 'oran' | 'sitrus' | 'magnet' | 'repel' | 'chest' | 'rare-candy' | 'mega-stone';
+/** `dig`: buried treasure (value = chest tier); never attracted, players stand on it to excavate. */
+export type PickupKind = 'candy' | 'coin' | 'oran' | 'sitrus' | 'magnet' | 'repel' | 'chest' | 'rare-candy' | 'mega-stone' | 'dig';
 
 export interface Pickup {
   id: number;
@@ -272,6 +273,8 @@ export interface Pickup {
   vx: number; vy: number;
   t: number;
   dead: boolean;
+  dig: number;              // `dig` spots: excavation progress 0..1
+  diggers: number;          // `dig` spots: players standing on it this tick
 }
 
 export type GameEvent =

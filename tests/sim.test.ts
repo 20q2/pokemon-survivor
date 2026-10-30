@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Sim, DT } from '../src/game/sim.ts';
+import { Sim, DT, DIG_TIME } from '../src/game/sim.ts';
 import { metaBonuses } from '../src/meta/shop.ts';
 import { botChoose, botSteer } from '../src/game/bot.ts';
 import { LINES } from '../src/data/pokedex.ts';
@@ -178,6 +178,32 @@ describe('late-game systems', () => {
     expect(alpha && stone && cache).toBe(true);
     expect(sim.enemies.some((e) => e.alpha && e.alive)).toBe(true);
   }, 20_000);
+
+  it('buried treasure opens only after standing on it for the dig time, and stepping off loses progress slowly', () => {
+    const sim = solo('squirtle');
+    sim.invulnerable = true;
+    const p = sim.players[0];
+    const pk = sim.spawnPickup('dig', p.x + 200, p.y, 2);
+    expect(pk.vx).toBe(0);
+    const tick = (s: number) => { for (let i = 0; i < Math.round(s * 60); i++) { p.mx = p.my = 0; sim.update(DT); } };
+    tick(1);
+    expect(pk.dig).toBe(0); // never attracted from a distance
+    expect(Math.hypot(pk.x - p.x - 200, pk.y - p.y)).toBeLessThan(1);
+    p.x = pk.x; p.y = pk.y;
+    tick(DIG_TIME / 2);
+    expect(pk.dig).toBeGreaterThan(0.4);
+    expect(pk.dead).toBe(false);
+    p.x += 200;
+    const before = pk.dig;
+    tick(0.5);
+    expect(pk.dig).toBeLessThan(before);
+    expect(pk.dig).toBeGreaterThan(before - 0.1);
+    p.x = pk.x; p.y = pk.y;
+    sim.events.length = 0;
+    tick(DIG_TIME);
+    expect(pk.dead).toBe(true);
+    expect(sim.events.some((e) => e.e === 'chest' && e.player === 0)).toBe(true);
+  });
 });
 
 describe('playtest regressions', () => {

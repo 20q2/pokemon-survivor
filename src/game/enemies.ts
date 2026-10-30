@@ -168,7 +168,7 @@ export class Spawner {
       x = p.x + Math.cos(a) * dist;
       y = p.y + Math.sin(a) * dist;
     }
-    const pk = sim.spawnPickup(kind === 'cache' ? 'chest' : 'mega-stone', x, y, kind === 'cache' ? (sim.rng.chance(0.3) ? 3 : 2) : 1);
+    const pk = sim.spawnPickup(kind === 'cache' ? 'dig' : 'mega-stone', x, y, kind === 'cache' ? (sim.rng.chance(0.3) ? 3 : 2) : 1);
     pk.vx = pk.vy = 0;
     this.pois.push({ kind, id: pk.id, x, y, guarded: false });
     sim.emit({ e: 'poi', kind, x, y });

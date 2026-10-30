@@ -86,7 +86,7 @@ export class Minimap {
     }
     for (const pk of world.pickups) {
       if (pk.dead) continue;
-      if (pk.kind === 'chest') {
+      if (pk.kind === 'chest' || pk.kind === 'dig') {
         const t = chestTier(pk.value);
         dot(pk.x, pk.y, t >= 3 ? 6 : 5, '#000', true);
         dot(pk.x, pk.y, t >= 3 ? 4 : 3, CHEST_COLOR[t], true);
