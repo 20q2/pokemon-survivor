@@ -96,7 +96,23 @@ export const SFX: Record<string, SfxDef> = {
   pop: { bpm: 220, p1: 'o5 l64 @1 E1 v10 g b > d', vol: 1.6 },
   tick: { bpm: 240, p1: 'o6 l64 @1 E1 v6 c', vol: 2.6 },
   ding: { bpm: 200, p1: 'o5 l32 @0 E1 v10 g > d g8', p2: 'o5 l32 @0 E1 v4 r32 g > d g16', vol: 1.6 },
-  reveal: { bpm: 170, p1: 'o5 l32 @2 E2 v10 c e g > c8', p2: 'o4 l32 @1 E2 v6 g > c e g8', noise: 'v10 x8', vol: 1.4 },
+  // Escalating treasure jingles: 1-2 rewards, 3-4 rewards (a third bar, higher ending), 5 rewards (fanfare).
+  reveal1: { bpm: 170, p1: 'o5 l32 @2 E2 v10 c e g > c8', p2: 'o4 l32 @1 E2 v6 g > c e g8', noise: 'v10 x8', vol: 1.4 },
+  reveal3: {
+    bpm: 170,
+    p1: 'o5 l32 @2 E2 v10 c e g > c8 | < g > c e g8 | c e g > c e g > c4',
+    p2: 'o4 l32 @1 E2 v6 g > c e g8 | c e g > c8 | g > c e g > c e g4',
+    noise: 'v10 x8 r8 r8 v10 x4',
+    vol: 1.4,
+  },
+  reveal5: {
+    bpm: 210,
+    p1: 'o5 l16 @2 E2 v11 c e g > c8 | < g > c e g8 | c e g > c e g > c8 | e g > c e g > c e c2',
+    p2: 'o4 l16 @1 E2 v7 g > c e g8 | c e g > c8 | g > c e g > c e g8 | c e g > c e g > c e g2',
+    tri: 'o3 l8 c c c c | g g > c c | c e g > c | c1',
+    noise: 'v9 k8 h8 k8 h8 | s8 h8 s8 h8 | s16 s16 s16 s16 s8 x8 | v11 x1',
+    vol: 1.4,
+  },
 
   // ── run end ──
   victory: {

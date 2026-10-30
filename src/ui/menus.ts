@@ -15,6 +15,7 @@ import { stageThumbnail } from '../render/background.ts';
 import { dirRow } from '../engine/math.ts';
 import type { RunSession } from '../game/session.ts';
 import type { Player } from '../game/types.ts';
+import { countUp } from './countup.ts';
 import { nearMissLines } from './nearMiss.ts';
 import { btn, catBadge, fmtTime, h, img, moveDisc, moveIcon, toast, typeBadge, uiIcon } from './dom.ts';
 import { hideTip, moveInfoTip, tipped } from './tips.ts';
@@ -532,6 +533,12 @@ export function resultsScreen(app: App, data: { session: RunSession; summary: Ru
   const moves = [...me.moves].sort((a, b) => b.dmgDealt - a.dmgDealt);
   const totalDmg = Math.max(1, me.dmgDealt);
   const title = r.cleared ? 'STAGE CLEAR!' : 'You blacked out…';
+  // Totals count up in a stagger once the screen is up.
+  const counter = (to: number, delay: number, format?: (n: number) => string) => {
+    const b = h('b', null, (format ?? ((n: number) => n.toLocaleString()))(to));
+    setTimeout(() => countUp(b, to, 900, format), delay);
+    return b;
+  };
   let started = false;
   let stopKeys = () => {};
   const retry = () => {
@@ -551,11 +558,11 @@ export function resultsScreen(app: App, data: { session: RunSession; summary: Ru
         h('div', { class: 'kv' },
           'Time survived', h('b', null, `${fmtTime(r.time)} (minute ${Math.floor(r.time / 60) + 1})`),
           'Level', h('b', null, r.level),
-          'Pokémon defeated', h('b', null, r.kills.toLocaleString()),
+          'Pokémon defeated', counter(r.kills, 0),
           'Bosses defeated', h('b', null, r.bosses),
           'Super-effective hits', h('b', null, r.superEff.toLocaleString()),
-          'Damage dealt', h('b', null, Math.round(me.dmgDealt).toLocaleString()),
-          'Poké Dollars earned', h('b', null, `₽${rewards.money.toLocaleString()}`),
+          'Damage dealt', counter(Math.round(me.dmgDealt), 300),
+          'Poké Dollars earned', counter(rewards.money, 600, (n) => `₽${n.toLocaleString()}`),
           'Friendship', h('b', null, `+${rewards.friendship}`),
         ),
         rewards.newBest ? h('div', { class: 'hint' }, '⭐ New best time on this route!') : null,

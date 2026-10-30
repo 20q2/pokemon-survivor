@@ -464,6 +464,9 @@ input[type=text], textarea { background: rgba(0, 0, 0, 0.35); color: var(--ink);
 @keyframes blink { 50% { opacity: 0.55; } }
 .chest-panel.tier-4 { animation: rainbow 1.6s linear infinite; }
 .coin-layer { position: absolute; left: 50%; top: 42%; width: 0; height: 0; pointer-events: none; z-index: 2; }
+.star { position: absolute; left: -9px; top: -12px; font-style: normal; font-size: 20px; line-height: 1; color: #ffd94a; text-shadow: 0 0 6px #fff3b0, 1px 1px 0 #b8860b; opacity: 0; animation: star-burst 0.6s ease-out forwards; }
+@keyframes star-burst { 0% { transform: translate(0, 0) scale(0.3); opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) scale(1.2) rotate(180deg); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .star { display: none; } }
 .coin { position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; background: #ffd94a; border: 2px solid #b8860b; box-shadow: inset -2px -2px 0 #e0a800; }
 /* TM discs for moves on level-up cards and treasure reels */
 .card .ic.tm, .reel-face.tm { display: grid; place-items: center; border-radius: 6px;

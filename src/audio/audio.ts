@@ -461,7 +461,8 @@ export class AudioEngine {
         this.phrase('tick', Math.round(arg));
         break;
       case 'ding': this.phrase('ding', arg * 2); break;
-      case 'reveal': this.phrase('reveal', arg * 2, 0.8 + arg * 0.1); break;
+      // arg = number of rewards in the chest.
+      case 'reveal': this.phrase(arg >= 5 ? 'reveal5' : arg >= 3 ? 'reveal3' : 'reveal1'); break;
       case 'fire':
         this.fireSfx(arg);
         break;

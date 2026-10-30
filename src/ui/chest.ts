@@ -73,7 +73,8 @@ export function chestShow(rewards: ChestReward[], tier: ChestTier, onDismiss: ((
   const coins = h('div', { class: 'coin-layer' });
   const panel = h('div', { class: `panel chest-panel tier-${tier}`, style: `--chest:${color}` },
     ball, title, h('div', { class: 'reels' }, slots.map((s) => s.root)), hint);
-  const el = h('div', { class: 'chest-pop' }, coins, panel);
+  const stars = h('div', { class: 'coin-layer' });
+  const el = h('div', { class: 'chest-pop' }, stars, coins, panel);
   const pool = decoys();
   preloadChestFaces();
   const t0 = performance.now();
@@ -91,11 +92,25 @@ export function chestShow(rewards: ChestReward[], tier: ChestTier, onDismiss: ((
     }
   };
 
+  /** Stars fly out of the ball for big hauls (3-4 rewards: 6, 5: 12); CSS does the motion. */
+  const burstStars = () => {
+    const n = rewards.length >= 5 ? 12 : rewards.length >= 3 ? 6 : 0;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
+      const d = 110 + Math.random() * 70;
+      const s = h('i', { class: 'star' }, '★');
+      s.style.setProperty('--dx', `${Math.cos(a) * d}px`);
+      s.style.setProperty('--dy', `${Math.sin(a) * d}px`);
+      stars.append(s);
+    }
+  };
+
   const open = () => {
     if (opened) return;
     opened = true;
     el.classList.add('opened');
-    audio.sfx('reveal', tier);
+    audio.sfx('reveal', rewards.length);
+    burstStars();
     spawnCoins(10 + tier * 8);
   };
 
