@@ -166,7 +166,6 @@ export class Renderer {
         P.burst(ev.x, ev.y, 18, ev.r * 3, TYPE_COLORS[ev.type], 0.45, 3, true, 0, Shape.SPARK);
         P.burst(ev.x, ev.y, 8, ev.r * 1.5, '#d8d0c8', 0.6, 5, false, -15, Shape.PUFF);
         P.ring(ev.x, ev.y, ev.r, TYPE_COLORS[ev.type], 0.3);
-        this.addShake(3);
         break;
       case 'chain':
         this.chains.push({ pts: ev.pts, color: TYPE_COLORS[ev.type], t: 0 });
@@ -178,10 +177,7 @@ export class Renderer {
         this.numbers.label(ev.x, ev.y - (ev.big ? 58 : 34), `${ev.name}!`, ev.big ? '#ffb0a0' : '#ffd0c0', 1.5, ev.big ? 8 : 6);
         break;
       case 'hurt':
-        if (ev.player === this.localId) {
-          this.hurtFlash = 0.35;
-          this.addShake(2.5);
-        }
+        if (ev.player === this.localId) this.hurtFlash = 0.35;
         {
           const p = world.players[ev.player];
           if (p && this.showNumbers) this.numbers.addPlayer(p.x, p.y - 30, ev.dmg, false);
@@ -204,7 +200,7 @@ export class Renderer {
         break;
       }
       case 'faint':
-        if (ev.player === this.localId) this.screenFlash('#000', 0.5);
+        if (ev.player === this.localId) { this.screenFlash('#000', 0.5); this.addShake(6); }
         break;
       case 'shiny':
         P.burst(ev.x, ev.y - 8, 14, 90, '#fff6a8', 0.9, 4, true, 0, Shape.SPARK);
@@ -1299,7 +1295,6 @@ export class Renderer {
     if (pr.t - pr.delay < 0.03) {
       this.particles.burst(pr.x, pr.y, 10, pr.r * 4, col, 0.4, 3, true, 0, Shape.SPARK);
       this.particles.ring(pr.x, pr.y, pr.r, col, 0.25);
-      this.addShake(0.6);
     }
     g.globalCompositeOperation = 'lighter';
     g.globalAlpha = 1 - k;
@@ -1332,7 +1327,7 @@ export class Renderer {
       return;
     }
     const k = Math.min(1, (t - flight) / Math.max(0.05, pr.life - pr.delay - flight));
-    if (t - flight < 0.03) { this.particles.burst(pr.x, pr.y, 12, pr.r * 4, col, 0.45, 3, true, 0, Shape.SPARK); this.particles.burst(pr.x, pr.y, 5, pr.r * 1.5, '#d8d0c8', 0.5, 4, false, -15, Shape.PUFF); this.addShake(1); }
+    if (t - flight < 0.03) { this.particles.burst(pr.x, pr.y, 12, pr.r * 4, col, 0.45, 3, true, 0, Shape.SPARK); this.particles.burst(pr.x, pr.y, 5, pr.r * 1.5, '#d8d0c8', 0.5, 4, false, -15, Shape.PUFF); }
     g.globalCompositeOperation = 'lighter';
     g.globalAlpha = (1 - k) * 0.9;
     g.drawImage(assets.glow.get(pr.type)!, pr.x - pr.r * 1.4, pr.y - pr.r * 1.4, pr.r * 2.8, pr.r * 2.8);
