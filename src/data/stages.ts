@@ -95,6 +95,37 @@ export function waveAt(stage: StageDef, t: number): { idx: number; wave: WaveDef
   return { idx, wave: stage.waves[idx] };
 }
 
+/** The species a minute's banner and stage-select icon show: its headline, else the first newcomer vs the minute before. */
+export function waveHeadline(stage: StageDef, minute: number): string {
+  const w = stage.waves[minute];
+  const prev = stage.waves[Math.max(0, minute - 1)];
+  return w.headline ?? (w.species.find((e) => !prev.species.some((p) => p.species === e.species)) ?? w.species[0]).species;
+}
+
+export interface WaveTimelineCell {
+  minute: number;
+  /** The minute's newcomer, for the icon. */
+  species: string;
+  /** What the minute's set piece is built from (the swarm species, the ring's dominant species, else the newcomer). */
+  focus: string;
+  kind: 'plain' | 'swarm' | 'ring';
+  /** The minute brings a wave boss. */
+  elite: boolean;
+}
+
+/** Minutes 1..15 of a stage at a glance, for the route card. */
+export function waveTimeline(stage: StageDef): WaveTimelineCell[] {
+  const cells: WaveTimelineCell[] = [];
+  for (let minute = 1; minute < stage.waves.length; minute++) {
+    const w = stage.waves[minute];
+    const species = waveHeadline(stage, minute);
+    const kind = w.events?.some((e) => e.kind === 'swarm') ? 'swarm' : w.events?.length ? 'ring' : 'plain';
+    const focus = kind === 'swarm' ? stage.swarm : kind === 'ring' ? w.species.reduce((a, e) => (e.w > a.w ? e : a)).species : species;
+    cells.push({ minute, species, focus, kind, elite: !!w.elite });
+  }
+  return cells;
+}
+
 /** Minutes that end with a wave boss (about one chest per minute); a second comes from minute 10. */
 const ELITE_MINUTES = new Set([1, 2, 3, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15]);
 

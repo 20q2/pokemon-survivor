@@ -3,7 +3,7 @@ import { audio } from '../audio/audio.ts';
 import { ABILITIES, LINE, LINES, SPECIES, SPECIES_LIST, finalForms, type Line } from '../data/pokedex.ts';
 import { MOVES, MOVE_LIST } from '../data/moves.ts';
 import { ITEMS, ITEM_LIST } from '../data/items.ts';
-import { STAGES } from '../data/stages.ts';
+import { STAGES, waveTimeline, type StageDef } from '../data/stages.ts';
 import { TYPE_COLORS, TYPES, effectiveness, type PType } from '../data/types.ts';
 import { ACHIEVEMENTS, rewardText, stageUnlocked } from '../meta/achievements.ts';
 import { checkAchievements, type RunRewards } from '../meta/progression.ts';
@@ -211,6 +211,15 @@ function matchupHint(lineId: string, routeTypes: PType[]) {
   return h('div', { class: `matchup ${score > 0.25 ? 'good' : score < -0.25 ? 'bad' : ''}` }, text);
 }
 
+/** One row of minute 1-15 newcomers; swarm and ring minutes are ringed, boss minutes carry a dot. */
+function waveStrip(stage: StageDef) {
+  return h('div', { class: 'wave-strip' }, waveTimeline(stage).map((c) => {
+    const name = SPECIES[c.focus].name;
+    const what = c.kind === 'swarm' ? `${name} swarm` : c.kind === 'ring' ? `${name} ring` : name;
+    return h('span', { class: `wc ${c.kind}${c.elite ? ' elite' : ''}`, title: `Minute ${c.minute}: ${what}${c.elite ? ' + boss' : ''}` }, img(assets.portraitUrl(c.species)));
+  }));
+}
+
 function stageSwatch(stage: (typeof STAGES)[number]) {
   const thumb = stageThumbnail(stage);
   const c = h('canvas', { class: 'thumb', width: thumb.width, height: thumb.height }) as HTMLCanvasElement;
@@ -235,6 +244,7 @@ export function stageScreen(app: App, lineId: string, onStart: (stageId: string)
         h('div', { class: 'hint' }, open ? st.subtitle : 'Clear the previous stage to unlock.'),
         h('div', { class: 'row mt', style: 'flex-wrap:wrap;gap:4px' }, st.types.map(typeBadge)),
         open ? matchupHint(lineId, st.types) : null,
+        open ? waveStrip(st) : null,
         h('div', { class: 'row mt' }, h('span', { class: 'stars' }, '★'.repeat(stars) + '☆'.repeat(Math.max(0, 5 - stars))), h('span', { class: 'spacer' }),
           h('span', { class: 'hint' }, clears ? `✔ Cleared ×${clears}` : best ? `Best ${fmtTime(best)}` : '')),
       ));

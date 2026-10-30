@@ -1,6 +1,6 @@
 import { SPECIES } from '../data/pokedex.ts';
 import { ELITE_CHEST_ODDS, ELITE_CHEST_SCRIPT } from '../data/items.ts';
-import { ENEMY_ROLE, RUN_LENGTH, type BossDef, type EnemyRole, type SpawnEntry, type WaveDef, type WaveEvent, eventTimes, waveAt } from '../data/stages.ts';
+import { ENEMY_ROLE, RUN_LENGTH, type BossDef, type EnemyRole, type SpawnEntry, type WaveDef, type WaveEvent, eventTimes, waveAt, waveHeadline } from '../data/stages.ts';
 import { TAU, dist2 } from '../engine/math.ts';
 import { freshStatus, makeProjectile, rawDamageEnemy } from './combat.ts';
 import { megaOnKill } from './mega.ts';
@@ -141,12 +141,11 @@ export class Spawner {
     const { idx, wave: w } = waveAt(sim.stage, t);
     const n = sim.players.length;
     if (idx !== this.waveIdx) {
-      const prev = sim.stage.waves[Math.max(0, idx - 1)];
       this.waveIdx = idx;
       this.nextQuota = t; // the new minute's quota lands with its banner
       this.pendingEvents = eventTimes(idx, w.events);
       if (idx > 0) {
-        const species = w.headline ?? (w.species.find((e) => !prev.species.some((p) => p.species === e.species)) ?? w.species[0]).species;
+        const species = waveHeadline(sim.stage, idx);
         sim.emit({ e: 'wave', minute: idx, species, text: w.text ?? `${SPECIES[species].name} appear!` });
       }
       if (w.elite) {
