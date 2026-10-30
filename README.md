@@ -52,6 +52,8 @@ species/items to the data files): `npm run fetch-assets`.
   you Mega Evolve for 20 seconds: real Mega sprites where PMD Sprite Collab has them
   (Charizard X, Gengar, Alakazam, Tyranitar, Gardevoir, Sceptile), a Mega aura otherwise.
 
+In Elite Mode every non-final boss is followed by a Poké Mart stop: the run pauses on four priced cards (a berry, an upgrade, something new, or "Leave the mart") paid for from the team's ₽; each stop costs 1.5x the last.
+
 ## Meta progression
 
 - **Poké Dollars** from coins + an end-of-run bonus → **Poké Mart** permanent

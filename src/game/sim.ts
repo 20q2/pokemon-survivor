@@ -8,7 +8,7 @@ import { Rng, dist2 } from '../engine/math.ts';
 import { SpatialGrid } from '../engine/spatial.ts';
 import type { MetaBonuses } from '../meta/shop.ts';
 import { derivePlayerStats } from './stats.ts';
-import { applyOffer, generateOffers, masteryCandidates, randomFiller, evolutionMove, learnOffers, ownedUpgrades } from './levelup.ts';
+import { applyOffer, generateOffers, martOffers, masteryCandidates, randomFiller, evolutionMove, learnOffers, ownedUpgrades } from './levelup.ts';
 import { fireMoves, updateProjectiles, damagePlayer, updatePlayerMoves } from './combat.ts';
 import { activateMega, updateMega } from './mega.ts';
 import { Spawner } from './spawner.ts';
@@ -165,6 +165,10 @@ export class Sim {
   xp = 0;
   xpNext = xpForLevel(1);
   money = 0;
+  /** Mart stops made this run (Elite Mode); raises prices. */
+  martVisits = 0;
+  /** A non-final boss just fell in Elite Mode: open the mart once its cinematics are out. */
+  private martDue = false;
   kills = 0;
   /** Weather (one at a time, shared by the team): kind, seconds left, who cast it and how hard it hits. */
   weather: WeatherKind | null = null;
@@ -555,11 +559,13 @@ export class Sim {
     if (c.kind === 'evolve') this.applyEvolution(this.players[c.player], c.to!);
     if (c.kind === 'mega') activateMega(this, this.players[c.player]);
     this.cine = null;
+    if (c.kind === 'bossDown' && this.elite && !this.finalDefeated) this.martDue = true;
     if (this.cineQueue.length) return this.startNextCine();
     if (this.finalDefeated) {
       this.phase = 'victory';
       return;
     }
+    if (this.martDue && this.beginMart()) return;
     if (this.players.some(needsChoice)) this.beginLevelUp();
     else this.phase = 'play';
   }
@@ -577,6 +583,41 @@ export class Sim {
     if (this.offers.size === 0) this.phase = 'play';
   }
 
+  /** Elite Mode's stop after a boss: the level-up phase with priced cards. Returns false if nobody is around to shop. */
+  private beginMart(): boolean {
+    this.martDue = false;
+    const shoppers = this.players.filter((p) => !p.fainted && p.connected);
+    if (!shoppers.length) return false;
+    for (const p of shoppers) this.offers.set(p.id, martOffers(p, this.rng, this.martVisits, this.tms.get(p.id) ?? [], this.stage.types));
+    this.martVisits++;
+    this.phase = 'levelup';
+    return true;
+  }
+
+  /** True while the offers on screen are a Poké Mart stop (every card carries a price). */
+  inMart() {
+    return this.phase === 'levelup' && [...this.offers.values()].some((o) => o[0]?.cost !== undefined);
+  }
+
+  /** The card a timed-out or auto-picking player gets: the first card, or "Leave the mart" at the stop. */
+  fallbackIndex(playerId: number) {
+    const offers = this.offers.get(playerId);
+    return offers && offers[0]?.cost !== undefined ? offers.length - 1 : 0;
+  }
+
+  private buy(p: Player, o: UpgradeOffer) {
+    const cost = o.cost ?? 0;
+    if (cost > this.money) return; // unaffordable: no-op, the player must pick something else
+    this.money -= cost;
+    if (o.kind !== 'keep') applyOffer(p, o);
+    if (o.kind === 'newMove') this.emit({ e: 'learn', player: p.id, move: o.id });
+    this.offers.delete(p.id);
+    this.refreshStats();
+    if (this.offers.size) return;
+    if (this.players.some(needsChoice)) this.beginLevelUp();
+    else this.phase = 'play';
+  }
+
   private makeOffers(p: Player) {
     if (p.pendingLearn) return learnOffers(p, p.pendingLearn);
     return generateOffers(p, this.rng, 3, this.tms.get(p.id) ?? [], this.stage.types);
@@ -587,6 +628,7 @@ export class Sim {
     const p = this.players[playerId];
     if (!offers || !p || !offers[index]) return;
     const o = offers[index];
+    if (o.cost !== undefined) return this.buy(p, o);
     applyOffer(p, o);
     if (o.kind === 'forget') this.emit({ e: 'learn', player: p.id, move: o.id });
     if (o.kind === 'forget' || o.kind === 'keep') return this.afterChoice(p, false);
@@ -596,7 +638,7 @@ export class Sim {
 
   skip(playerId: number) {
     const p = this.players[playerId];
-    if (!p || p.skips <= 0 || !this.offers.has(playerId) || p.pendingLearn) return;
+    if (!p || p.skips <= 0 || !this.offers.has(playerId) || p.pendingLearn || this.inMart()) return;
     p.skips--;
     heal(p, p.stats.maxHp * 0.1, 'skip');
     this.afterChoice(p);
@@ -604,7 +646,7 @@ export class Sim {
 
   reroll(playerId: number) {
     const p = this.players[playerId];
-    if (!p || p.rerolls <= 0 || !this.offers.has(playerId) || p.pendingLearn) return;
+    if (!p || p.rerolls <= 0 || !this.offers.has(playerId) || p.pendingLearn || this.inMart()) return;
     p.rerolls--;
     this.offers.set(playerId, this.makeOffers(p));
   }
@@ -612,7 +654,7 @@ export class Sim {
   banish(playerId: number, index: number) {
     const p = this.players[playerId];
     const offers = this.offers.get(playerId);
-    if (!p || !offers || p.banishes <= 0 || !offers[index]) return;
+    if (!p || !offers || p.banishes <= 0 || !offers[index] || this.inMart()) return;
     const o = offers[index];
     if (o.kind === 'heal' || o.kind === 'vitamin') return;
     p.banishes--;

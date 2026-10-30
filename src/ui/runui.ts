@@ -33,7 +33,7 @@ function tmIcon(id: string) {
   return moveDisc(id, 'ic tm');
 }
 
-export function offerCard(o: UpgradeOffer, p: Player, index: number, onPick: () => void) {
+export function offerCard(o: UpgradeOffer, p: Player, index: number, onPick: () => void, money = Infinity) {
   let icon: HTMLElement, name: string, tag: string, desc: string;
   let meta: HTMLElement | null = null;
   let note = '';
@@ -80,6 +80,7 @@ export function offerCard(o: UpgradeOffer, p: Player, index: number, onPick: () 
     }
     case 'keep':
       icon = h('div', { class: 'ic item' }, img(assets.itemUrl('escape-rope')));
+      if (o.cost !== undefined) { name = 'Leave the mart'; tag = 'CONTINUE'; desc = 'Keep your money and get back to the fight.'; break; }
       name = `Don't learn`;
       tag = 'KEEP MOVES';
       desc = `Give up on ${MOVES[o.id].name} and keep your current four moves.`;
@@ -92,7 +93,8 @@ export function offerCard(o: UpgradeOffer, p: Player, index: number, onPick: () 
       icon = h('div', { class: 'ic item' }, img(assets.itemUrl(o.id)));
       name = VITAMIN[o.id].name; tag = o.level > 1 ? `×${o.level}` : 'VITAMIN'; desc = vitaminDesc(o.id, o.level);
   }
-  return h('button', { class: 'panel card', 'data-nav': true, onclick: () => { audio.sfx('select'); onPick(); } },
+  const unaffordable = o.cost !== undefined && o.cost > money;
+  const card = h('button', { class: `panel card${unaffordable ? ' unaffordable' : ''}`, 'data-nav': true, onclick: () => { if (unaffordable) return; audio.sfx('select'); onPick(); } },
     h('span', { class: 'key' }, String(index + 1)),
     icon,
     h('div', { class: `tag${o.kind.startsWith('new') ? ' new' : ''}` }, tag),
@@ -100,8 +102,15 @@ export function offerCard(o: UpgradeOffer, p: Player, index: number, onPick: () 
     meta,
     h('div', { class: 'ds' }, desc),
     note ? h('div', { class: 'stab' }, note) : null,
+    o.cost !== undefined ? h('div', { class: 'price' }, o.cost ? `₽${o.cost}` : 'Free') : null,
   );
+  // A disabled button also stops Enter / Space from picking it.
+  if (unaffordable) (card as HTMLButtonElement).disabled = true;
+  return card;
 }
+
+/** Cards change with the offers, and at a mart stop with the money in hand. */
+const sigOf = (offers: UpgradeOffer[], money: number) => JSON.stringify(offers) + (offers[0]?.cost !== undefined ? `|${Math.floor(money)}` : '');
 
 /** Level-up overlay; rebuilt whenever the offers change. */
 export class LevelUpUI {
@@ -122,12 +131,17 @@ export class LevelUpUI {
   private onKey(e: KeyboardEvent) {
     if (!this.el || !this.session || !this.shownFor) return;
     const n = Number(e.key);
-    if (n >= 1 && n <= this.shownFor.length) this.pick(n - 1);
+    if (n >= 1 && n <= this.shownFor.length && this.affordable(n - 1)) this.pick(n - 1);
     if (e.code === 'KeyR') this.session.reroll();
   }
 
+  private affordable(i: number) {
+    const cost = this.shownFor?.[i]?.cost;
+    return cost === undefined || !this.session || cost <= this.session.world.money;
+  }
+
   private pick(i: number) {
-    if (!this.session) return;
+    if (!this.session || !this.affordable(i)) return;
     if (this.banishMode) { this.session.banish(i); this.banishMode = false; }
     else this.session.choose(i);
   }
@@ -138,7 +152,7 @@ export class LevelUpUI {
     const offers = session.offers();
     if (phase !== 'levelup') return this.close();
     // Offers arrive as fresh arrays every network tick: compare by content.
-    if (offers && this.el && this.shownSig === JSON.stringify(offers) && this.shownFor) return;
+    if (offers && this.el && this.shownSig === sigOf(offers, session.world.money) && this.shownFor) return;
     if (!offers) {
       // waiting for teammates
       const waiting = session.waitingOn();
@@ -152,13 +166,14 @@ export class LevelUpUI {
     }
     this.close();
     this.shownFor = offers;
-    this.shownSig = JSON.stringify(offers);
+    this.shownSig = sigOf(offers, session.world.money);
     const me = session.world.players[session.localId];
-    const learning = offers[0]?.kind === 'forget' || offers[0]?.kind === 'keep';
+    const mart = offers[0]?.cost !== undefined;
+    const learning = !mart && (offers[0]?.kind === 'forget' || offers[0]?.kind === 'keep');
     audio.sfx(learning ? 'evolved' : 'levelup');
-    const cards = h('div', { class: `cards${learning ? ' learn' : ''}` }, offers.map((o, i) => offerCard(o, me, i, () => this.pick(i))));
+    const cards = h('div', { class: `cards${learning ? ' learn' : ''}` }, offers.map((o, i) => offerCard(o, me, i, () => this.pick(i), session.world.money)));
     if (this.banishMode) cards.querySelectorAll('.card').forEach((c) => c.classList.add('banish-mode'));
-    const actions = learning ? null : h('div', { class: 'lu-actions' },
+    const actions = learning || mart ? null : h('div', { class: 'lu-actions' },
       me.rerolls > 0 ? btn(`Reroll (${me.rerolls})`, () => session.reroll(), 'small') : null,
       me.skips > 0 ? btn(`Skip (${me.skips})`, () => session.skip(), 'small') : null,
       me.banishes > 0 ? btn(this.banishMode ? 'Cancel banish' : `Banish (${me.banishes})`, () => {
@@ -177,7 +192,9 @@ export class LevelUpUI {
             h('div', { class: 'meta' }, typeBadge(nd.type), catBadge(nd.cat), h('span', { class: 'hint' }, BEHAVIOR_TEXT[nd.behavior])),
             h('div', { class: 'ds' }, nd.desc))),
         h('div', { class: 'hint' }, `But ${SPECIES[me.speciesId].name} can't learn more than four moves. Forget one?`));
-    } else heading = h('h2', null, this.banishMode ? 'Banish which?' : `Level ${session.world.level}!`);
+    } else heading = mart
+      ? h('div', { class: 'learn-head' }, h('h2', null, 'Poké Mart stop'), h('div', { class: 'hint' }, `You have ₽${Math.floor(session.world.money)} to spend. Pick one.`))
+      : h('h2', null, this.banishMode ? 'Banish which?' : `Level ${session.world.level}!`);
     // Your current build and stats stay live in the HUD above this overlay (see Hud 'lifted').
     this.el = h('div', { class: 'levelup' }, heading, cards, actions);
     this.root.appendChild(this.el);

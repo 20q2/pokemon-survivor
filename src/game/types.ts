@@ -338,5 +338,7 @@ export interface UpgradeOffer {
   kind: 'newMove' | 'moveUp' | 'newItem' | 'itemUp' | 'heal' | 'vitamin' | 'forget' | 'keep';
   id: string;
   level: number; // resulting level
+  /** Poké Mart stop price in ₽ (shared team money); absent for ordinary level-up cards. */
+  cost?: number;
 }
 

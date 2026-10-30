@@ -134,13 +134,15 @@ export function botChoose(sim: Sim, p: Player): number {
   if (!offers) return 0;
   if (offers[0].kind === 'forget' || offers[0].kind === 'keep') return learnChoice(p, offers);
   const score = (k: string) => ({ newMove: 4, moveUp: 3, newItem: 2.5, itemUp: 2, heal: 1, vitamin: 1.5 } as Record<string, number>)[k] ?? 0;
+  // At a Poké Mart stop only affordable cards count; "Leave the mart" (free, last) is the floor.
+  const value = (o: UpgradeOffer) => ((o.cost ?? 0) > sim.money ? -1 : score(o.kind));
   let bi = 0;
-  offers.forEach((o, i) => { if (score(o.kind) > score(offers[bi].kind)) bi = i; });
-  return bi;
+  offers.forEach((o, i) => { if (value(o) > value(offers[bi])) bi = i; });
+  return value(offers[bi]) < 0 ? offers.length - 1 : bi;
 }
 
 /** Upgrade choice for the "auto-pick" option: works from any session's offers. */
-export function autoChoice(s: { offers(): UpgradeOffer[] | null; world: { players: Player[] }; localId: number }): number {
+export function autoChoice(s: { offers(): UpgradeOffer[] | null; world: { players: Player[]; money: number }; localId: number }): number {
   const offers = s.offers() ?? [];
   const me = s.world.players[s.localId];
   if (offers[0]?.kind === 'forget' || offers[0]?.kind === 'keep') return learnChoice(me, offers);
@@ -149,6 +151,7 @@ export function autoChoice(s: { offers(): UpgradeOffer[] | null; world: { player
     if (o.kind === 'heal') v = me.hp < me.stats.maxHp * 0.35 ? 60 : 5;
     if (o.kind === 'newMove' && me.types.includes(MOVES[o.id].type)) v += 8;
     if ((o.kind === 'newItem' || o.kind === 'itemUp') && me.moves.some((m) => MASTERY_OF[m.id]?.mastery?.item === o.id)) v += 25;
+    if ((o.cost ?? 0) > s.world.money) v = -1000;
     return v + botRng.next() * 6;
   };
   let bi = 0;

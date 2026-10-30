@@ -228,6 +228,31 @@ export function masteryCandidates(p: Player): { from: string; to: string }[] {
   return out;
 }
 
+/** Mart price: base ₽ x1.5 per earlier visit, in tens. */
+export const martPrice = (base: number, visit: number) => Math.round((base * 1.5 ** visit) / 10) * 10;
+
+/**
+ * The Poké Mart stop after a boss in Elite Mode: a berry, one upgrade for something you own, one new move or
+ * item, and a free way out. `visit` counts earlier stops this run.
+ */
+export function martOffers(p: Player, rng: Rng, visit: number, tms: readonly string[] = [], routeTypes: readonly PType[] = []): UpgradeOffer[] {
+  const chosen: UpgradeOffer[] = [];
+  const has = (o: UpgradeOffer) => chosen.some((c) => c.kind === o.kind && c.id === o.id);
+  const take = (o: UpgradeOffer | undefined, base: number): UpgradeOffer => {
+    // Nothing left of that kind: a limit break or vitamin always exists.
+    const card = { ...(o ?? pickFillers(p, rng, 1, chosen)[0]), cost: martPrice(base, visit) };
+    chosen.push(card);
+    return card;
+  };
+  const heal: UpgradeOffer = take({ kind: 'heal', id: 'oran-berry', level: 0 }, 40);
+  const owned = ownedUpgrades(p);
+  const upgrade = take(owned.length ? rng.pick(owned) : limitBreaks(p).length ? rng.pick(limitBreaks(p)) : undefined, 80);
+  const fresh = generateOffers(p, rng, 6, tms, routeTypes).filter((o) => (o.kind === 'newMove' || o.kind === 'newItem') && !has(o));
+  const rest = owned.filter((o) => !has(o));
+  const novelty = take(fresh.length ? rng.pick(fresh) : rest.length ? rng.pick(rest) : undefined, 120);
+  return [heal, upgrade, novelty, { kind: 'keep', id: 'leave-mart', level: 0, cost: 0 }];
+}
+
 export function offerLabel(o: UpgradeOffer): string {
   switch (o.kind) {
     case 'newMove': case 'moveUp': return MOVES[o.id].name;
@@ -235,7 +260,7 @@ export function offerLabel(o: UpgradeOffer): string {
     case 'heal': return 'Oran Berry';
     case 'vitamin': return VITAMIN[o.id].name;
     case 'forget': return `Learn ${MOVES[o.id].name}`;
-    case 'keep': return `Don't learn ${MOVES[o.id].name}`;
+    case 'keep': return o.cost !== undefined ? 'Leave the mart' : `Don't learn ${MOVES[o.id].name}`;
   }
 }
 

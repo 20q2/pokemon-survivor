@@ -216,7 +216,7 @@ export class NetHost {
       if (since === undefined) this.offerSince.set(id, now);
       else if (now - since > LEVELUP_TIMEOUT_MS) {
         this.offerSince.delete(id);
-        sim.choose(id, 0);
+        sim.choose(id, sim.fallbackIndex(id));
       }
     }
   }
