@@ -20,6 +20,7 @@ import { chestShow, preloadChestFaces, type ChestShow } from './ui/chest.ts';
 import { CHEST_BALL, CHEST_NAME } from './game/types.ts';
 import { Hud } from './ui/hud.ts';
 import { LevelUpUI } from './ui/runui.ts';
+import { hideTip } from './ui/tips.ts';
 import * as screens from './ui/menus.ts';
 import type { NetHost, NetClient } from './net/net.ts';
 
@@ -104,6 +105,7 @@ export class App {
 
   /** Replace all menu screens with one element. */
   show(el: HTMLElement | null) {
+    hideTip();
     this.ui.querySelectorAll('.screen').forEach((s) => s.remove());
     if (el) {
       this.ui.appendChild(el);

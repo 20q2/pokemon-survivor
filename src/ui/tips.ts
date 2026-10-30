@@ -81,6 +81,23 @@ export function moveTip(me: Player, id: string): HTMLElement {
   );
 }
 
+/** A move outside a run (menus): its Lv 1 numbers, no player stats. */
+export function moveInfoTip(id: string, gate = ''): HTMLElement {
+  const def = MOVES[id];
+  const st = moveStatsAt(def, 1);
+  const facts: string[] = [];
+  if (st.power) facts.push(`Power ${Math.round(st.power)}`);
+  facts.push(`Every ${st.cd.toFixed(2)}s`);
+  if (st.count > 1) facts.push(`×${Math.round(st.count)}`);
+  return h('div', null,
+    h('b', null, def.name, gate ? h('span', { class: 'lvl' }, ` ${gate}`) : null),
+    h('div', { class: 'meta' }, typeBadge(def.type), catBadge(def.cat), h('span', null, VERB_TEXT[def.verb] ?? BEHAVIOR_TEXT[def.behavior])),
+    h('p', null, def.desc),
+    ...statusLines(def.effect, def.effect2?.kind),
+    h('p', { class: 'facts' }, facts.join(' · ')),
+  );
+}
+
 export function itemTip(me: Player, id: string): HTMLElement {
   const def = ITEMS[id];
   const lvl = me.items.find((x) => x.id === id)?.level ?? 1;

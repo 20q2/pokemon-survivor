@@ -15,7 +15,8 @@ import { stageThumbnail } from '../render/background.ts';
 import { dirRow } from '../engine/math.ts';
 import type { RunSession } from '../game/session.ts';
 import type { Player } from '../game/types.ts';
-import { btn, cap, catBadge, fmtTime, h, img, moveDisc, moveIcon, toast, typeBadge, uiIcon } from './dom.ts';
+import { btn, catBadge, fmtTime, h, img, moveDisc, moveIcon, toast, typeBadge, uiIcon } from './dom.ts';
+import { hideTip, moveInfoTip, tipped } from './tips.ts';
 import { lobbyMenu } from './lobby.ts';
 
 const nn = (...a: (Node | string | null)[]) => a.filter((x): x is Node | string => x !== null);
@@ -109,11 +110,11 @@ function movePool(app: App, line: Line) {
     h('div', { class: 'pool-grid' }, entries.map((e) => {
       const known = seen.has(e.move);
       const def = MOVES[e.move];
-      return h('div', {
+      return tipped(h('div', {
         class: `pool-move${known ? '' : ' unknown'}`,
         style: known ? `--tc:${TYPE_COLORS[def.type]}` : '',
-        title: known ? `${def.name} (${cap(def.type)}, ${def.cat}): ${def.desc}` : 'Not discovered yet: learn or be offered it in a run.',
-      }, known ? img(uiIcon(`logo/${def.type}`), 'pl') : null, h('span', { class: 'mn' }, known ? def.name : '???'), e.gate ? h('span', { class: 'gate' }, e.gate) : null);
+      }, known ? img(uiIcon(`logo/${def.type}`), 'pl') : null, h('span', { class: 'mn' }, known ? def.name : '???'), e.gate ? h('span', { class: 'gate' }, e.gate) : null),
+      () => known ? moveInfoTip(e.move, e.gate) : h('div', null, h('b', null, '???'), h('p', null, 'Not discovered yet: learn or be offered it in a run.')));
     })),
   );
 }
@@ -132,6 +133,7 @@ export function selectScreen(app: App, onConfirm: (lineId: string) => void, titl
     const fr = app.save.friendship[sel] ?? 0;
     const hearts = Math.floor((fr / FRIENDSHIP_MAX) * 5);
     const evo = line.branch ? Object.values(line.branch) : line.stages.slice(1);
+    hideTip(detail);
     detail.innerHTML = '';
     detail.append(...nn(
       h('h3', null, sp.name, ' ', ...sp.types.map(typeBadge)),
@@ -372,7 +374,7 @@ export function dexScreen(app: App, tab: 'mons' | 'moves' | 'items' = 'mons') {
     for (const sp of [...SPECIES_LIST].sort((a, b) => a.dex - b.dex)) {
       const isSeen = !!app.save.seen[sp.id] || app.save.lines.some((l) => LINE[l].stages.includes(sp.id));
       const def = app.save.defeated[sp.id] ?? 0;
-      body.append(h('div', { class: `panel dex${isSeen ? '' : ' unseen'}`, title: isSeen ? sp.name : '???' },
+      body.append(h('div', { class: `panel dex${isSeen ? '' : ' unseen'}` },
         img(isSeen ? assets.portraitUrl(sp.id) : assets.itemUrl('poke-ball')),
         h('div', null, `#${String(sp.dex).padStart(3, '0')}`),
         h('div', null, isSeen ? sp.name : '???'),
