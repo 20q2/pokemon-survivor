@@ -1,6 +1,6 @@
 import type { App } from '../app.ts';
 import { audio } from '../audio/audio.ts';
-import { ABILITIES, LINE, LINES, SPECIES, SPECIES_LIST, type Line } from '../data/pokedex.ts';
+import { ABILITIES, LINE, LINES, SPECIES, SPECIES_LIST, finalForms, type Line } from '../data/pokedex.ts';
 import { MOVES, MOVE_LIST } from '../data/moves.ts';
 import { ITEMS, ITEM_LIST } from '../data/items.ts';
 import { STAGES } from '../data/stages.ts';
@@ -99,9 +99,9 @@ function movePool(app: App, line: Line) {
   const seen = new Set([line.starter, ...(app.save.movesSeen[line.id] ?? [])]);
   const entries: { move: string; gate: string }[] = line.learnset.map((e) => ({
     move: e.move,
-    gate: e.stage === 0 ? '' : line.branch ? 'Evolved' : `Lv${line.evoLevels[e.stage - 1]}+`,
+    gate: e.stage === 0 ? '' : `Lv${line.evoLevels[e.stage - 1]}+`,
   }));
-  for (const [species, moves] of Object.entries(line.branchMoves ?? {})) {
+  for (const [species, moves] of Object.entries(line.formMoves ?? {})) {
     for (const m of moves) if (!entries.some((e) => e.move === m)) entries.push({ move: m, gate: SPECIES[species].name });
   }
   const found = entries.filter((e) => seen.has(e.move)).length;
@@ -119,6 +119,25 @@ function movePool(app: App, line: Line) {
   );
 }
 
+/** Base → middle stages → every possible final form; alternate forms say where they evolve. */
+function evoRow(line: Line, shiny: boolean) {
+  const portrait = (id: string) => img(assets.portraitUrl(id, shiny));
+  const arrow = (i: number) => h('span', { class: 'arrow' }, `Lv${line.evoLevels[i]} →`);
+  const finals = finalForms(line);
+  const where = (id: string) => STAGES.filter((st) => line.envForms?.[st.id]?.includes(id)).map((st) =>
+    line.envForms![st.id].length > 1 ? `${st.name} (if your moves lean ${SPECIES[id].types[0]})` : st.name);
+  const final = (id: string) => {
+    if (finals.length === 1) return portrait(id);
+    const at = where(id);
+    return tipped(portrait(id), () => h('div', null, h('b', null, SPECIES[id].name),
+      h('p', null, at.length ? `Evolves in ${at.join(' or ')}.` : 'Evolves anywhere else.')));
+  };
+  const mids = line.stages.slice(1, line.evoLevels.length);
+  return h('div', { class: 'evo' }, portrait(line.stages[0]),
+    ...mids.flatMap((id, i) => [arrow(i), portrait(id)]),
+    arrow(mids.length), ...finals.map(final));
+}
+
 export function selectScreen(app: App, onConfirm: (lineId: string) => void, title = 'Choose your partner', onBack = () => app.goTitle()) {
   let sel = app.lineUnlocked(app.save.lastLine) ? app.save.lastLine : 'charmander';
   const detail = h('div', { class: 'panel detail col' });
@@ -132,7 +151,6 @@ export function selectScreen(app: App, onConfirm: (lineId: string) => void, titl
     const unlocked = app.lineUnlocked(sel);
     const fr = app.save.friendship[sel] ?? 0;
     const hearts = Math.floor((fr / FRIENDSHIP_MAX) * 5);
-    const evo = line.branch ? Object.values(line.branch) : line.stages.slice(1);
     hideTip(detail);
     detail.innerHTML = '';
     detail.append(...nn(
@@ -144,9 +162,7 @@ export function selectScreen(app: App, onConfirm: (lineId: string) => void, titl
       h('div', null, h('b', null, 'Starts with: '), MOVES[line.starter].name, ' ', typeBadge(MOVES[line.starter].type)),
       movePool(app, line),
       statBars(sp.id),
-      h('div', { class: 'evo' }, img(assets.portraitUrl(sp.id, shinyOn(sel))),
-        ...(line.branch ? [h('span', { class: 'arrow' }, `Lv${line.evoLevels[0]} →`), ...evo.map((e) => img(assets.portraitUrl(e, shinyOn(sel))))]
-          : line.stages.slice(1).flatMap((e, i) => [h('span', { class: 'arrow' }, `Lv${line.evoLevels[i]} →`), img(assets.portraitUrl(e, shinyOn(sel)))]))),
+      evoRow(line, shinyOn(sel)),
       h('div', null, h('b', null, 'Friendship '), h('span', { class: 'hearts' }, '♥'.repeat(hearts) + '♡'.repeat(5 - hearts)), h('span', { class: 'hint' }, ` ${fr}/${FRIENDSHIP_MAX}`)),
       h('div', { class: 'hint' }, FRIENDSHIP_PERKS.map((p) => (fr >= p.at ? '✔ ' : '• ') + p.text).join(' · ')),
       app.save.shinyUnlocked.includes(sel)
@@ -386,7 +402,7 @@ export function dexScreen(app: App, tab: 'mons' | 'moves' | 'items' = 'mons') {
     body = h('div', { class: 'ach-list' });
     const order = [...MOVE_LIST].sort((a, b) => TYPES.indexOf(a.type) - TYPES.indexOf(b.type) || Number(!!a.mastery) - Number(!!b.mastery));
     for (const m of order) {
-      const learners = LINES.filter((l) => l.starter === m.id || l.learnset.some((e) => e.move === m.id) || Object.values(l.branchMoves ?? {}).some((ms) => ms.includes(m.id)));
+      const learners = LINES.filter((l) => l.starter === m.id || l.learnset.some((e) => e.move === m.id) || Object.values(l.formMoves ?? {}).some((ms) => ms.includes(m.id)));
       const tm = (TM_LIST as { id: string }[]).some((t) => t.id === m.id);
       body.append(h('div', { class: `panel ach${m.mastery ? ' done' : ''}` },
         moveIcon(m.id, '', 'move-ic dex-ic'),

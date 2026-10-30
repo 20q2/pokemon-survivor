@@ -4,23 +4,29 @@ import { STATUS_INFO } from '../src/data/status.ts';
 import { lookKey } from '../src/ui/movelook.ts';
 import { VERB_TEXT } from '../src/ui/verbs.ts';
 import { ITEMS, TYPE_BOOSTER } from '../src/data/items.ts';
-import { LINES, SPECIES } from '../src/data/pokedex.ts';
+import { LINES, SPECIES, finalForms, lineSpecies } from '../src/data/pokedex.ts';
 import { STAGES, ENEMY_ROLE } from '../src/data/stages.ts';
 import { TYPES, effectiveness, typeMult } from '../src/data/types.ts';
 import manifest from '../public/assets/manifest.json';
 
 describe('data integrity', () => {
-  it('every learnset / starter / branch move exists and is not a mastery move', () => {
+  it('every learnset / starter / form move exists and is not a mastery move', () => {
     for (const l of LINES) {
       expect(MOVES[l.starter], l.starter).toBeTruthy();
       for (const e of l.learnset) {
         expect(MOVES[e.move], `${l.id}:${e.move}`).toBeTruthy();
         expect(MOVES[e.move].mastery, `${l.id}:${e.move} is mastery`).toBeFalsy();
-        expect(e.stage).toBeLessThan(l.stages.length + (l.branch ? 1 : 0));
+        expect(e.stage).toBeLessThan(l.evoLevels.length + 1);
       }
-      for (const ms of Object.values(l.branchMoves ?? {})) for (const m of ms) expect(MOVES[m], m).toBeTruthy();
-      for (const s of [...l.stages, ...Object.values(l.branch ?? {})]) expect(SPECIES[s], s).toBeTruthy();
-      expect(l.evoLevels.length).toBe(l.branch ? 1 : l.stages.length - 1);
+      for (const [s, ms] of Object.entries(l.formMoves ?? {})) {
+        expect(finalForms(l), `${l.id}: formMoves for ${s}`).toContain(s);
+        for (const m of ms) expect(MOVES[m], m).toBeTruthy();
+      }
+      for (const s of lineSpecies(l)) expect(SPECIES[s], s).toBeTruthy();
+      // Eevee has no normal final stage, so every stage must name its form.
+      expect(l.evoLevels.length).toBe(l.stages.length - (l.stages.length > l.evoLevels.length ? 1 : 0));
+      if (l.stages.length === l.evoLevels.length) for (const st of STAGES) expect(l.envForms?.[st.id]?.length, `${l.id} on ${st.id}`).toBeTruthy();
+      for (const st of Object.keys(l.envForms ?? {})) expect(STAGES.some((x) => x.id === st), `${l.id}: unknown stage ${st}`).toBe(true);
     }
   });
 
@@ -36,7 +42,7 @@ describe('data integrity', () => {
 
   it('every line can reach at least one mastery', () => {
     for (const l of LINES) {
-      const pool = new Set([l.starter, ...l.learnset.map((e) => e.move), ...Object.values(l.branchMoves ?? {}).flat()]);
+      const pool = new Set([l.starter, ...l.learnset.map((e) => e.move), ...Object.values(l.formMoves ?? {}).flat()]);
       expect([...pool].some((m) => MASTERY_OF[m]), l.id).toBe(true);
     }
   });

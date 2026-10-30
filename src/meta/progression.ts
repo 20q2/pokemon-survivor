@@ -58,7 +58,7 @@ export function applyRun(save: SaveData, r: RunSummary, seen: Iterable<string>, 
     newBest = true;
   }
   const line = LINE[r.lineId];
-  if (line?.branch && r.finalSpecies !== line.stages[0]) {
+  if (r.lineId === 'eevee' && r.finalSpecies !== line.stages[0]) {
     const ev = new Set(save.flags.eeveelutions ?? []);
     ev.add(r.finalSpecies);
     save.flags.eeveelutions = [...ev];

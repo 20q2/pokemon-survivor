@@ -5,7 +5,7 @@
 import { mkdir, writeFile, readFile, access } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SPECIES_LIST, LINES, MEGA } from '../src/data/pokedex.ts';
+import { SPECIES_LIST, LINES, MEGA, lineSpecies } from '../src/data/pokedex.ts';
 import { ITEM_LIST } from '../src/data/items.ts';
 import { TYPES } from '../src/data/types.ts';
 
@@ -20,7 +20,7 @@ const PS_MISC = 'https://raw.githubusercontent.com/msikma/pokesprite/master/misc
 const TYPE_ID = { normal: 1, fighting: 2, flying: 3, poison: 4, ground: 5, rock: 6, bug: 7, ghost: 8, steel: 9, fire: 10, water: 11, grass: 12, electric: 13, psychic: 14, ice: 15, dragon: 16, dark: 17, fairy: 18 };
 const FORCE = process.argv.includes('--force');
 
-const PLAYER_SPECIES = new Set(LINES.flatMap((l) => [...l.stages, ...Object.values(l.branch ?? {})]));
+const PLAYER_SPECIES = new Set(LINES.flatMap(lineSpecies));
 const PLAYER_ANIMS = ['Walk', 'Idle', 'Hurt'];
 const ENEMY_ANIMS = ['Walk', 'Hurt'];
 const EXTRA_ITEMS = [
@@ -127,16 +127,18 @@ async function main() {
     const isPlayer = PLAYER_SPECIES.has(sp.id);
     const anims = isPlayer ? PLAYER_ANIMS : ENEMY_ANIMS;
     const dir = join(OUT, 'sprites', sp.id);
-    const normal = await fetchSpriteSet(sp.dex, '', join(dir, 'normal'), anims);
-    const shiny = await fetchSpriteSet(sp.dex, '/0000/0001', join(dir, 'shiny'), anims);
-    const portrait = await download(`${SC}/portrait/${pad(sp.dex)}/Normal.png`, join(dir, 'portrait.png'));
+    // Regional forms live in their own form folder; the shiny is that folder's 0001.
+    const form = sp.form ? `/${sp.form}` : '';
+    const normal = await fetchSpriteSet(sp.dex, form, join(dir, 'normal'), anims);
+    const shiny = await fetchSpriteSet(sp.dex, `${form || '/0000'}/0001`, join(dir, 'shiny'), anims);
+    const portrait = await download(`${SC}/portrait/${pad(sp.dex)}${form}/Normal.png`, join(dir, 'portrait.png'));
     const shinyPortrait = isPlayer
-      ? await download(`${SC}/portrait/${pad(sp.dex)}/0000/0001/Normal.png`, join(dir, 'portrait-shiny.png'))
+      ? await download(`${SC}/portrait/${pad(sp.dex)}${form || '/0000'}/0001/Normal.png`, join(dir, 'portrait-shiny.png'))
       : false;
     if (!normal) console.warn(`!! no sprite for ${sp.id} (#${sp.dex})`);
     manifest.species[sp.id] = { normal, shiny, portrait, shinyPortrait };
-    const t = tracker[pad(sp.dex)];
-    const shinyNode = t?.subgroups?.['0000']?.subgroups?.['0001'];
+    const t = sp.form ? tracker[pad(sp.dex)]?.subgroups?.[sp.form] : tracker[pad(sp.dex)];
+    const shinyNode = sp.form ? t?.subgroups?.['0001'] : t?.subgroups?.['0000']?.subgroups?.['0001'];
     credits.push({
       species: sp.name, dex: sp.dex,
       sprite: creditOf(t?.sprite_credit), portrait: creditOf(t?.portrait_credit),

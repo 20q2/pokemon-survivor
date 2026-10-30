@@ -9,9 +9,11 @@ export interface Species {
   name: string;
   types: PType[];
   base: BaseStats;
+  /** PMD SpriteCollab form folder for regional forms (e.g. '0001' = Alolan Raichu). */
+  form?: string;
 }
 
-const S = (id: string, dex: number, name: string, types: PType[], base: BaseStats): Species => ({ id, dex, name, types, base });
+const S = (id: string, dex: number, name: string, types: PType[], base: BaseStats, form?: string): Species => ({ id, dex, name, types, base, form });
 
 export const SPECIES_LIST: Species[] = [
   // ── Playable lines ──
@@ -27,6 +29,7 @@ export const SPECIES_LIST: Species[] = [
   S('pichu', 172, 'Pichu', ['electric'], [20, 40, 15, 35, 35, 60]),
   S('pikachu', 25, 'Pikachu', ['electric'], [35, 55, 40, 50, 50, 90]),
   S('raichu', 26, 'Raichu', ['electric'], [60, 90, 55, 90, 80, 110]),
+  S('raichu-alola', 26, 'Alolan Raichu', ['electric', 'psychic'], [60, 85, 50, 95, 85, 110], '0001'),
   S('gastly', 92, 'Gastly', ['ghost', 'poison'], [30, 35, 30, 100, 35, 80]),
   S('haunter', 93, 'Haunter', ['ghost', 'poison'], [45, 50, 45, 115, 55, 95]),
   S('gengar', 94, 'Gengar', ['ghost', 'poison'], [60, 65, 60, 130, 75, 110]),
@@ -63,6 +66,7 @@ export const SPECIES_LIST: Species[] = [
   S('ralts', 280, 'Ralts', ['psychic', 'fairy'], [28, 25, 25, 45, 35, 40]),
   S('kirlia', 281, 'Kirlia', ['psychic', 'fairy'], [38, 35, 35, 65, 55, 50]),
   S('gardevoir', 282, 'Gardevoir', ['psychic', 'fairy'], [68, 65, 65, 125, 115, 80]),
+  S('gallade', 475, 'Gallade', ['psychic', 'fighting'], [68, 125, 65, 65, 115, 80]),
 
   // ── Wild Pokémon ──
   S('caterpie', 10, 'Caterpie', ['bug'], [45, 30, 35, 20, 20, 45]),
@@ -185,9 +189,14 @@ export interface Line {
   ability: AbilityId;
   starter: string;         // starting move id
   learnset: LearnEntry[];
-  /** Eevee-style branching: dominant move type -> species id */
-  branch?: Partial<Record<PType, string>>;
-  branchMoves?: Record<string, string[]>;
+  /**
+   * Final forms that depend on where the partner evolves: stage id -> species. With several
+   * candidates the dominant move type picks between them. Unlisted stages evolve into the
+   * line's normal last stage (a line with no normal last stage, like Eevee, lists them all).
+   */
+  envForms?: Record<string, string[]>;
+  /** Moves an alternate final form can learn (and picks from when it evolves). */
+  formMoves?: Record<string, string[]>;
   blurb: string;
 }
 
@@ -213,6 +222,8 @@ export const LINES: Line[] = [
     id: 'pichu', name: 'Pichu', stages: ['pichu', 'pikachu', 'raichu'], evoLevels: [8, 22],
     ability: 'static', starter: 'thunder-shock', blurb: 'Fragile at first, evolves early into a lightning storm.',
     learnset: [L('thunder-shock'), L('quick-attack'), L('spark'), L('thunder-wave'), L('electro-ball'), L('swift'), L('fairy-wind'), L('discharge', 1), L('thunderbolt', 1), L('agility', 1), L('electric-terrain', 1), L('rain-dance', 1), L('magnet-bomb', 2)],
+    envForms: { cerulean: ['raichu-alola'] },
+    formMoves: { 'raichu-alola': ['psybeam', 'future-sight', 'calm-mind'] },
   },
   {
     id: 'gastly', name: 'Gastly', stages: ['gastly', 'haunter', 'gengar'], evoLevels: [12, 26],
@@ -237,13 +248,13 @@ export const LINES: Line[] = [
   {
     id: 'eevee', name: 'Eevee', stages: ['eevee'], evoLevels: [14],
     ability: 'adaptability', starter: 'swift',
-    blurb: 'Evolves into the Eeveelution matching your most-used move type.',
+    blurb: 'Evolves into the Eeveelution that suits the place it evolves in.',
     learnset: [L('swift'), L('tackle'), L('quick-attack'), L('bite'), L('water-pulse'), L('ember'), L('thunder-shock'), L('confusion'), L('leech-seed'), L('powder-snow'), L('fairy-wind'), L('hyper-voice'), L('double-team')],
-    branch: {
-      water: 'vaporeon', electric: 'jolteon', fire: 'flareon', psychic: 'espeon', dark: 'umbreon',
-      grass: 'leafeon', ice: 'glaceon', fairy: 'sylveon',
+    envForms: {
+      viridian: ['leafeon'], mtmoon: ['sylveon'], seafoam: ['glaceon', 'vaporeon'], powerplant: ['jolteon'],
+      tower: ['umbreon'], cinnabar: ['flareon'], cerulean: ['espeon'],
     },
-    branchMoves: {
+    formMoves: {
       vaporeon: ['surf', 'aqua-ring', 'whirlpool', 'rain-dance'],
       jolteon: ['thunderbolt', 'discharge', 'electro-ball', 'electric-terrain'],
       flareon: ['flamethrower', 'flame-wheel', 'heat-wave', 'sunny-day'],
@@ -278,6 +289,8 @@ export const LINES: Line[] = [
     id: 'ralts', name: 'Ralts', stages: ['ralts', 'kirlia', 'gardevoir'], evoLevels: [10, 24],
     ability: 'synchronize', starter: 'fairy-wind', blurb: 'Empathic psychic-fairy. Punishes anyone who strikes it.',
     learnset: [L('fairy-wind'), L('confusion'), L('disarming-voice'), L('double-team'), L('draining-kiss'), L('calm-mind'), L('psybeam', 1), L('future-sight', 1), L('dazzling-gleam', 1), L('misty-terrain', 1), L('mirror-coat', 2), L('shadow-ball', 2)],
+    envForms: { cinnabar: ['gallade'] },
+    formMoves: { gallade: ['leaf-blade', 'night-slash', 'sky-uppercut', 'swords-dance'] },
   },
 ];
 
@@ -302,15 +315,38 @@ export const MEGA: Record<string, MegaDef> = {
   swampert: { id: 'swampert-mega', name: 'Mega Swampert', dex: 260, form: '0001', sprite: false },
   tyranitar: { id: 'tyranitar-mega', name: 'Mega Tyranitar', dex: 248, form: '0001', sprite: true },
   gardevoir: { id: 'gardevoir-mega', name: 'Mega Gardevoir', dex: 282, form: '0001', sprite: true },
+  gallade: { id: 'gallade-mega', name: 'Mega Gallade', dex: 475, form: '0001', sprite: true },
 };
+
+/** The line's normal last stage, if it has one past the base (Eevee doesn't). */
+function normalFinal(line: Line): string | undefined {
+  return line.stages[line.evoLevels.length];
+}
+
+/** Every species the line can end up as. */
+export function finalForms(line: Line): string[] {
+  const f = normalFinal(line);
+  return [...new Set([...(f ? [f] : []), ...Object.values(line.envForms ?? {}).flat()])];
+}
+
+/** Every species the line passes through or ends as. */
+export function lineSpecies(line: Line): string[] {
+  return [...new Set([...line.stages, ...finalForms(line)])];
+}
+
+/** Candidates for the line's final evolution on this stage (first one is the default). */
+export function finalFormsOn(line: Line, stageId: string): string[] {
+  const env = line.envForms?.[stageId];
+  if (env) return env;
+  const f = normalFinal(line);
+  return f ? [f] : finalForms(line);
+}
 
 /** True once a partner has reached the end of its line (Mega Evolution becomes possible). */
 export function fullyEvolved(lineId: string, speciesId: string): boolean {
-  const line = LINE[lineId];
-  if (line.branch) return Object.values(line.branch).includes(speciesId);
-  return line.stages[line.stages.length - 1] === speciesId;
+  return finalForms(LINE[lineId]).includes(speciesId);
 }
 
 export function lineOfSpecies(speciesId: string): Line | undefined {
-  return LINES.find((l) => l.stages.includes(speciesId) || (l.branch && Object.values(l.branch).includes(speciesId)));
+  return LINES.find((l) => lineSpecies(l).includes(speciesId));
 }

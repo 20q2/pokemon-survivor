@@ -373,6 +373,19 @@
   ]
  },
  {
+  "species": "Alolan Raichu",
+  "dex": 26,
+  "sprite": [
+   "baronessfaron"
+  ],
+  "portrait": [
+   "Emmuffin"
+  ],
+  "shinySprite": [
+   "ShyStarryRain"
+  ]
+ },
+ {
   "species": "Mega Raichu X",
   "dex": 26,
   "sprite": [],
@@ -2107,6 +2120,33 @@
   "shinySprite": [
    "",
    "baronessfaron"
+  ]
+ },
+ {
+  "species": "Gallade",
+  "dex": 475,
+  "sprite": [
+   "CHUNSOFT"
+  ],
+  "portrait": [
+   "CHUNSOFT",
+   "baronessfaron"
+  ],
+  "shinySprite": [
+   "Anonymous"
+  ]
+ },
+ {
+  "species": "Mega Gallade",
+  "dex": 475,
+  "sprite": [
+   "JFain"
+  ],
+  "portrait": [
+   "Emmuffin"
+  ],
+  "shinySprite": [
+   "Morei"
   ]
  },
  {

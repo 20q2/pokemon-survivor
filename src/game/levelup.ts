@@ -21,8 +21,8 @@ export function learnableMoves(p: Player, tms: readonly string[]): string[] {
   const line = LINE[p.lineId];
   const out = new Set<string>();
   for (const e of line.learnset) if (e.stage <= p.stage) out.add(e.move);
-  const branch = line.branchMoves?.[p.speciesId];
-  if (branch) for (const m of branch) out.add(m);
+  const form = line.formMoves?.[p.speciesId];
+  if (form) for (const m of form) out.add(m);
   for (const tm of tms) out.add(tm);
   return [...out].filter((id) => MOVES[id] && !MOVES[id].mastery);
 }
@@ -140,12 +140,13 @@ export function randomFiller(p: Player, rng: Rng): UpgradeOffer {
 }
 
 /**
- * The move a partner learns on evolving: one its new form unlocks (or, for Eevee, its
- * Eeveelution's signature set), preferring damaging same-type moves it doesn't know yet.
+ * The move a partner learns on evolving: one its new form unlocks (or, for alternate final
+ * forms like the Eeveelutions, that form's signature set), preferring damaging same-type moves
+ * it doesn't know yet.
  */
 export function evolutionMove(p: Player): string | null {
   const line = LINE[p.lineId];
-  const pool = line.branch ? (line.branchMoves?.[p.speciesId] ?? []) : line.learnset.filter((e) => e.stage === p.stage).map((e) => e.move);
+  const pool = line.formMoves?.[p.speciesId] ?? line.learnset.filter((e) => e.stage === p.stage).map((e) => e.move);
   const owned = ownedMoveIds(p);
   const cands = pool.filter((id) => MOVES[id] && !MOVES[id].mastery && !owned.has(id));
   if (!cands.length) return null;

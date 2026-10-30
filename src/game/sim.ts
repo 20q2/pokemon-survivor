@@ -1,4 +1,4 @@
-import { LINE, SPECIES } from '../data/pokedex.ts';
+import { LINE, SPECIES, finalFormsOn } from '../data/pokedex.ts';
 import { MOVES, MAX_MOVE_LEVEL } from '../data/moves.ts';
 import { ITEM_LIST } from '../data/items.ts';
 import { TYPES, type PType } from '../data/types.ts';
@@ -468,26 +468,20 @@ export class Sim {
       const line = LINE[p.lineId];
       const need = line.evoLevels[p.stage];
       if (need === undefined || this.level < need) continue;
-      let to = line.stages[p.stage + 1];
-      if (line.branch) to = this.pickBranch(p);
+      const to = p.stage + 1 === line.evoLevels.length ? this.pickFinalForm(p) : line.stages[p.stage + 1];
       if (!to) continue;
       this.cineQueue.push({ kind: 'evolve', t: 0, dur: 3.2, player: p.id, from: p.speciesId, to });
     }
   }
 
-  /** Eevee: evolve into the Eeveelution of the dominant move type (weighted by move level). */
-  private pickBranch(p: Player): string {
-    const line = LINE[p.lineId];
-    const score = new Map<PType, number>();
-    for (const m of p.moves) {
-      const t = MOVES[m.id].type;
-      if (line.branch![t]) score.set(t, (score.get(t) ?? 0) + m.level);
-    }
-    let best: PType | undefined;
-    let bs = 0;
-    for (const [t, s] of score) if (s > bs) { bs = s; best = t; }
-    const opts = Object.values(line.branch!) as string[];
-    return best ? line.branch![best]! : this.rng.pick(opts);
+  /**
+   * The final form depends on where the partner evolves (Eevee in Viridian Forest becomes
+   * Leafeon…). Where a stage offers several, the dominant move type (by move level) picks.
+   */
+  private pickFinalForm(p: Player): string {
+    const opts = finalFormsOn(LINE[p.lineId], this.stage.id);
+    const score = (id: string) => p.moves.reduce((s, m) => s + (SPECIES[id].types[0] === MOVES[m.id].type ? m.level : 0), 0);
+    return opts.reduce((best, id) => (score(id) > score(best) ? id : best), opts[0]);
   }
 
   private applyEvolution(p: Player, to: string) {

@@ -1,5 +1,5 @@
 import { audio } from './audio/audio.ts';
-import { LINE, LINES, MEGA, SPECIES, STARTER_LINES, fullyEvolved } from './data/pokedex.ts';
+import { LINE, LINES, MEGA, SPECIES, STARTER_LINES, fullyEvolved, lineSpecies } from './data/pokedex.ts';
 import { STAGE } from './data/stages.ts';
 import { TYPES } from './data/types.ts';
 import { MOVES } from './data/moves.ts';
@@ -171,12 +171,12 @@ export class App {
     const ids = new Set<string>();
     for (const p of w.players) {
       const line = LINE[p.lineId];
-      for (const s of [...line.stages, ...Object.values(line.branch ?? {})]) ids.add(s);
+      for (const s of lineSpecies(line)) ids.add(s);
     }
     const st = session.stage;
     for (const pool of [st.pools.early, st.pools.mid, st.pools.late]) for (const e of pool) ids.add(e.species);
     for (const s of [...st.elites, st.swarm, ...st.bosses.map((b) => b.species), ...st.bosses.flatMap((b) => b.minions ?? []), 'chansey', 'meowth']) ids.add(s);
-    const shiny = new Set(w.players.filter((p) => p.shiny).flatMap((p) => [...LINE[p.lineId].stages, ...Object.values(LINE[p.lineId].branch ?? {})]));
+    const shiny = new Set(w.players.filter((p) => p.shiny).flatMap((p) => lineSpecies(LINE[p.lineId])));
     await Promise.all([...ids].map((id) => assets.load(id, false).then(() => (shiny.has(id) ? assets.load(id, true) : null))));
     for (const icon of ['exp-candy-s', 'exp-candy-m', 'exp-candy-l', 'exp-candy-xl', 'oran-berry', 'sitrus-berry', 'magnet', 'max-repel', 'poke-ball', 'rare-candy', 'nugget']) assets.itemImage(icon);
   }

@@ -69,17 +69,34 @@ describe('phase handling', () => {
     expect(sim.players[0].speciesId).toBe('wartortle');
   });
 
-  it('Eevee evolves by dominant move type', () => {
-    const sim = new Sim({ stageId: 'viridian', seed: 5, players: [{ name: 'a', lineId: 'eevee', shiny: false, meta: metaBonuses({}), tms: [] }] });
+  const evolveOn = (stageId: string, lineId: string, moves: [string, number][], level: number) => {
+    const sim = new Sim({ stageId, seed: 5, players: [{ name: 'a', lineId, shiny: false, meta: metaBonuses({}), tms: [] }] });
     const p = sim.players[0];
-    p.moves = [{ id: 'ember', level: 4, cd: 1, dmgDealt: 0, kills: 0 }, { id: 'swift', level: 2, cd: 1, dmgDealt: 0, kills: 0 }];
-    sim.level = 13;
+    p.moves = moves.map(([id, lv]) => ({ id, level: lv, cd: 1, dmgDealt: 0, kills: 0 }));
+    p.stage = level > 14 ? 1 : 0;
+    sim.level = level - 1;
     sim.xp = sim.xpNext;
-    for (let i = 0; i < 600 && p.speciesId === 'eevee'; i++) {
+    const from = p.speciesId;
+    for (let i = 0; i < 600 && p.speciesId === from; i++) {
       if (sim.phase === 'levelup') sim.choose(0, 0);
       else sim.update(DT);
     }
-    expect(p.speciesId).toBe('flareon');
+    return p.speciesId;
+  };
+
+  it('Eevee evolves into the Eeveelution of the stage, whatever its moves', () => {
+    expect(evolveOn('viridian', 'eevee', [['ember', 4]], 14)).toBe('leafeon');
+    expect(evolveOn('tower', 'eevee', [['ember', 4]], 14)).toBe('umbreon');
+  });
+
+  it('where a stage offers two forms, the dominant move type picks', () => {
+    expect(evolveOn('seafoam', 'eevee', [['swift', 2]], 14)).toBe('glaceon');
+    expect(evolveOn('seafoam', 'eevee', [['water-pulse', 4], ['powder-snow', 2]], 14)).toBe('vaporeon');
+  });
+
+  it('Pikachu becomes Alolan Raichu in Cerulean Cave, plain Raichu elsewhere', () => {
+    expect(evolveOn('cerulean', 'pichu', [['thunder-shock', 3]], 22)).toBe('raichu-alola');
+    expect(evolveOn('viridian', 'pichu', [['thunder-shock', 3]], 22)).toBe('raichu');
   });
 });
 
