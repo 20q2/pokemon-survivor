@@ -13,6 +13,10 @@ export { SONGS, compileSong };
  * sidechain pump, pan) sending to a reverb and a tempo-synced ping-pong delay.
  */
 
+/** ±7% random pitch for sounds that fire constantly, so repetition doesn't fatigue. `rand01` is in [0, 1). */
+export const JITTER = 0.07;
+export const jitterHz = (hz: number, rand01: number) => hz * (1 + (rand01 * 2 - 1) * JITTER);
+
 /** SFX mix: a little drier than the music so effects stay crisp, but sharing a room. */
 const SFX_MIX: { gain: number; pan: number; send: number }[] = [
   { gain: 0.26, pan: -0.08, send: 0.14 },
@@ -120,6 +124,7 @@ export class AudioEngine {
   static async renderSfxOffline(name: string, arg = 0, seconds = 3, sampleRate = 44100): Promise<AudioBuffer> {
     const e = new AudioEngine();
     const ctx = new OfflineAudioContext(2, Math.ceil(seconds * sampleRate), sampleRate);
+    e.deterministic = true;
     e.init(ctx);
     e.setVolumes(0, 1);
     if (name === 'candy' || name === 'kill') {
@@ -377,6 +382,14 @@ export class AudioEngine {
     return true;
   }
 
+  /** Offline renders switch this on so level checks are repeatable. */
+  deterministic = false;
+
+  jitter(hz: number) { return this.deterministic ? hz : jitterHz(hz, Math.random()); }
+
+  /** The same jitter as a transpose in (fractional) semitones, for MML phrases. */
+  private jitterSemis() { return 12 * Math.log2(this.jitter(1)); }
+
   /** Play a scored effect from sfx.ts on the chip voices, optionally transposed (semitones). */
   private phrase(name: string, transpose = 0, volMul = 1) {
     const def = SFX[name];
@@ -402,12 +415,12 @@ export class AudioEngine {
       case 'hit':
         if (!this.gate('hit', 0.05)) return;
         syn.noiseHit(d, t, 0.045, 0.14, 1400, 5500);
-        syn.tone(d, t, 260 + Math.random() * 60, 0.05, 0.05, 'pulse', 0.5, 110);
+        syn.tone(d, t, this.jitter(260 + Math.random() * 60), 0.05, 0.05, 'pulse', 0.5, 110);
         break;
       case 'super':
         if (!this.gate('super', 0.12)) return;
         syn.noiseHit(d, t, 0.07, 0.16, 900, 5000);
-        syn.tone(d, t, midiHz(76), 0.07, 0.07, 'pulse', 0.25, midiHz(83));
+        { const j = this.jitter(1); syn.tone(d, t, midiHz(76) * j, 0.07, 0.07, 'pulse', 0.25, midiHz(83) * j); }
         break;
       case 'crit': {
         // sparkle layered over the normal hit: two quick high pings a fifth apart
@@ -432,13 +445,15 @@ export class AudioEngine {
         if (!this.gate('candy', 0.055)) return;
         const step = this.candyLadder.step(this.ctx.currentTime + this.clockSkew);
         const vol = 0.085 * (1 - step * 0.05);
-        syn.tone(d, t, midiHz(67 + CANDY_LADDER[step]), 0.07, vol, 'pulse', 0.125);
-        syn.tone(d, t, midiHz(55 + CANDY_LADDER[step]), 0.05, vol * 0.6, 'triangle');
+        // Jitter the final Hz only; the ladder rung stays exact. One factor keeps the two voices in tune.
+        const j = this.jitter(1);
+        syn.tone(d, t, midiHz(67 + CANDY_LADDER[step]) * j, 0.07, vol, 'pulse', 0.125);
+        syn.tone(d, t, midiHz(55 + CANDY_LADDER[step]) * j, 0.05, vol * 0.6, 'triangle');
         break;
       }
       case 'coin':
         if (!this.gate('coin', 0.07)) return;
-        this.phrase('coin');
+        this.phrase('coin', this.jitterSemis());
         break;
       case 'hurt':
         if (!this.gate('hurt', 0.12)) return;
@@ -447,7 +462,7 @@ export class AudioEngine {
       case 'boom':
         if (!this.gate('boom', 0.08)) return;
         syn.noiseHit(d, t, 0.35, 0.3, 60, 1600);
-        syn.tone(d, t, 140, 0.3, 0.22, 'triangle', 0.5, 40);
+        { const j = this.jitter(1); syn.tone(d, t, 140 * j, 0.3, 0.22, 'triangle', 0.5, 40 * j); }
         break;
       case 'raid':
         // A rising siren as a big attack winds up (arg 1 = boss-sized: lower, louder).
@@ -455,10 +470,10 @@ export class AudioEngine {
         this.phrase('raid', arg ? -7 : 0, arg ? 1.2 : 0.8);
         break;
       case 'wobble': this.phrase('wobble', arg * 2); break;
-      case 'pop': this.phrase('pop', arg * 2); break;
+      case 'pop': this.phrase('pop', arg * 2 + this.jitterSemis()); break;
       case 'tick':
         if (!this.gate('tick', 0.03)) return;
-        this.phrase('tick', Math.round(arg));
+        this.phrase('tick', Math.round(arg) + this.jitterSemis());
         break;
       case 'ding': this.phrase('ding', arg * 2); break;
       // arg = number of rewards in the chest.
@@ -478,21 +493,22 @@ export class AudioEngine {
     const d = this.sfxIn;
     const syn = this.syn;
     const v = 0.045;
+    const j = this.jitter(1);
     switch (typeIdx) {
       case 1: syn.noiseHit(d, t, 0.16, v * 2.2, 400, 3200); break; // fire: roar
-      case 2: syn.tone(d, t, midiHz(72), 0.1, v, 'triangle', 0.5, midiHz(84)); break; // water: bloop up
-      case 3: syn.noiseHit(d, t, 0.07, v * 1.8, 3000, 10000, true); syn.tone(d, t, 1800, 0.05, v * 0.6, 'pulse', 0.125, 900); break; // electric: zap
+      case 2: syn.tone(d, t, midiHz(72) * j, 0.1, v, 'triangle', 0.5, midiHz(84) * j); break; // water: bloop up
+      case 3: syn.noiseHit(d, t, 0.07, v * 1.8, 3000, 10000, true); syn.tone(d, t, 1800 * j, 0.05, v * 0.6, 'pulse', 0.125, 900 * j); break; // electric: zap
       case 4: syn.noiseHit(d, t, 0.07, v * 1.4, 2500, 7000); break; // grass: rustle
-      case 5: syn.tone(d, t, midiHz(91), 0.08, v * 0.8, 'pulse', 0.125, midiHz(96)); break; // ice: glint
+      case 5: syn.tone(d, t, midiHz(91) * j, 0.08, v * 0.8, 'pulse', 0.125, midiHz(96) * j); break; // ice: glint
       case 6: syn.noiseHit(d, t, 0.06, v * 2.4, 200, 2000); break; // fighting: thump
-      case 7: syn.tone(d, t, midiHz(55), 0.12, v, 'pulse', 0.25, midiHz(50)); break; // poison: blub
+      case 7: syn.tone(d, t, midiHz(55) * j, 0.12, v, 'pulse', 0.25, midiHz(50) * j); break; // poison: blub
       case 8: syn.noiseHit(d, t, 0.12, v * 2.4, 60, 900); break; // ground: rumble
       case 9: syn.noiseHit(d, t, 0.14, v * 1.3, 1500, 6000); break; // flying: whoosh
-      case 10: syn.tone(d, t, midiHz(71), 0.15, v, 'triangle', 0.5, midiHz(83)); break; // psychic: swell
-      case 13: syn.tone(d, t, midiHz(67), 0.18, v, 'triangle', 0.5, midiHz(59)); break; // ghost: droop
-      case 14: syn.tone(d, t, midiHz(43), 0.15, v * 1.3, 'pulse', 0.125, midiHz(36)); break; // dragon: growl
-      case 17: syn.tone(d, t, midiHz(88), 0.1, v * 0.8, 'triangle', 0.5, midiHz(93)); break; // fairy: twinkle
-      default: syn.tone(d, t, midiHz(74), 0.05, v, 'pulse', 0.5, midiHz(62));
+      case 10: syn.tone(d, t, midiHz(71) * j, 0.15, v, 'triangle', 0.5, midiHz(83) * j); break; // psychic: swell
+      case 13: syn.tone(d, t, midiHz(67) * j, 0.18, v, 'triangle', 0.5, midiHz(59) * j); break; // ghost: droop
+      case 14: syn.tone(d, t, midiHz(43) * j, 0.15, v * 1.3, 'pulse', 0.125, midiHz(36) * j); break; // dragon: growl
+      case 17: syn.tone(d, t, midiHz(88) * j, 0.1, v * 0.8, 'triangle', 0.5, midiHz(93) * j); break; // fairy: twinkle
+      default: syn.tone(d, t, midiHz(74) * j, 0.05, v, 'pulse', 0.5, midiHz(62) * j);
     }
   }
 }

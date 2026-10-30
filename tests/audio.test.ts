@@ -145,3 +145,22 @@ describe('kill streak ladder', () => {
     expect(run(1 / 3, 20)).toBeGreaterThan(0);
   });
 });
+
+describe('pitch jitter', async () => {
+  const { AudioEngine, jitterHz } = await import('../src/audio/audio.ts');
+  it('is exact when deterministic', () => {
+    const e = new AudioEngine();
+    e.deterministic = true;
+    expect(e.jitter(440)).toBe(440);
+  });
+  it('stays within ±7% and varies otherwise', () => {
+    const e = new AudioEngine();
+    const xs = Array.from({ length: 200 }, () => e.jitter(440));
+    for (const x of xs) { expect(x).toBeGreaterThanOrEqual(409.2); expect(x).toBeLessThanOrEqual(470.8); }
+    expect(new Set(xs).size).toBeGreaterThan(1);
+  });
+  it('jitterHz spans the band at its ends', () => {
+    expect(jitterHz(440, 0)).toBeCloseTo(409.2);
+    expect(jitterHz(440, 0.5)).toBeCloseTo(440);
+  });
+});
