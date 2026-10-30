@@ -403,6 +403,29 @@ function puddle(water: Ramp): PropSprite {
   return { frames, ax: 15, ay: 7, tall: false, fps: 2 };
 }
 
+/**
+ * Oil stain soaked into a metal floor: flat, only a shade darker than the plates and outlined in
+ * its own colour, so it reads as a mark on the ground rather than a dark pad to walk around.
+ */
+function oilSlick(): PropSprite {
+  const OIL: Ramp = ['#6a6c62', '#6a6c62', '#62645a', '#5a5c53', '#5a5c53'];
+  const SHEEN = ['#8a78a8', '#5a9a9c', '#a8985a'];
+  const lobes: [number, number, number, number][] = [[12, 7, 10, 4], [21, 8, 6, 3], [7, 9, 4, 2]];
+  const frames = [0, 1, 2].map((f) => {
+    const k = new Ink(30, 14);
+    for (const [cx, cy, rx, ry] of lobes) {
+      for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y++) for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++) {
+        const nx = (x + 0.5 - cx) / rx, ny = (y + 0.5 - cy) / ry, d = nx * nx + ny * ny;
+        if (d <= 1) k.set(x, y, OIL[d < 0.35 ? 3 : 2], OIL);
+      }
+    }
+    // a thin rainbow film that drifts along the stain
+    for (let i = 0; i < 6; i++) k.mark(8 + f * 2 + i, 6 + (i >> 2), SHEEN[(i + f) % 3]);
+    return k.finish();
+  });
+  return { frames, ax: 15, ay: 8, tall: false, fps: 2 };
+}
+
 function lavaPool(): PropSprite {
   const LAVA: Ramp = ['#401808', '#b02c10', '#e8641c', '#ffa830', '#fff0a0'];
   const frames = [0, 1, 2].map((f) => {
@@ -588,7 +611,8 @@ const builders: Record<string, () => Biome> = {
       solids: [machine(), machine(), pylon()],
       smallSolids: [barrel()],
       props: [
-        { sprites: [puddle(['#101010', '#2a2a30', '#3a3a44', '#5a5a70', '#a0a0c0'])], cell: 1, density: 0.006, on: [0, 2] },
+        // plates only: the stain is tuned to the metal and would read as a light patch on the dark rock
+        { sprites: [oilSlick()], cell: 1, density: 0.006, on: [0] },
       ],
     };
   },
