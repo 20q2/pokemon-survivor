@@ -89,7 +89,7 @@ export const WAVE_EVENTS: Record<number, WaveEvent[]> = {
 export const WAVE_INTERVAL = [1, 1, 0.5, 0.5, 0.5, 0.25, 0.25, 0.25, 0.25, 0.25, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1];
 /** Roughly 1 + 0.15m + 0.025m^2 + 0.0025m^3 at whole minutes. */
 export const WAVE_HP = [1, 1.18, 1.42, 1.74, 2.16, 2.69, 3.34, 4.13, 5.08, 6.2, 7.5, 9, 10.7, 12.6, 14.7, 17.1];
-/** The wave in force at run time `t` (seconds). Overtime (past minute 15) keeps the last wave as-is; a later task adds an overtime sweeper. */
+/** The wave in force at run time `t` (seconds). Overtime (past minute 15) keeps the last wave as-is; the overtime sweeper is spawned by Spawner.updateSweeper. */
 export function waveAt(stage: StageDef, t: number): { idx: number; wave: WaveDef } {
   const idx = Math.min(stage.waves.length - 1, Math.floor(t / 60));
   return { idx, wave: stage.waves[idx] };

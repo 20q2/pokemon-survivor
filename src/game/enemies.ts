@@ -31,7 +31,13 @@ const SWEEPER_FROM = RUN_LENGTH + 60;
 const SWEEPER_PERIOD = 60;
 const SWEEPER_SPECIES = 'banette'; // ghost, and no stage's boss
 /** About 1.15x the fastest starter. */
-const SWEEPER_SPEED = 165;
+export const SWEEPER_SPEED = 165;
+/** Contact damage as a fraction of the party's biggest maxHp: three hits fell a full-hp player. */
+const SWEEPER_CONTACT_FRAC = 0.4;
+/** Placeholder hp (damage never lands), final-boss scale and its hitbox. */
+const SWEEPER_HP = 1e9;
+const SWEEPER_SCALE = 2.4;
+const SWEEPER_RADIUS = 26;
 
 export interface SpawnOpts {
   elite?: boolean;
@@ -43,7 +49,7 @@ export interface SpawnOpts {
   alpha?: boolean;
   /** Guards map treasure: drops no treasure of its own. */
   guardian?: boolean;
-  /** Overtime Reaper: immune to everything, relentless, heavy contact damage, outside the quota. */
+  /** Overtime Reaper: immune to damage and status, walks at the nearest player, heavy contact damage, outside the quota. */
   sweeper?: boolean;
 }
 
@@ -143,6 +149,9 @@ export class Spawner {
     if (idx !== this.waveIdx) {
       this.waveIdx = idx;
       this.nextQuota = t; // the new minute's quota lands with its banner
+      // A reprieve never leaks into the next minute. It costs 4 s plus at most one interval (nextQuota advances
+      // before the early return below); that is deliberate, the breather should be real.
+      this.trickleResumeAt = 0;
       this.pendingEvents = eventTimes(idx, w.events);
       if (idx > 0) {
         const species = waveHeadline(sim.stage, idx);
@@ -179,8 +188,8 @@ export class Spawner {
     const sim = this.sim;
     const up = sim.players.filter((p) => !p.fainted);
     const hpFrac = up.length ? up.reduce((s, p) => s + p.hp / p.stats.maxHp, 0) / up.length : 0;
-    const act = this.director.update(dt, { minute: this.waveIdx, hpFrac, kills: sim.kills, eventPending: this.pendingEvents.length > 0 });
-    if (act.pullForward) this.pendingEvents[0].at -= act.pullForward;
+    const act = this.director.update(dt, { minute: this.waveIdx, hpFrac, standing: up.length > 0, kills: sim.kills, eventPending: this.pendingEvents.length > 0 });
+    if (act.pullForward) this.pendingEvents[0].at = Math.max(t, this.pendingEvents[0].at - act.pullForward);
     if (act.pauseTrickle) this.trickleResumeAt = t + act.pauseTrickle;
   }
 
@@ -356,8 +365,7 @@ export function spawnEnemy(sim: Sim, speciesId: string, x: number, y: number, op
     hp = (4 + bhp * 0.12) * ROLE_HP.tank * 3 * sim.spawner.hpMult(); xp = baseXp * 6; knockResist = 0.6; speed = opts.wall.speed;
   }
   if (opts.sweeper) {
-    // Three hits fell a full-hp player; hp is only a placeholder since damage never lands.
-    hp = 1e9; dmg = 0.4 * Math.max(...sim.players.map((p) => p.stats.maxHp)); xp = 0; scale = 2.4; radius = 26; knockResist = 1; speed = SWEEPER_SPEED;
+    hp = SWEEPER_HP; dmg = SWEEPER_CONTACT_FRAC * Math.max(...sim.players.map((p) => p.stats.maxHp)); xp = 0; scale = SWEEPER_SCALE; radius = SWEEPER_RADIUS; knockResist = 1; speed = SWEEPER_SPEED;
   }
   if (role === 'treasure') { speed = Math.max(speed, 80); xp = 5; }
   if (shiny) { hp *= 3; xp *= 5; }
@@ -390,6 +398,8 @@ export function updateEnemies(sim: Sim, dt: number) {
     e.flash = Math.max(0, e.flash - dt);
     e.contactCd -= dt;
     const st = e.st;
+    // The Reaper shrugs off every status, so a frozen, charmed or stuttering sweeper still presses on.
+    if (e.sweeper) Object.assign(st, freshStatus());
     // ─ status timers & DoTs
     st.paralyze = Math.max(0, st.paralyze - dt);
     st.freeze = Math.max(0, st.freeze - dt);
@@ -438,17 +448,16 @@ export function updateEnemies(sim: Sim, dt: number) {
     let target: { x: number; y: number } | undefined = player;
     // Decoys: a doll within its lure radius wins the foe's attention.
     for (const d of decoys) {
-      if (!e.boss && dist2(e.x, e.y, d.x, d.y) < d.growth * d.growth) { target = d; break; }
+      if (!e.boss && !e.sweeper && dist2(e.x, e.y, d.x, d.y) < d.growth * d.growth) { target = d; break; }
     }
     let mult = 1;
     // Paralysis locks a foe up in random stutters (~35% of the time).
     const stutter = st.paralyze > 0 && ((sim.time * 3.1 + e.id * 0.618) % 1) < 0.35;
     // Can it do anything at all? (frozen, asleep, airborne or stuttering)
-    const helpless = !e.sweeper && (st.freeze > 0 || st.sleep > 0 || st.air > 0 || stutter);
+    const helpless = (st.freeze > 0 || st.sleep > 0 || st.air > 0 || stutter);
     if (st.slow > 0) mult *= 0.55;
     if (st.chill > 0) mult *= 1 - 0.15 * st.chill;
     if (helpless || st.root > 0) mult = 0;
-    if (e.sweeper) mult = 1;
     let mx = 0, my = 0;
     if (target && player) {
       const dx = target.x - e.x, dy = target.y - e.y;

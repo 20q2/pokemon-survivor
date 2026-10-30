@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { Sim, DT } from '../src/game/sim.ts';
 import { metaBonuses } from '../src/meta/shop.ts';
-import { spawnEnemy } from '../src/game/enemies.ts';
+import { SWEEPER_SPEED, spawnEnemy } from '../src/game/enemies.ts';
+import { WAVE_MIN } from '../src/data/stages.ts';
 import { rawDamageEnemy } from '../src/game/combat.ts';
 
 function sim() {
@@ -18,6 +19,7 @@ const runTo = (s: Sim, t: number) => {
 
 describe('overtime sweeper', () => {
   it('appears at 960 s while the final boss stands, and again a minute later', () => {
+    // Counts sweepers only: the stage's boss table (final boss at 900 s) also spawns things at this time.
     const s = sim();
     s.time = 955;
     s.spawner.update(0);
@@ -48,20 +50,18 @@ describe('overtime sweeper', () => {
     e.x = 400; e.y = 0;
     for (let i = 0; i < 60; i++) { p.hp = p.stats.maxHp; s.update(DT); }
     expect(e.x).toBeLessThan(400 - 120);
-    expect(e.speed).toBeCloseTo(165);
+    expect(e.speed).toBeCloseTo(SWEEPER_SPEED);
     expect(e.dmg * 3).toBeGreaterThan(p.stats.maxHp);
   });
 
   it('is left out of the quota count', () => {
     const s = sim();
-    const quiet = () => { s.update(DT); return s.enemies.filter((e) => e.alive && !e.sweeper).length; };
     s.time = 100;
-    const base = quiet();
     for (let i = 0; i < 80; i++) spawnEnemy(s, 'banette', 500 + i, 500, { sweeper: true });
-    const after = quiet();
-    // 80 sweepers would exceed any minute-1 quota if counted, so no filler may vanish or be withheld.
-    expect(after).toBeGreaterThanOrEqual(base);
-    expect(s.enemies.filter((e) => e.sweeper)).toHaveLength(80);
+    s.spawner.update(0.1); // minute 1's quota: 35 for one player
+    const filler = s.enemies.filter((e) => e.alive && !e.sweeper && !e.elite && e.role !== 'treasure');
+    // 80 sweepers would satisfy the quota if they were counted.
+    expect(filler.length).toBeGreaterThanOrEqual(WAVE_MIN[1]);
   });
 });
 
@@ -76,6 +76,7 @@ describe('director reprieve in the spawner', () => {
     s.spawner.update(0.1); // the reprieve starts
     s.time += 2;
     s.spawner.update(0.1);
+    expect(s.enemies.some((e) => e.alive && e.elite)).toBe(true); // the wave boss still arrives during the pause
     const filler = () => s.enemies.filter((e) => e.alive && !e.elite && e.role !== 'treasure');
     expect(filler()).toHaveLength(0);
     s.time += 3;

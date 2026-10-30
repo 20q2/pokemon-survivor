@@ -18,6 +18,7 @@ import type { Player } from '../game/types.ts';
 import { btn, catBadge, fmtTime, h, img, moveDisc, moveIcon, toast, typeBadge, uiIcon } from './dom.ts';
 import { hideTip, moveInfoTip, tipped } from './tips.ts';
 import { lobbyMenu } from './lobby.ts';
+import { tipped } from './tips.ts';
 
 const nn = (...a: (Node | string | null)[]) => a.filter((x): x is Node | string => x !== null);
 
@@ -216,7 +217,8 @@ function waveStrip(stage: StageDef) {
   return h('div', { class: 'wave-strip' }, waveTimeline(stage).map((c) => {
     const name = SPECIES[c.focus].name;
     const what = c.kind === 'swarm' ? `${name} swarm` : c.kind === 'ring' ? `${name} ring` : name;
-    return h('span', { class: `wc ${c.kind}${c.elite ? ' elite' : ''}`, title: `Minute ${c.minute}: ${what}${c.elite ? ' + boss' : ''}` }, img(assets.portraitUrl(c.species)));
+    return tipped(h('span', { class: `wc ${c.kind}${c.elite ? ' elite' : ''}` }, img(assets.portraitUrl(c.species))),
+      () => h('div', null, `Minute ${c.minute}: ${what}${c.elite ? ' + boss' : ''}`));
   }));
 }
 

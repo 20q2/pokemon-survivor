@@ -4,6 +4,8 @@ export interface DirectorSnapshot {
   minute: number;
   /** Mean hp fraction of the party's standing members. */
   hpFrac: number;
+  /** Anyone still on their feet; with nobody up, hpFrac says nothing and no reprieve is due. */
+  standing: boolean;
   /** Total kills so far; the Director derives kills/s itself. */
   kills: number;
   /** Whether the current minute still has a set piece waiting to fire. */
@@ -21,6 +23,11 @@ export interface DirectorAction {
 export const SURGE_HP = 0.9;
 export const SURGE_KPS = 8;
 export const SURGE_AFTER = 20;
+/** A surge pulls the next set piece forward by a random amount in this range (s). */
+export const SURGE_PULL_MIN = 10;
+export const SURGE_PULL_MAX = 15;
+/** One tick's kills/s is clamped to this multiple of SURGE_KPS so a Repel burst can't fake dominance. */
+const KPS_SAMPLE_CAP = 4;
 /** A struggling party is below this hp fraction; the backfill rests for REPRIEVE_FOR seconds. */
 export const REPRIEVE_HP = 0.35;
 export const REPRIEVE_FOR = 4;
@@ -50,7 +57,7 @@ export class Director {
       this.surged = this.reprieved = false;
       this.dominantFor = 0;
     }
-    const inst = dt > 0 ? (s.kills - this.lastKills) / dt : this.kps;
+    const inst = dt > 0 ? Math.min(SURGE_KPS * KPS_SAMPLE_CAP, (s.kills - this.lastKills) / dt) : this.kps;
     this.lastKills = s.kills;
     this.kps += (inst - this.kps) * Math.min(1, dt / KPS_WINDOW);
 
@@ -59,9 +66,9 @@ export class Director {
     if (!this.surged && s.eventPending && this.dominantFor >= SURGE_AFTER) {
       this.surged = true;
       this.dominantFor = 0;
-      act.pullForward = this.range(10, 15);
+      act.pullForward = this.range(SURGE_PULL_MIN, SURGE_PULL_MAX);
     }
-    if (!this.reprieved && s.hpFrac < REPRIEVE_HP) {
+    if (!this.reprieved && s.standing && s.hpFrac < REPRIEVE_HP) {
       this.reprieved = true;
       act.pauseTrickle = REPRIEVE_FOR;
     }

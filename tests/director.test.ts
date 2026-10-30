@@ -7,7 +7,7 @@ function run(d: Director, secs: number, kps: number, snap: Partial<DirectorSnaps
   let kills = kills0;
   for (let i = 1; i <= secs * 10; i++) {
     kills += kps / 10;
-    const act = d.update(0.1, { minute: 3, hpFrac: 1, kills, eventPending: true, ...snap });
+    const act = d.update(0.1, { minute: 3, hpFrac: 1, standing: true, kills, eventPending: true, ...snap });
     if (act.pullForward !== undefined || act.pauseTrickle !== undefined) out.push({ t: t0 + i / 10, act });
   }
   return out;
@@ -46,13 +46,25 @@ describe('Director reprieve', () => {
     const hits = run(make(), 30, 1, { hpFrac: 0.2 });
     expect(hits).toHaveLength(1);
     expect(hits[0].act.pauseTrickle).toBe(REPRIEVE_FOR);
-    expect(run(make(), 5, 1, { hpFrac: 0.2, minute: 3 })).toHaveLength(1);
   });
 
   it('re-arms on a new minute', () => {
     const d = make();
     expect(run(d, 5, 1, { hpFrac: 0.2 })).toHaveLength(1);
     expect(run(d, 5, 1, { hpFrac: 0.2, minute: 4 })).toHaveLength(1);
+  });
+});
+
+describe('Director guards', () => {
+  it('no reprieve when nobody is standing', () => {
+    expect(run(make(), 10, 0, { hpFrac: 0, standing: false })).toHaveLength(0);
+  });
+
+  it('a one-tick kill burst cannot fake dominance', () => {
+    const d = make();
+    d.update(0.1, { minute: 3, hpFrac: 1, standing: true, kills: 0, eventPending: true });
+    d.update(0.1, { minute: 3, hpFrac: 1, standing: true, kills: 5000, eventPending: true });
+    expect(run(d, 15, 0, {}, 0, 5000)).toHaveLength(0);
   });
 });
 

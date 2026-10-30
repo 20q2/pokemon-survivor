@@ -610,6 +610,6 @@ input[type=text], textarea { background: rgba(0, 0, 0, 0.35); color: var(--ink);
 .wave-strip { display: flex; gap: 1px; margin-top: 6px; }
 .wave-strip .wc { position: relative; flex: 1 1 0; min-width: 0; border-radius: 4px; }
 .wave-strip .wc img { width: 100%; image-rendering: pixelated; display: block; }
-.wave-strip .wc.swarm { box-shadow: inset 0 0 0 2px #ff8a3d; background: rgba(255,138,61,0.22); }
-.wave-strip .wc.ring { box-shadow: inset 0 0 0 2px #b06cff; background: rgba(176,108,255,0.22); }
+.wave-strip .wc.swarm { box-shadow: inset 0 0 0 1.5px #ff8a3d; background: rgba(255,138,61,0.22); }
+.wave-strip .wc.ring { box-shadow: inset 0 0 0 1.5px #b06cff; background: rgba(176,108,255,0.22); }
 .wave-strip .wc.elite::after { content: ''; position: absolute; right: 1px; bottom: 1px; width: 5px; height: 5px; border-radius: 50%; background: #ff4b4b; border: 1px solid rgba(0,0,0,0.6); }
