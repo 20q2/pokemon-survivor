@@ -18,7 +18,6 @@ import type { Player } from '../game/types.ts';
 import { btn, catBadge, fmtTime, h, img, moveDisc, moveIcon, toast, typeBadge, uiIcon } from './dom.ts';
 import { hideTip, moveInfoTip, tipped } from './tips.ts';
 import { lobbyMenu } from './lobby.ts';
-import { tipped } from './tips.ts';
 
 const nn = (...a: (Node | string | null)[]) => a.filter((x): x is Node | string => x !== null);
 
