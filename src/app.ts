@@ -436,6 +436,7 @@ export class App {
     const s = this.session;
     if (s) {
       if (this.input.consume('KeyT')) this.toggleMeter();
+      if (this.input.consume('KeyC')) this.hud.toggleSheet();
       if ((this.input.consume('Escape') || this.input.consume('PadStart') || this.input.consume('KeyP')) && s.phase() !== 'levelup') this.togglePause();
       const m = s.paused || this.ended ? { x: 0, y: 0 } : this.input.move();
       s.step(dt, m.x, m.y, this.renderer.viewW, this.renderer.viewH);

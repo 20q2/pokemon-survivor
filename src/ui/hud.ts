@@ -33,6 +33,8 @@ export class Hud {
   private minimap = new Minimap();
   private effects = new EffectRow();
   private sheet = new StatSheet();
+  /** Your own card, which the stat sheet hangs from. */
+  private mine: HTMLElement | null = null;
   readonly meter = new DamageMeter();
   private meterT = 0;
   onMeterToggle: (() => void) | null = null;
@@ -67,7 +69,7 @@ export class Hud {
     this.nextKey = '';
     this.fps = h('div', { class: 'fps' });
     const pause = h('button', { class: 'btn small pause-btn', onclick: () => this.onPause?.(), 'aria-label': 'Pause' }, 'II');
-    const meterBtn = h('button', { class: 'btn small meter-btn', onclick: () => this.onMeterToggle?.(), title: 'Damage tracker (T)', 'aria-label': 'Damage tracker' }, 'DMG');
+    const meterBtn = tipped(h('button', { class: 'btn small meter-btn', onclick: () => this.onMeterToggle?.(), 'aria-label': 'Damage tracker' }, 'DMG'), () => h('div', null, h('b', null, 'Damage tracker (T)')));
     this.el.append(h('div', { class: 'xpbar' }, this.xpFill, this.lv), this.timer, pause, meterBtn, h('div', { class: 'hud-right' }, this.stats, this.minimap.el, this.meter.el), this.left, h('div', { class: 'top-center' }, this.next, this.boss), this.fps);
     this.el.classList.remove('hidden');
     this.sig = '';
@@ -75,6 +77,13 @@ export class Hud {
 
   hide() {
     this.el.classList.add('hidden');
+  }
+
+  /** Drop the stat sheet down from your card, or fold it away (card click or C). */
+  toggleSheet() {
+    this.sheet.open = !this.sheet.open;
+    this.mine?.classList.toggle('open', this.sheet.open);
+    this.textT = 0; // fill the numbers on the next frame
   }
 
   private rebuildLeft(s: RunSession, me: Player) {
@@ -100,11 +109,8 @@ export class Hud {
     mine.classList.add('me');
     mine.classList.toggle('open', this.sheet.open);
     mine.append(this.effects.el, h('div', { class: 'caret' }));
-    mine.addEventListener('click', () => {
-      this.sheet.open = !this.sheet.open;
-      mine.classList.toggle('open', this.sheet.open);
-      this.sheet.update(me, s.world.level, s.world.time);
-    });
+    this.mine = mine;
+    mine.addEventListener('click', () => this.toggleSheet());
     this.left.append(mine);
     const moves = h('div', { class: 'slots' });
     for (let i = 0; i < me.moveSlots; i++) {

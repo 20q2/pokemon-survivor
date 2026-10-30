@@ -53,7 +53,7 @@ export function titleScreen(app: App) {
       btn([img(assets.itemUrl('soothe-bell')), 'Sound Test'], () => app.show(soundTestScreen(app))),
       btn('Credits', () => app.show(creditsScreen(app))),
     ),
-    h('div', { class: 'title-foot' }, 'Move with WASD / arrows / gamepad / touch. Everything else is automatic. A non-commercial fan game.'),
+    h('div', { class: 'title-foot' }, 'Move with WASD / arrows / gamepad / touch, C for your stats. Everything else is automatic. A non-commercial fan game.'),
   );
 }
 
