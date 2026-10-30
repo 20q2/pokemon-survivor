@@ -696,7 +696,9 @@ const sheetBuilders: Record<string, (s: Sheet) => Biome> = {
           auto: autotile(s, [0, 6], [[1, 6], [2, 6], [3, 6], [4, 6], [1, 7], [2, 7], [3, 7], [4, 7], [1, 8], [2, 8], [3, 8], [4, 8]], basePal),
         },
       ],
-      solids: [P2([14, 0], 3, 4, 24, 54), P2([3, 34], 3, 4, 24, 58), P2([3, 34], 3, 4, 24, 58), P2([14, 17], 2, 3, 16, 44), P2([14, 17], 2, 3, 16, 44), P2([0, 34], 3, 4, 24, 58)],
+      // meadow trees only: the round route tree with the odd autumn one (the sheet's jungle tree and
+      // forest pines look out of place on open grass)
+      solids: [P2([3, 34], 3, 4, 24, 58), P2([3, 34], 3, 4, 24, 58), P2([3, 34], 3, 4, 24, 58), P2([3, 34], 3, 4, 24, 58), P2([0, 34], 3, 4, 24, 58)],
       // round bush and two rocks
       smallSolids: [P2([17, 0], 1, 1, 8, 15), P2([7, 16], 1, 1, 8, 15), P2([8, 18], 1, 1, 8, 15)],
       props: [
