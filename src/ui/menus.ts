@@ -18,6 +18,7 @@ import type { Player } from '../game/types.ts';
 import { btn, catBadge, fmtTime, h, img, moveDisc, moveIcon, toast, typeBadge, uiIcon } from './dom.ts';
 import { hideTip, moveInfoTip, tipped } from './tips.ts';
 import { lobbyMenu } from './lobby.ts';
+import { soundTestScreen } from './soundtest.ts';
 
 const nn = (...a: (Node | string | null)[]) => a.filter((x): x is Node | string => x !== null);
 
@@ -46,6 +47,7 @@ export function titleScreen(app: App) {
       btn([img(assets.itemUrl('shiny-charm')), `Achievements ${done}/${ACHIEVEMENTS.length}`], () => app.show(achievementsScreen(app))),
       btn([img(assets.itemUrl('great-ball')), 'Pokédex'], () => app.show(dexScreen(app))),
       btn('Options', () => app.show(optionsScreen(app, () => app.goTitle()))),
+      btn([img(assets.itemUrl('soothe-bell')), 'Sound Test'], () => app.show(soundTestScreen(app))),
       btn('Credits', () => app.show(creditsScreen(app))),
     ),
     h('div', { class: 'title-foot' }, 'Move with WASD / arrows / gamepad / touch. Everything else is automatic. A non-commercial fan game.'),
@@ -272,6 +274,7 @@ type MartTab = ShopCat | 'tms';
 let martTab: MartTab = 'stats';
 
 export function shopScreen(app: App) {
+  audio.playMusic('shop');
   const root = screen('');
   const render = (focusSel?: string) => {
     const s = app.save;

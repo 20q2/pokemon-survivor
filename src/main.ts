@@ -39,7 +39,7 @@ async function boot(screen: BootScreen) {
   // Dev hook: render a song offline with the real synth (scripts/render-music.mjs).
   if (import.meta.env.DEV) {
     const w = window as unknown as { renderSong: unknown; renderSfx: unknown };
-    w.renderSong = (n: string, s: number) => AudioEngine.renderOffline(n, s);
+    w.renderSong = (n: string, s: number, at?: number, mute?: number[]) => AudioEngine.renderOffline(n, s, 44100, at, mute);
     w.renderSfx = (n: string, arg?: number) => AudioEngine.renderSfxOffline(n, arg);
   }
 }

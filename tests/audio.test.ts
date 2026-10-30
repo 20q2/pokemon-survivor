@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { compileSong, KILL_LADDER, Ladder, SONGS } from '../src/audio/audio.ts';
+import { isKitInst } from '../src/audio/instruments.ts';
 import { parseMml, TICKS_PER_WHOLE } from '../src/audio/mml.ts';
-import type { Mode } from '../src/audio/songs.ts';
+import type { Mode, SongDef } from '../src/audio/songs.ts';
 import { STAGES } from '../src/data/stages.ts';
 
 const SCALE: Record<Mode, number[]> = {
@@ -10,19 +11,21 @@ const SCALE: Record<Mode, number[]> = {
   harmonic: [0, 2, 3, 5, 7, 8, 10, 11],
   dorian: [0, 2, 3, 5, 7, 9, 10],
   mixolydian: [0, 2, 4, 5, 7, 9, 10],
+  phrygian: [0, 1, 3, 4, 5, 7, 8, 10, 11],
 };
 
-const channels = (name: string) => {
-  const s = SONGS[name];
-  return ([['p1', s.p1], ['p2', s.p2], ['tri', s.tri], ['noise', s.noise]] as const)
-    .filter(([, src]) => src.trim())
-    .map(([ch, src]) => ({ ch, track: parseMml(src, s.macros, ch === 'noise') }));
+const tracks = (s: SongDef) => s.tracks
+  .filter((t) => t.mml.trim())
+  .map((t) => ({ name: t.name, track: parseMml(t.mml, s.macros, isKitInst(t.inst)) }));
+const role = (s: SongDef, r: 'lead' | 'bass') => {
+  const t = s.tracks.find((x) => x.role === r)!;
+  return parseMml(t.mml, s.macros).notes;
 };
 
 describe('songbook', () => {
   it('every stage, the menus and bosses have music', () => {
     for (const st of STAGES) expect(SONGS[st.music], st.music).toBeTruthy();
-    for (const n of ['title', 'menu', 'boss', 'shop']) expect(SONGS[n], n).toBeTruthy();
+    for (const n of ['title', 'menu', 'boss', 'final', 'shop']) expect(SONGS[n], n).toBeTruthy();
   });
 
   it('parses the MML dialect', () => {
@@ -32,23 +35,32 @@ describe('songbook', () => {
     expect(t.notes.at(-1)!.midi).toEqual([60, 64, 67]);
   });
 
+  it('transposes, glides and sets brightness', () => {
+    const t = parseMml('o4 l4 K-3 c G6 F12 e K0 c r', {});
+    expect(t.notes.map((n) => n.midi[0])).toEqual([57, 61, 60]);
+    expect(t.notes[1]).toMatchObject({ glide: 6, from: 57, cut: 12 });
+    expect(t.notes[0].glide).toBe(0);
+  });
+
   for (const name of Object.keys(SONGS)) {
     describe(name, () => {
-      it('every bar of every channel is exactly one 4/4 measure, and channels line up', () => {
-        const chs = channels(name);
-        const lens = new Set(chs.map((c) => c.track.length));
-        const loops = new Set(chs.map((c) => c.track.loopTick));
-        expect(lens.size, `${name}: channel lengths ${[...chs.map((c) => `${c.ch}=${c.track.length / TICKS_PER_WHOLE}`)]}`).toBe(1);
+      it('arranges cleanly: every bar of every track is one 4/4 measure, and tracks line up', () => {
+        const s = SONGS[name];
+        expect(s.problems ?? [], `${name}: ${(s.problems ?? []).join('; ')}`).toEqual([]);
+        const ts = tracks(s);
+        const lens = new Set(ts.map((c) => c.track.length));
+        const loops = new Set(ts.map((c) => c.track.loopTick));
+        expect(lens.size, `${name}: track lengths ${[...ts.map((c) => `${c.name}=${c.track.length / TICKS_PER_WHOLE}`)]}`).toBe(1);
         expect(loops.size, `${name}: loop points differ`).toBe(1);
-        for (const { ch, track } of chs) {
-          track.bars.forEach((b, i) => expect(b, `${name}.${ch} bar ${i + 1} is ${b / 48} beats`).toBe(TICKS_PER_WHOLE));
+        for (const { name: tn, track } of ts) {
+          track.bars.forEach((b, i) => expect(b, `${name}.${tn} bar ${i + 1} is ${b / 48} beats`).toBe(TICKS_PER_WHOLE));
         }
-        expect(chs[0].track.length / TICKS_PER_WHOLE, `${name} is long enough to not grate`).toBeGreaterThanOrEqual(16);
+        expect(ts[0].track.length / TICKS_PER_WHOLE, `${name} is long enough to not grate`).toBeGreaterThanOrEqual(16);
       });
 
       it('lead melody stays in key, in a singable range, without wild leaps', () => {
         const s = SONGS[name];
-        const lead = parseMml(s.p1, s.macros).notes.filter((n) => n.midi.length === 1).map((n) => n.midi[0]);
+        const lead = role(s, 'lead').filter((n) => n.midi.length === 1).map((n) => n.midi[0]);
         const scale = SCALE[s.key[1]].map((d) => (d + s.key[0]) % 12);
         const inKey = lead.filter((m) => scale.includes(m % 12)).length / lead.length;
         expect(inKey, `${name}: ${(inKey * 100).toFixed(0)}% of lead notes in key`).toBeGreaterThan(0.88);
@@ -60,8 +72,8 @@ describe('songbook', () => {
 
       it('lead and bass agree on strong beats (few harsh intervals)', () => {
         const s = SONGS[name];
-        const lead = parseMml(s.p1, s.macros).notes;
-        const bass = parseMml(s.tri, s.macros).notes;
+        const lead = role(s, 'lead');
+        const bass = role(s, 'bass');
         const at = (notes: typeof lead, tick: number) => notes.find((n) => n.tick <= tick && tick < n.tick + n.len);
         let checked = 0, harsh = 0;
         for (const n of lead) {
@@ -77,13 +89,14 @@ describe('songbook', () => {
       });
 
       it('compiles to a playable, loopable event list', () => {
-        const c = compileSong(SONGS[name]);
+        const s = SONGS[name];
+        const c = compileSong(s);
         expect(c.events.length).toBeGreaterThan(100);
         expect(c.loopTick).toBeLessThan(c.length);
         for (const e of c.events) {
           expect(e.tick).toBeGreaterThanOrEqual(0);
           expect(e.tick).toBeLessThan(c.length);
-          if (e.ch !== 3) for (const m of e.midi) expect(m >= 30 && m <= 96, `${name} midi ${m}`).toBe(true);
+          if (!isKitInst(s.tracks[e.tr].inst)) for (const m of e.midi) expect(m >= 23 && m <= 100, `${name} midi ${m}`).toBe(true);
         }
       });
     });

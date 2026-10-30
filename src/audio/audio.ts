@@ -1,29 +1,19 @@
-import { parseMml, TICKS_PER_WHOLE, type MmlNote } from './mml.ts';
-import { SONGS, type SongDef } from './songs.ts';
+import { chip, compileSong, type CompiledSong } from './score.ts';
+import { INSTRUMENTS, type Inst } from './instruments.ts';
+import { midiHz, Synth } from './synth.ts';
+import { SONGS } from './songs.ts';
 import { SFX, type SfxDef } from './sfx.ts';
 
-export { SONGS };
+export { SONGS, compileSong };
 
 /**
- * Chiptune engine: hand-composed MML scores (songs.ts) played on a small Game Boy-flavoured
- * synth (two pulse channels with duty cycles, a stepped triangle bass and LFSR noise drums),
- * mixed through per-channel stereo buses and a light room reverb. Sound effects are MML phrases
- * too (sfx.ts) and run through the same voices, envelopes, buses and reverb as the music.
+ * Music and sound effects. Songs are multi-track MML scores (songs/*.ts) played on the voices in
+ * synth.ts: chip voices for the classic set and the sound effects, synth and FM voices and a
+ * drum machine for the rest. Each song gets its own rack: per-track buses (level, drive,
+ * sidechain pump, pan) sending to a reverb and a tempo-synced ping-pong delay.
  */
 
-type Ch = 0 | 1 | 2 | 3;
-export interface SongEvent extends MmlNote { ch: Ch }
-export interface CompiledSong { events: SongEvent[]; length: number; loopTick: number; loopIdx: number; spt: number }
-
-const DUTY = [0.125, 0.25, 0.5, 0.75];
-/** Per-channel mix: base gain, stereo pan, reverb send. */
-const MIX: { gain: number; pan: number; send: number }[] = [
-  { gain: 0.17, pan: -0.18, send: 0.22 },
-  { gain: 0.12, pan: 0.24, send: 0.28 },
-  { gain: 0.34, pan: 0, send: 0.05 },
-  { gain: 0.3, pan: 0.06, send: 0.08 },
-];
-/** SFX mix: a little drier than the music so effects stay crisp, but sharing the same room. */
+/** SFX mix: a little drier than the music so effects stay crisp, but sharing a room. */
 const SFX_MIX: { gain: number; pan: number; send: number }[] = [
   { gain: 0.26, pan: -0.08, send: 0.14 },
   { gain: 0.2, pan: 0.12, send: 0.2 },
@@ -31,27 +21,7 @@ const SFX_MIX: { gain: number; pan: number; send: number }[] = [
   { gain: 0.4, pan: 0, send: 0.06 },
 ];
 
-const sfxAsSong = (d: SfxDef): SongDef => ({ title: '', bpm: d.bpm, key: [0, 'major'], p1: d.p1 ?? '', p2: d.p2 ?? '', tri: d.tri ?? '', noise: d.noise ?? '' });
-
-export function compileSong(def: SongDef): CompiledSong {
-  const tracks = [def.p1, def.p2, def.tri, def.noise].map((src, i) => (src.trim() ? parseMml(src, def.macros, i === 3) : null));
-  const length = Math.max(...tracks.map((t) => t?.length ?? 0));
-  const loopTick = tracks[0]?.loopTick ?? 0;
-  const events: SongEvent[] = [];
-  tracks.forEach((t, ch) => t?.notes.forEach((n) => events.push({ ...n, ch: ch as Ch })));
-  if (def.echo && tracks[0]) {
-    for (const n of tracks[0].notes) {
-      let tick = n.tick + def.echo.delay;
-      if (tick >= length) tick = loopTick + (tick - length);
-      events.push({ ...n, tick, vol: n.vol * def.echo.vol, vib: 0, ch: 1 });
-    }
-  }
-  events.sort((a, b) => a.tick - b.tick || a.ch - b.ch);
-  const loopIdx = Math.max(0, events.findIndex((e) => e.tick >= loopTick));
-  return { events, length, loopTick, loopIdx, spt: 60 / def.bpm / (TICKS_PER_WHOLE / 4) };
-}
-
-const midiHz = (m: number) => 440 * Math.pow(2, (m - 69) / 12);
+const sfxAsSong = (d: SfxDef) => chip({ title: '', bpm: d.bpm, key: [0, 'major'], p1: d.p1, p2: d.p2, tri: d.tri, noise: d.noise });
 
 /** Pentatonic semitone offsets for the kill streak; the top (a 12th up) stays near 1.2 kHz. */
 export const KILL_LADDER = [0, 2, 4, 7, 9, 12, 14, 16, 19];
@@ -84,34 +54,39 @@ const CANDY_LADDER = [0, 2, 4, 7, 9, 12, 14, 16];
  */
 const KILL_DRAIN = 2.5;
 
+interface TrackBus { input: GainNode; mute: GainNode; pump: GainNode | null; depth: number; inst: Inst }
+/** One song's buses and effects; the previous rack is torn down once its last notes have rung out. */
+interface Rack { buses: TrackBus[]; nodes: AudioNode[]; beat: number }
+
 export class AudioEngine {
   ctx: BaseAudioContext | null = null;
+  private syn!: Synth;
   private master!: GainNode;
+  private musicIn!: GainNode;
   private musicGain!: GainNode;
   private sfxGain!: GainNode;
-  private waves = new Map<number, PeriodicWave>();
-  private noise!: AudioBuffer;
-  private metal!: AudioBuffer;
-  private buses: GainNode[] = [];
   private sfxBuses: GainNode[] = [];
   /** Dry-ish input for the hand-built effects (hits, per-type attacks): same room as the phrases. */
   private sfxIn!: GainNode;
-  private triWave: PeriodicWave | null = null;
+  /** The music after its volume, for the sound test's visualiser. */
+  analyser: AnalyserNode | null = null;
   private song: CompiledSong | null = null;
   private songName = '';
+  private startTick = 0;
   private songStart = 0;
   private nextIdx = 0;
   private pass = 0;
   private timer: number | null = null;
+  private rack: Rack | null = null;
   private lastPlay = new Map<string, number>();
   private candyLadder = new Ladder(CANDY_LADDER.length, 5);
   private killLadder = new Ladder(KILL_LADDER.length, KILL_DRAIN);
   /** Added to currentTime for the ladders; offline renders advance it since the context clock is frozen. */
   private clockSkew = 0;
   private sfxCache = new Map<string, CompiledSong>();
+  private cache = new Map<string, CompiledSong>();
   musicVol = 0.5;
   sfxVol = 0.6;
-  private cache = new Map<string, CompiledSong>();
 
   /** Must be called from a user gesture. */
   unlock() {
@@ -123,15 +98,21 @@ export class AudioEngine {
     this.init(new AC());
   }
 
-  /** Render a song with the real synth into a buffer (used for level checks and previews). */
-  static async renderOffline(name: string, seconds: number, sampleRate = 44100): Promise<AudioBuffer> {
+  /** Render a song with the real synth into a buffer (level checks, previews); optionally from a tick, with tracks muted. */
+  static async renderOffline(name: string, seconds: number, sampleRate = 44100, at = 0, mute: number[] = []): Promise<AudioBuffer> {
     const e = new AudioEngine();
     const ctx = new OfflineAudioContext(2, Math.ceil(seconds * sampleRate), sampleRate);
     e.init(ctx);
-    e.musicVol = 1;
-    e.playMusic(name);
-    if (e.timer !== null) { clearInterval(e.timer); e.timer = null; }
-    e.scheduleUntil(seconds);
+    e.setVolumes(1, e.sfxVol);
+    e.playMusic(name, at);
+    for (const tr of mute) e.setMute(tr, true);
+    // Schedule a quarter second ahead at a time, as live playback does, so the graph only ever
+    // holds the notes that are about to sound (render speed then reflects the live CPU cost).
+    const step = 0.25;
+    e.scheduleUntil(step + 0.1);
+    for (let t = step; t < seconds; t += step) {
+      void ctx.suspend(t).then(() => { e.scheduleUntil(t + step + 0.1); void ctx.resume(); });
+    }
     return ctx.startRendering();
   }
 
@@ -152,68 +133,55 @@ export class AudioEngine {
 
   private init(ctx: BaseAudioContext) {
     this.ctx = ctx;
-    this.master = this.ctx.createGain();
+    this.syn = new Synth(ctx);
+    this.master = ctx.createGain();
     this.master.gain.value = 0.8;
-    const comp = this.ctx.createDynamicsCompressor();
+    const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -14;
     comp.ratio.value = 6;
-    this.master.connect(comp).connect(this.ctx.destination);
-    this.musicGain = this.ctx.createGain();
-    this.sfxGain = this.ctx.createGain();
-    // Music: gentle top-end roll-off, then per-channel pan + reverb send.
-    const tone = this.ctx.createBiquadFilter();
+    this.master.connect(comp).connect(ctx.destination);
+    // Music: every track sums into musicIn, then volume, a gentle top-end roll-off and the analyser.
+    this.musicIn = ctx.createGain();
+    this.musicGain = ctx.createGain();
+    const tone = ctx.createBiquadFilter();
     tone.type = 'lowpass';
-    tone.frequency.value = 10500;
-    this.musicGain.connect(tone).connect(this.master);
-    const sfxTone = this.ctx.createBiquadFilter();
+    tone.frequency.value = 12000;
+    this.analyser = ctx.createAnalyser();
+    this.analyser.fftSize = 2048;
+    this.analyser.smoothingTimeConstant = 0.7;
+    this.musicIn.connect(this.musicGain).connect(tone).connect(this.analyser).connect(this.master);
+
+    this.sfxGain = ctx.createGain();
+    const sfxTone = ctx.createBiquadFilter();
     sfxTone.type = 'lowpass';
     sfxTone.frequency.value = 9000;
     this.sfxGain.connect(sfxTone).connect(this.master);
-    const verb = this.ctx.createConvolver();
-    verb.buffer = this.makeImpulse(1.7);
-    const verbOut = this.ctx.createGain();
-    verbOut.gain.value = 0.55;
-    verb.connect(verbOut).connect(this.musicGain);
-    this.buses = MIX.map((m) => {
-      const g = this.ctx!.createGain();
-      g.gain.value = m.gain;
-      const pan = this.ctx!.createStereoPanner();
-      pan.pan.value = m.pan;
-      const send = this.ctx!.createGain();
-      send.gain.value = m.send;
-      g.connect(pan).connect(this.musicGain);
-      g.connect(send).connect(verb);
-      return g;
-    });
-    const sfxVerb = this.ctx.createConvolver();
-    sfxVerb.buffer = this.makeImpulse(1.1);
-    const sfxVerbOut = this.ctx.createGain();
+    const sfxVerb = ctx.createConvolver();
+    sfxVerb.buffer = this.syn.impulse(1.1);
+    const sfxVerbOut = ctx.createGain();
     sfxVerbOut.gain.value = 0.6;
     sfxVerb.connect(sfxVerbOut).connect(this.sfxGain);
     this.sfxBuses = SFX_MIX.map((m) => {
-      const g = this.ctx!.createGain();
+      const g = ctx.createGain();
       g.gain.value = m.gain;
-      const pan = this.ctx!.createStereoPanner();
+      const pan = ctx.createStereoPanner();
       pan.pan.value = m.pan;
-      const send = this.ctx!.createGain();
+      const send = ctx.createGain();
       send.gain.value = m.send;
       g.connect(pan).connect(this.sfxGain);
       g.connect(send).connect(sfxVerb);
       return g;
     });
-    this.sfxIn = this.ctx.createGain();
-    this.sfxIn.gain.value = 1;
-    const inSend = this.ctx.createGain();
+    this.sfxIn = ctx.createGain();
+    const inSend = ctx.createGain();
     inSend.gain.value = 0.12;
     this.sfxIn.connect(this.sfxGain);
     this.sfxIn.connect(inSend).connect(sfxVerb);
     this.setVolumes(this.musicVol, this.sfxVol);
-    this.noise = this.lfsrNoise(false);
-    this.metal = this.lfsrNoise(true);
     if (this.songName) {
       const n = this.songName;
       this.songName = '';
-      this.playMusic(n);
+      this.playMusic(n, this.startTick);
     }
   }
 
@@ -225,138 +193,144 @@ export class AudioEngine {
     this.sfxGain.gain.setTargetAtTime(sfx * 0.7, this.ctx.currentTime, 0.05);
   }
 
-  private pulseWave(duty: number): PeriodicWave {
-    const key = Math.round(duty * 1000);
-    let w = this.waves.get(key);
-    if (w) return w;
-    const n = 64;
-    const real = new Float32Array(n), imag = new Float32Array(n);
-    for (let i = 1; i < n; i++) imag[i] = (2 / (i * Math.PI)) * Math.sin(i * Math.PI * duty);
-    w = this.ctx!.createPeriodicWave(real, imag);
-    this.waves.set(key, w);
-    return w;
-  }
-
-  /** A one-off chip tone with an optional pitch sweep (pulse, or the stepped triangle). */
-  private tone(dest: AudioNode, t: number, freq: number, dur: number, vol: number, type: 'pulse' | 'triangle', duty = 0.5, slideTo?: number) {
-    const ctx = this.ctx!;
-    const o = ctx.createOscillator();
-    o.setPeriodicWave(type === 'pulse' ? this.pulseWave(duty) : this.triangleWave());
-    o.frequency.setValueAtTime(freq, t);
-    if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(20, slideTo), t + dur);
-    const g = ctx.createGain();
-    // plucked: fast attack, exponential decay like the music's E1 envelope
-    g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(vol, t + 0.004);
-    g.gain.exponentialRampToValueAtTime(Math.max(0.0005, vol * 0.3), t + Math.max(0.006, dur));
-    g.gain.linearRampToValueAtTime(0, t + dur + 0.015);
-    o.connect(g).connect(dest);
-    o.start(t);
-    o.stop(t + dur + 0.04);
-  }
-
-  private noiseHit(dest: AudioNode, t: number, dur: number, vol: number, hp: number, lp = 12000, metal = false) {
-    const ctx = this.ctx!;
-    const s = ctx.createBufferSource();
-    s.buffer = metal ? this.metal : this.noise;
-    s.playbackRate.value = 1;
-    const f1 = ctx.createBiquadFilter();
-    f1.type = 'highpass';
-    f1.frequency.value = hp;
-    const f2 = ctx.createBiquadFilter();
-    f2.type = 'lowpass';
-    f2.frequency.value = lp;
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(vol, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    s.connect(f1).connect(f2).connect(g).connect(dest);
-    s.start(t, Math.random() * 0.5);
-    s.stop(t + dur + 0.02);
-  }
-
   // ─────────────────────────── music ───────────────────────────
 
-  /** Game Boy-style noise: a 15-bit LFSR (or the short 7-bit "metallic" mode), held a few samples per step. */
-  private lfsrNoise(short: boolean): AudioBuffer {
-    const ctx = this.ctx!;
-    const len = ctx.sampleRate;
-    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-    const d = buf.getChannelData(0);
-    let r = 0x7fff;
-    const hold = short ? 3 : 2;
-    let v = 1;
-    for (let i = 0; i < len; i++) {
-      if (i % hold === 0) {
-        const bit = (r ^ (r >> 1)) & 1;
-        r = (r >> 1) | (bit << 14);
-        if (short) r = (r & ~0x40) | (bit << 6);
-        v = r & 1 ? 1 : -1;
-      }
-      d[i] = v * 0.8;
-    }
-    return buf;
-  }
-
-  /** Small stereo room: exponentially decaying noise with a short pre-delay. */
-  private makeImpulse(seconds: number): AudioBuffer {
-    const ctx = this.ctx!;
-    const len = Math.floor(ctx.sampleRate * seconds);
-    const buf = ctx.createBuffer(2, len, ctx.sampleRate);
-    const pre = Math.floor(ctx.sampleRate * 0.018);
-    for (let c = 0; c < 2; c++) {
-      const d = buf.getChannelData(c);
-      for (let i = pre; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - (i - pre) / (len - pre), 3.2);
-    }
-    return buf;
-  }
-
-  /** NES-like 4-bit stepped triangle: a little grit that reads well on small speakers. */
-  private triangleWave(): PeriodicWave {
-    if (this.triWave) return this.triWave;
-    const N = 32, H = 24;
-    const samples: number[] = [];
-    for (let i = 0; i < N; i++) samples.push(((i < 16 ? i : 31 - i) / 15) * 2 - 1);
-    const real = new Float32Array(H), imag = new Float32Array(H);
-    for (let k = 1; k < H; k++) {
-      let re = 0, im = 0;
-      for (let i = 0; i < N; i++) {
-        const a = (2 * Math.PI * k * (i + 0.5)) / N;
-        re += samples[i] * Math.cos(a);
-        im += samples[i] * Math.sin(a);
-      }
-      real[k] = (re / N) * 2;
-      imag[k] = (im / N) * 2;
-    }
-    this.triWave = this.ctx!.createPeriodicWave(real, imag);
-    return this.triWave;
-  }
-
-  playMusic(name: string) {
-    if (name === this.songName) return;
-    this.songName = name;
-    if (!this.ctx) return;
-    const def = SONGS[name];
-    if (!def) return;
+  /** The compiled score for a song name (cached), or null if there is no such song. */
+  compiled(name: string): CompiledSong | null {
     let song = this.cache.get(name);
     if (!song) {
+      const def = SONGS[name];
+      if (!def) return null;
       song = compileSong(def);
       this.cache.set(name, song);
     }
+    return song;
+  }
+
+  /** Builds the song's buses: level → drive → pump → mute → pan → mix, with reverb and delay sends after the mute. */
+  private buildRack(song: CompiledSong): Rack {
+    const ctx = this.ctx!;
+    const def = song.def;
+    const beat = 60 / def.bpm;
+    const nodes: AudioNode[] = [];
+    const node = <T extends AudioNode>(n: T) => { nodes.push(n); return n; };
+    const out = node(ctx.createGain());
+    out.gain.value = def.level ?? 1;
+    out.connect(this.musicIn);
+
+    const verb = node(ctx.createConvolver());
+    verb.buffer = this.syn.impulse(def.room ?? 1.7);
+    const verbOut = node(ctx.createGain());
+    verbOut.gain.value = 0.5;
+    verb.connect(verbOut).connect(out);
+
+    // ping-pong delay: a left repeat, then a right one, fed back through a darkening filter
+    const dIn = node(ctx.createGain());
+    const time = beat * (def.delayBeats ?? 0.75);
+    const dl = node(ctx.createDelay(4)), dr = node(ctx.createDelay(4));
+    dl.delayTime.value = time;
+    dr.delayTime.value = time;
+    const fb = node(ctx.createGain());
+    fb.gain.value = 0.38;
+    const damp = node(ctx.createBiquadFilter());
+    damp.type = 'lowpass';
+    damp.frequency.value = 4200;
+    const pl = node(ctx.createStereoPanner()), pr = node(ctx.createStereoPanner());
+    pl.pan.value = -0.75;
+    pr.pan.value = 0.75;
+    const dOut = node(ctx.createGain());
+    dOut.gain.value = 0.6;
+    dIn.connect(dl);
+    dl.connect(dr);
+    dr.connect(damp).connect(fb).connect(dl);
+    dl.connect(pl).connect(dOut);
+    dr.connect(pr).connect(dOut);
+    dOut.connect(out);
+
+    const buses = def.tracks.map((t): TrackBus => {
+      const inst = INSTRUMENTS[t.inst];
+      const input = node(ctx.createGain());
+      input.gain.value = t.gain ?? 1;
+      let head: AudioNode = input;
+      if (t.drive) {
+        const pre = node(ctx.createGain());
+        pre.gain.value = 1 + t.drive * 1.5;
+        const shaper = node(ctx.createWaveShaper());
+        shaper.curve = Synth.driveCurve();
+        shaper.oversample = '2x';
+        const post = node(ctx.createGain());
+        post.gain.value = 1.3 / (1 + t.drive * 1.5);
+        head = head.connect(pre).connect(shaper).connect(post);
+      }
+      let pump: GainNode | null = null;
+      if (t.pump) { pump = node(ctx.createGain()); head = head.connect(pump); }
+      const mute = node(ctx.createGain());
+      head.connect(mute);
+      const pan = node(ctx.createStereoPanner());
+      pan.pan.value = t.pan ?? 0;
+      mute.connect(pan).connect(out);
+      const vs = node(ctx.createGain());
+      vs.gain.value = t.verb ?? 0.12;
+      mute.connect(vs).connect(verb);
+      if (t.delay) {
+        const ds = node(ctx.createGain());
+        ds.gain.value = t.delay;
+        mute.connect(ds).connect(dIn);
+      }
+      return { input, mute, pump, depth: t.pump ?? 0, inst };
+    });
+    return { buses, nodes, beat };
+  }
+
+  /** Start a song (from `at` ticks in, for the sound test). The same song keeps playing unless `at` is given. */
+  playMusic(name: string, at?: number) {
+    if (name === this.songName && at === undefined) return;
+    this.songName = name;
+    this.startTick = at ?? 0;
+    if (!this.ctx) return;
+    const song = this.compiled(name);
+    if (!song) return;
     // quick fade between songs
     const now = this.ctx.currentTime;
     this.musicGain.gain.cancelScheduledValues(now);
     this.musicGain.gain.setValueAtTime(0, now);
     this.musicGain.gain.linearRampToValueAtTime(this.musicVol * 0.55, now + 0.4);
+    this.retireRack();
+    this.rack = this.buildRack(song);
     this.song = song;
-    this.songStart = now + 0.1;
-    this.nextIdx = 0;
+    this.songStart = now + 0.1 - this.startTick * song.spt;
+    const idx = song.events.findIndex((e) => e.tick >= this.startTick);
+    this.nextIdx = idx < 0 ? song.events.length : idx;
     this.pass = 0;
-    if (this.timer === null) this.timer = window.setInterval(() => this.schedule(), 25);
+    if (this.timer === null && this.ctx instanceof AudioContext) this.timer = window.setInterval(() => this.schedule(), 25);
   }
 
   stopMusic() {
     this.songName = '';
     this.song = null;
+    this.retireRack();
+  }
+
+  /** Disconnect the old rack once anything already scheduled on it has rung out. */
+  private retireRack() {
+    const old = this.rack;
+    this.rack = null;
+    if (old && this.ctx instanceof AudioContext) setTimeout(() => old.nodes.forEach((n) => n.disconnect()), 4000);
+  }
+
+  /** The playing song and its position in ticks (following the loop), or null. */
+  nowPlaying(): { name: string; song: CompiledSong; tick: number } | null {
+    if (!this.ctx || !this.song) return null;
+    const s = this.song;
+    const el = Math.max(0, (this.ctx.currentTime - this.songStart) / s.spt);
+    const tick = el < s.length ? el : s.loopTick + ((el - s.length) % Math.max(1, s.length - s.loopTick));
+    return { name: this.songName, song: s, tick };
+  }
+
+  /** Silence one track of the playing song (sound test). */
+  setMute(track: number, on: boolean) {
+    const b = this.rack?.buses[track];
+    if (b && this.ctx) b.mute.gain.setTargetAtTime(on ? 0 : 1, this.ctx.currentTime, 0.01);
   }
 
   private schedule() {
@@ -364,9 +338,10 @@ export class AudioEngine {
   }
 
   private scheduleUntil(ahead: number) {
-    if (!this.ctx || !this.song) return;
+    if (!this.ctx || !this.song || !this.rack || !this.song.events.length) return;
     const song = this.song;
-    for (let guard = 0; guard < 200000; guard++) {
+    const rack = this.rack;
+    for (let guard = 0; guard < 400000; guard++) {
       if (this.nextIdx >= song.events.length) {
         this.nextIdx = song.loopIdx;
         this.pass++;
@@ -377,68 +352,18 @@ export class AudioEngine {
       if (t > ahead) break;
       this.nextIdx++;
       if (t < this.ctx.currentTime - 0.03) continue;
-      this.voice(ev, t, song.spt, this.buses[ev.ch]);
+      const bus = rack.buses[ev.tr];
+      this.syn.play(ev, bus.inst, t, song.spt, bus.input);
+      if ((ev.drum === 'k' || ev.drum === 'i') && bus.inst.kind === 'kit') this.duck(rack, t);
     }
   }
 
-  /** Play one score event on a chip voice. Shared by the music and the sound-effect phrases. */
-  private voice(ev: SongEvent, t: number, spt: number, bus: AudioNode, transpose = 0, volMul = 1) {
-    const ctx = this.ctx!;
-    const dur = ev.dur * spt;
-    if (ev.ch === 3) return this.drum(bus, ev.drum!, t, ev.vol * volMul);
-    const o = ctx.createOscillator();
-    const midi = transpose ? ev.midi.map((m) => m + transpose) : ev.midi;
-    const hz = midiHz(midi[0]);
-    if (ev.ch === 2) o.setPeriodicWave(this.triangleWave());
-    else o.setPeriodicWave(this.pulseWave(DUTY[ev.duty] ?? 0.5));
-    if (midi.length > 1) {
-      // fast arpeggio: cycle the chord tones like a sound chip would
-      const step = 1 / 36;
-      for (let k = 0, tt = t; tt < t + dur; k++, tt += step) o.frequency.setValueAtTime(midiHz(midi[k % midi.length]), tt);
-    } else o.frequency.setValueAtTime(hz, t);
-    if (ev.vib && dur > 0.24 && midi.length === 1) {
-      // delayed vibrato, so short notes stay clean and held notes sing
-      const lfo = ctx.createOscillator();
-      lfo.frequency.value = 5.5;
-      const depth = ctx.createGain();
-      depth.gain.setValueAtTime(0, t);
-      depth.gain.setValueAtTime(0, t + 0.16);
-      depth.gain.linearRampToValueAtTime(hz * (Math.pow(2, (ev.vib * 6) / 1200) - 1), t + 0.42);
-      lfo.connect(depth).connect(o.frequency);
-      lfo.start(t);
-      lfo.stop(t + dur + 0.06);
-    }
-    const g = ctx.createGain();
-    const peak = ev.vol * volMul;
-    const rel = ev.ch === 2 ? 0.012 : 0.03;
-    g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(peak, t + 0.004);
-    // envelopes: E1 plucked decay, E2 soft decay to a sustain, E0 organ
-    const end = ev.ch !== 2 && ev.env === 1 ? peak * Math.exp(-Math.max(0, dur - 0.01) / 0.13) * 0.92 + peak * 0.08
-      : ev.ch !== 2 && ev.env === 2 ? peak * 0.62 + peak * 0.38 * Math.exp(-Math.max(0, dur - 0.02) / 0.16)
-      : peak;
-    if (end !== peak) g.gain.exponentialRampToValueAtTime(Math.max(0.0005, end), t + Math.max(0.005, dur));
-    else g.gain.setValueAtTime(peak, t + Math.max(0.005, dur));
-    g.gain.linearRampToValueAtTime(0, t + dur + rel);
-    o.connect(g).connect(bus);
-    o.start(t);
-    o.stop(t + dur + rel + 0.02);
-  }
-
-  private drum(bus: AudioNode, d: string, t: number, vol: number) {
-    switch (d) {
-      case 'k':
-        this.tone(bus, t, 160, 0.13, vol * 0.9, 'triangle', 0.5, 42);
-        this.noiseHit(bus, t, 0.012, vol * 0.25, 1500, 8000);
-        break;
-      case 's':
-        this.noiseHit(bus, t, 0.14, vol * 0.65, 1300, 9500);
-        this.tone(bus, t, 200, 0.06, vol * 0.35, 'triangle', 0.5, 150);
-        break;
-      case 'h': this.noiseHit(bus, t, 0.035, vol * 0.45, 7500, 16000, true); break;
-      case 'p': this.noiseHit(bus, t, 0.16, vol * 0.4, 6500, 16000, true); break;
-      case 'x': this.noiseHit(bus, t, 0.8, vol * 0.45, 3500, 15000); break;
-      case 't': this.tone(bus, t, 230, 0.16, vol * 0.75, 'triangle', 0.5, 105); break;
+  /** Sidechain: every kick pulls the pumped tracks down and lets them swell back over about half a beat. */
+  private duck(rack: Rack, t: number) {
+    for (const b of rack.buses) {
+      if (!b.pump) continue;
+      b.pump.gain.setTargetAtTime(1 - b.depth, t, 0.004);
+      b.pump.gain.setTargetAtTime(1, t + 0.03, rack.beat * 0.16);
     }
   }
 
@@ -463,29 +388,32 @@ export class AudioEngine {
     }
     const t0 = this.ctx.currentTime + 0.005;
     const v = (def.vol ?? 1) * volMul;
-    for (const ev of song.events) this.voice(ev, t0 + ev.tick * song.spt, song.spt, this.sfxBuses[ev.ch], transpose, v);
+    for (const ev of song.events) {
+      this.syn.play(ev, INSTRUMENTS[song.def.tracks[ev.tr].inst], t0 + ev.tick * song.spt, song.spt, this.sfxBuses[ev.tr], transpose, v);
+    }
   }
 
   sfx(name: string, arg = 0) {
     if (!this.ctx || this.sfxVol <= 0) return;
     const t = this.ctx.currentTime + 0.005;
     const d = this.sfxIn;
+    const syn = this.syn;
     switch (name) {
       case 'hit':
         if (!this.gate('hit', 0.05)) return;
-        this.noiseHit(d, t, 0.045, 0.14, 1400, 5500);
-        this.tone(d, t, 260 + Math.random() * 60, 0.05, 0.05, 'pulse', 0.5, 110);
+        syn.noiseHit(d, t, 0.045, 0.14, 1400, 5500);
+        syn.tone(d, t, 260 + Math.random() * 60, 0.05, 0.05, 'pulse', 0.5, 110);
         break;
       case 'super':
         if (!this.gate('super', 0.12)) return;
-        this.noiseHit(d, t, 0.07, 0.16, 900, 5000);
-        this.tone(d, t, midiHz(76), 0.07, 0.07, 'pulse', 0.25, midiHz(83));
+        syn.noiseHit(d, t, 0.07, 0.16, 900, 5000);
+        syn.tone(d, t, midiHz(76), 0.07, 0.07, 'pulse', 0.25, midiHz(83));
         break;
       case 'crit': {
         // sparkle layered over the normal hit: two quick high pings a fifth apart
         if (!this.gate('crit', 0.08)) return;
-        this.tone(d, t, midiHz(93), 0.05, 0.045, 'pulse', 0.125);
-        this.tone(d, t + 0.035, midiHz(100), 0.07, 0.04, 'pulse', 0.125, midiHz(103));
+        syn.tone(d, t, midiHz(93), 0.05, 0.045, 'pulse', 0.125);
+        syn.tone(d, t + 0.035, midiHz(100), 0.07, 0.04, 'pulse', 0.125, midiHz(103));
         break;
       }
       case 'kill': {
@@ -495,8 +423,8 @@ export class AudioEngine {
         const step = this.killLadder.step(this.ctx.currentTime + this.clockSkew);
         const midi = 67 + KILL_LADDER[step];
         const vol = 0.08 * (1 - step * 0.06);
-        this.tone(d, t, midiHz(midi), 0.08, vol, 'pulse', 0.125, midiHz(midi - 12));
-        this.noiseHit(d, t, 0.03, 0.06 * (1 - step * 0.06), 2500, 8000, true);
+        syn.tone(d, t, midiHz(midi), 0.08, vol, 'pulse', 0.125, midiHz(midi - 12));
+        syn.noiseHit(d, t, 0.03, 0.06 * (1 - step * 0.06), 2500, 8000, true);
         break;
       }
       case 'candy': {
@@ -504,8 +432,8 @@ export class AudioEngine {
         if (!this.gate('candy', 0.055)) return;
         const step = this.candyLadder.step(this.ctx.currentTime + this.clockSkew);
         const vol = 0.085 * (1 - step * 0.05);
-        this.tone(d, t, midiHz(67 + CANDY_LADDER[step]), 0.07, vol, 'pulse', 0.125);
-        this.tone(d, t, midiHz(55 + CANDY_LADDER[step]), 0.05, vol * 0.6, 'triangle');
+        syn.tone(d, t, midiHz(67 + CANDY_LADDER[step]), 0.07, vol, 'pulse', 0.125);
+        syn.tone(d, t, midiHz(55 + CANDY_LADDER[step]), 0.05, vol * 0.6, 'triangle');
         break;
       }
       case 'coin':
@@ -518,8 +446,8 @@ export class AudioEngine {
         break;
       case 'boom':
         if (!this.gate('boom', 0.08)) return;
-        this.noiseHit(d, t, 0.35, 0.3, 60, 1600);
-        this.tone(d, t, 140, 0.3, 0.22, 'triangle', 0.5, 40);
+        syn.noiseHit(d, t, 0.35, 0.3, 60, 1600);
+        syn.tone(d, t, 140, 0.3, 0.22, 'triangle', 0.5, 40);
         break;
       case 'raid':
         // A rising siren as a big attack winds up (arg 1 = boss-sized: lower, louder).
@@ -547,22 +475,23 @@ export class AudioEngine {
     if (!this.gate(`fire${typeIdx}`, 0.09)) return;
     const t = this.ctx!.currentTime + 0.005;
     const d = this.sfxIn;
+    const syn = this.syn;
     const v = 0.045;
     switch (typeIdx) {
-      case 1: this.noiseHit(d, t, 0.16, v * 2.2, 400, 3200); break; // fire: roar
-      case 2: this.tone(d, t, midiHz(72), 0.1, v, 'triangle', 0.5, midiHz(84)); break; // water: bloop up
-      case 3: this.noiseHit(d, t, 0.07, v * 1.8, 3000, 10000, true); this.tone(d, t, 1800, 0.05, v * 0.6, 'pulse', 0.125, 900); break; // electric: zap
-      case 4: this.noiseHit(d, t, 0.07, v * 1.4, 2500, 7000); break; // grass: rustle
-      case 5: this.tone(d, t, midiHz(91), 0.08, v * 0.8, 'pulse', 0.125, midiHz(96)); break; // ice: glint
-      case 6: this.noiseHit(d, t, 0.06, v * 2.4, 200, 2000); break; // fighting: thump
-      case 7: this.tone(d, t, midiHz(55), 0.12, v, 'pulse', 0.25, midiHz(50)); break; // poison: blub
-      case 8: this.noiseHit(d, t, 0.12, v * 2.4, 60, 900); break; // ground: rumble
-      case 9: this.noiseHit(d, t, 0.14, v * 1.3, 1500, 6000); break; // flying: whoosh
-      case 10: this.tone(d, t, midiHz(71), 0.15, v, 'triangle', 0.5, midiHz(83)); break; // psychic: swell
-      case 13: this.tone(d, t, midiHz(67), 0.18, v, 'triangle', 0.5, midiHz(59)); break; // ghost: droop
-      case 14: this.tone(d, t, midiHz(43), 0.15, v * 1.3, 'pulse', 0.125, midiHz(36)); break; // dragon: growl
-      case 17: this.tone(d, t, midiHz(88), 0.1, v * 0.8, 'triangle', 0.5, midiHz(93)); break; // fairy: twinkle
-      default: this.tone(d, t, midiHz(74), 0.05, v, 'pulse', 0.5, midiHz(62));
+      case 1: syn.noiseHit(d, t, 0.16, v * 2.2, 400, 3200); break; // fire: roar
+      case 2: syn.tone(d, t, midiHz(72), 0.1, v, 'triangle', 0.5, midiHz(84)); break; // water: bloop up
+      case 3: syn.noiseHit(d, t, 0.07, v * 1.8, 3000, 10000, true); syn.tone(d, t, 1800, 0.05, v * 0.6, 'pulse', 0.125, 900); break; // electric: zap
+      case 4: syn.noiseHit(d, t, 0.07, v * 1.4, 2500, 7000); break; // grass: rustle
+      case 5: syn.tone(d, t, midiHz(91), 0.08, v * 0.8, 'pulse', 0.125, midiHz(96)); break; // ice: glint
+      case 6: syn.noiseHit(d, t, 0.06, v * 2.4, 200, 2000); break; // fighting: thump
+      case 7: syn.tone(d, t, midiHz(55), 0.12, v, 'pulse', 0.25, midiHz(50)); break; // poison: blub
+      case 8: syn.noiseHit(d, t, 0.12, v * 2.4, 60, 900); break; // ground: rumble
+      case 9: syn.noiseHit(d, t, 0.14, v * 1.3, 1500, 6000); break; // flying: whoosh
+      case 10: syn.tone(d, t, midiHz(71), 0.15, v, 'triangle', 0.5, midiHz(83)); break; // psychic: swell
+      case 13: syn.tone(d, t, midiHz(67), 0.18, v, 'triangle', 0.5, midiHz(59)); break; // ghost: droop
+      case 14: syn.tone(d, t, midiHz(43), 0.15, v * 1.3, 'pulse', 0.125, midiHz(36)); break; // dragon: growl
+      case 17: syn.tone(d, t, midiHz(88), 0.1, v * 0.8, 'triangle', 0.5, midiHz(93)); break; // fairy: twinkle
+      default: syn.tone(d, t, midiHz(74), 0.05, v, 'pulse', 0.5, midiHz(62));
     }
   }
 }

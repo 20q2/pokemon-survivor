@@ -333,7 +333,7 @@ export class App {
       case 'boss':
         banner(`A wild ${SPECIES[ev.species].name.toUpperCase()} appeared!`, true, 3200);
         audio.sfx('boss');
-        audio.playMusic('boss');
+        audio.playMusic(ev.final ? 'final' : 'boss');
         this.bossMusic = true;
         break;
       case 'bossDown':

@@ -83,7 +83,8 @@ their own upgrades, fainted teammates are revived by standing next to them.
 | `src/game/session.ts` | `RunSession` interface shared by solo/host/client |
 | `src/net/` | PeerJS host/client, binary snapshot protocol, client replica session |
 | `src/render/` | Canvas2D renderer, tile-map world (`background.ts`, `biomes.ts`, `pixelart.ts`), pixel particles, bitmap damage numbers |
-| `src/audio/` | MML score engine (`mml.ts`), 11 hand-composed songs (`songs.ts`), SFX phrases (`sfx.ts`) on the same chip synth |
+| `src/audio/` | MML parser (`mml.ts`), section-based multi-track scores (`score.ts`), synth voices and drum kits (`synth.ts`, `instruments.ts`), the soundtrack (`songs/*.ts`: 12 songs plus the original chip set as `classic-*`), SFX phrases (`sfx.ts`) on the chip voices |
+| `src/ui/soundtest.ts` | Sound Test (title menu): every song by level, live piano roll, section jumps, track mutes |
 | `src/game/mega.ts` | Mega Evolution meter and transformation |
 | `src/ui/minimap.ts` | PMD-style minimap |
 | `src/ui/` | DOM menus, HUD, level-up cards, lobby; keyboard/gamepad menu navigation |
@@ -91,7 +92,7 @@ their own upgrades, fainted teammates are revived by standing next to them.
 | `scripts/balance.ts` | Headless balance runs with a kiting bot (`node scripts/balance.ts mtmoon 900`) |
 | `scripts/pacing.ts` | Pacing telemetry for a headless run: level-up gaps (actual and "potential" with floor candy counted), enemies alive / in view / peak, hits per second, ms per tick (`node scripts/pacing.ts viridian charmander 960 7`, last arg = seed) |
 | `scripts/*.mjs` | Playwright screenshot / flow / co-op / perf checks (uses installed Edge) |
-| `scripts/render-music.mjs` | Renders every song with the real synth (levels report + optional WAVs) |
+| `scripts/render-music.mjs` | Renders songs with the real synth: levels, render speed, optional WAVs, per-track stems (`--stems`), from a section (`--from drop`) |
 | `scripts/sfx-levels.mjs` | Renders every sound effect with the real synth and prints peak/RMS |
 | `scripts/stageshots.mjs` | Screenshots a run on each route (`FIGHT=1` fast-forwards into combat) |
 | `scripts/props-sheet.mjs` | Contact sheet of every route's props, for checking the pixel art |
