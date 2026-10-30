@@ -144,7 +144,8 @@ export class AudioEngine {
     if (name === 'candy' || name === 'kill') {
       // currentTime is frozen before rendering, so step the ladder clock to space the run out
       const gap = name === 'candy' ? 0.08 : 1 / 60; // a candy burst, or a 60 kills/s mow
-      for (let i = 0; i < arg; i++) { e.lastPlay.clear(); e.clockSkew += gap; e.sfx(name); }
+      // arg 0 (the level-check script's default) still means "one sound", not silence.
+      for (let i = 0; i < Math.max(1, arg); i++) { e.lastPlay.clear(); e.clockSkew += gap; e.sfx(name); }
     } else e.sfx(name, arg);
     return ctx.startRendering();
   }
