@@ -44,10 +44,12 @@ export interface PropSpec {
 export interface Biome {
   base: Material;
   layers: Layer[];
-  /** Decorative scatter (walk-through). */
+  /** Decorative scatter (walk-through): only flat things like flowers, pebbles, puddles. */
   props: PropSpec[];
   /** Art for the solid obstacles; where they stand comes from game/obstacles.ts. */
   solids: PropSprite[];
+  /** Art for its small obstacles (rocks, stumps…). Every route with them there needs some here. */
+  smallSolids: PropSprite[];
   seed: number;
 }
 
@@ -535,10 +537,11 @@ const builders: Record<string, () => Biome> = {
         { mat: tallGrass(P('#173a1e', '#2a6a2e', '#3c8a3a', '#5cae4c', '#8cd070'), 13), field: { scale: 9, kind: 'blob', thr: 0.6 }, rim: '#1f4c24', shade: true },
       ],
       solids: [...sprites(3, 1, (r) => tree(r, LEAF)), tree(new PRng(9), LEAF, '#e04040'), pine(LEAF_DARK)],
+      smallSolids: [stump(), ...sprites(2, 16, (r, i) => boulder(r, ['#3a3a36', '#7a7a70', '#9a9a8c', '#b8b8a8', '#dcdccc'], [16, 14][i]))],
       props: [
         { sprites: [bush(LEAF), bush(LEAF, '#4060e0')], cell: 1, density: 0.012, on: [0] },
         { sprites: sprites(3, 2, (r, i) => flowers(r, ([['#7a1a1a', '#c03030', '#e85050', '#ff8080', '#ffd0d0'], ['#7a6a10', '#d0b020', '#f0d840', '#fff080', '#ffffff'], ['#6a6a7a', '#c8c8d8', '#e8e8f0', '#ffffff', '#ffffff']] as Ramp[])[i], '#2a6a2a')), cell: 1, density: 0.03, on: [0] },
-        { sprites: [mushroom(['#5a1010', '#a02020', '#d03a30', '#e86a50', '#ffb0a0']), stump()], cell: 1, density: 0.004, on: [0] },
+        { sprites: [mushroom(['#5a1010', '#a02020', '#d03a30', '#e86a50', '#ffb0a0'])], cell: 1, density: 0.002, on: [0] },
       ],
     };
   },
@@ -554,6 +557,7 @@ const builders: Record<string, () => Biome> = {
       ...sprites(2, 4, (r) => stalagmite(r, CAVE_STONE)),
       ...sprites(2, 5, (r) => crystal(r, ['#2a2a6a', '#5a5ab8', '#8a8ae8', '#bcbcff', '#ffffff'])),
     ],
+    smallSolids: [],
     props: [
       { sprites: [...sprites(2, 6, (r) => pebbles(r, CAVE_STONE)), bones()], cell: 1, density: 0.02, on: [0, 2] },
     ],
@@ -566,6 +570,7 @@ const builders: Record<string, () => Biome> = {
       { mat: wetRock(P('#1e3a5a', '#2e5680', '#3e6c9a', '#6a98c0', '#a8d0ec'), 33), field: { scale: 7, kind: 'blob', thr: 0.7 }, rim: '#1e3a5a' },
     ],
     solids: [...sprites(3, 7, (r) => iceSpike(r)), ...sprites(2, 8, (r) => boulder(r, ['#2a4a68', '#6a8aa8', '#8eaac4', '#b4cce0', '#e0f0ff'], 24))],
+    smallSolids: sprites(2, 17, (r, i) => boulder(r, ['#2a4a68', '#6a8aa8', '#8eaac4', '#b4cce0', '#e0f0ff'], [22, 20][i])),
     props: [
       { sprites: [snowPile(), snowPile(), shell(new PRng(9))], cell: 1, density: 0.01, on: [0, 1] },
       { sprites: [puddle(['#1e3a5a', '#3a6a9a', '#5a8cc0', '#9ac4e8', '#ffffff'])], cell: 2, density: 0.01, on: [0] },
@@ -581,8 +586,9 @@ const builders: Record<string, () => Biome> = {
         { mat: rockFloor(P('#1e1e1a', '#34342e', '#44443c', '#56564c', '#6a6a5e'), 42), field: { scale: 8, kind: 'blob', thr: 0.66 }, rim: '#24241e', shade: true },
       ],
       solids: [machine(), machine(), pylon()],
+      smallSolids: [barrel()],
       props: [
-        { sprites: [barrel(), puddle(['#101010', '#2a2a30', '#3a3a44', '#5a5a70', '#a0a0c0'])], cell: 1, density: 0.012, on: [0, 2] },
+        { sprites: [puddle(['#101010', '#2a2a30', '#3a3a44', '#5a5a70', '#a0a0c0'])], cell: 1, density: 0.006, on: [0, 2] },
       ],
     };
   },
@@ -594,6 +600,7 @@ const builders: Record<string, () => Biome> = {
       { mat: grass(P('#1e2a24', '#34443a', '#46584c', '#5a6e60', '#748a7a'), 52), field: { scale: 9, kind: 'blob', thr: 0.6 }, rim: '#26342c', shade: true },
     ],
     solids: [...sprites(4, 10, (r) => grave(r)), deadTree()],
+    smallSolids: [],
     props: [
       { sprites: [candle()], cell: 1, density: 0.012, on: [0, 1] },
       { sprites: [bones()], cell: 1, density: 0.006, on: [0, 2] },
@@ -605,6 +612,7 @@ const builders: Record<string, () => Biome> = {
       ...sprites(3, 11, (r, i) => boulder(r, ['#1a0c0a', '#4a2a22', '#64382c', '#7e4a3a', '#9a6250'], [26, 20, 24][i])),
       ...sprites(2, 12, (r) => stalagmite(r, ['#1a0c0a', '#4a2a22', '#64382c', '#7e4a3a', '#9a6250'])),
     ],
+    smallSolids: [],
     base: rockFloor(P('#1e1010', '#3e2420', '#56322a', '#6c4234', '#845444'), 61, ['#e8641c', '#ffc040']),
     layers: [
       { mat: dirt(P('#1e1a1a', '#3e3836', '#4e4744', '#625a56', '#7a706a'), 62, 2), field: { scale: 9, kind: 'blob', thr: 0.66 }, rim: '#2a2422', shade: true },
@@ -627,6 +635,7 @@ const builders: Record<string, () => Biome> = {
       ...sprites(2, 14, (r, i) => boulder(r, ['#0e1422', '#34405a', '#465674', '#5a6c8c', '#7a8ca8'], [26, 20][i])),
       ...sprites(1, 15, (r) => stalagmite(r, ['#0e1422', '#34405a', '#465674', '#5a6c8c', '#7a8ca8'])),
     ],
+    smallSolids: sprites(2, 18, (r, i) => boulder(r, ['#0e1422', '#34405a', '#465674', '#5a6c8c', '#7a8ca8'], [20, 18][i])),
     props: [
       { sprites: [puddle(['#0a1420', '#1e3a60', '#2e5488', '#5a88c0', '#c0e0ff']), pebbles(new PRng(3), ['#0e1422', '#34405a', '#465674', '#5a6c8c', '#7a8ca8'])], cell: 1, density: 0.014, on: [0, 1] },
     ],
@@ -664,9 +673,10 @@ const sheetBuilders: Record<string, (s: Sheet) => Biome> = {
         },
       ],
       solids: [P2([14, 0], 3, 4, 24, 54), P2([3, 34], 3, 4, 24, 58), P2([3, 34], 3, 4, 24, 58), P2([14, 17], 2, 3, 16, 44), P2([14, 17], 2, 3, 16, 44), P2([0, 34], 3, 4, 24, 58)],
+      // round bush and two rocks
+      smallSolids: [P2([17, 0], 1, 1, 8, 15), P2([7, 16], 1, 1, 8, 15), P2([8, 18], 1, 1, 8, 15)],
       props: [
-        { sprites: [P2([17, 0], 1, 1, 8, 15)], cell: 2, density: 0.006, on: [0], clear: 72 },
-        { sprites: [P2([7, 12], 1, 1, 8, 14, false), P2([7, 16], 1, 1, 8, 14, false), P2([8, 18], 1, 1, 8, 14, false)], cell: 1, density: 0.012, on: [0] },
+        { sprites: [P2([7, 12], 1, 1, 8, 14, false)], cell: 1, density: 0.004, on: [0] },
         { sprites: [P2([7, 2], 1, 1, 8, 14, false), P2([7, 0], 1, 1, 8, 14, false), P2([2, 33], 1, 1, 8, 14, false)], cell: 1, density: 0.03, on: [0] },
       ],
     };
@@ -685,6 +695,7 @@ const sheetBuilders: Record<string, (s: Sheet) => Biome> = {
         { mat: sheetMaterial(s, [[19, 23]], [1]), field: { scale: 9, kind: 'blob', thr: 0.6 }, rim: '#706858', shade: true },
       ],
       solids: [onDirt([21, 28], 1, 1, 8, 15), onDirt([22, 28], 1, 1, 8, 15)],
+      smallSolids: [],
       props: [
         { sprites: [onLedge([20, 23], 1, 1, 8, 8), onLedge([21, 26], 2, 1, 16, 8)], cell: 2, density: 0.03, on: [1] },
         { sprites: [onDirt([20, 28], 1, 1, 8, 8, false), onDirt([19, 27], 1, 2, 8, 24, false)], cell: 2, density: 0.003, on: [0], clear: 64 },
@@ -705,9 +716,9 @@ const sheetBuilders: Record<string, (s: Sheet) => Biome> = {
         { mat: sheetMaterial(s, [cobble], [1]), field: { scale: 10, kind: 'blob', thr: 0.6 }, rim: '#808070', shade: true },
       ],
       solids: [P2([0, 46], 1, 1, 8, 15), P2([0, 46], 1, 1, 8, 15), P2([1, 46], 1, 1, 8, 15)],
-      props: [
-        { sprites: [P2([3, 43], 2, 3, 16, 46)], cell: 2, density: 0.006, on: [1], clear: 72 },
-      ],
+      // a big boulder standing in its own pool
+      smallSolids: [P2([3, 43], 2, 3, 16, 46)],
+      props: [],
     };
   },
   // Mauve cave set (bottom right): mossy cobble floor with autotiled sand drifts.
@@ -726,9 +737,9 @@ const sheetBuilders: Record<string, (s: Sheet) => Biome> = {
         },
       ],
       solids: [P2([19, 33], 1, 1, 8, 15), P2([19, 34], 1, 1, 8, 15), P2([20, 34], 1, 1, 8, 15), P2([21, 34], 1, 1, 8, 15)],
-      props: [
-        { sprites: [P2([22, 34], 2, 2, 16, 31)], cell: 2, density: 0.008, on: [0], clear: 72 },
-      ],
+      // rocks in a pool
+      smallSolids: [P2([22, 34], 2, 2, 16, 31)],
+      props: [],
     };
   },
 };

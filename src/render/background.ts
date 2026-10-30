@@ -202,12 +202,12 @@ export class Background {
       else flat.push(p);
     }
     // solid obstacles whose foot lies in this chunk
-    const solids = biome.solids;
-    if (solids.length) {
+    if (biome.solids.length) {
       const per = CPX / OB_CELL;
       for (let j = cy * per; j < (cy + 1) * per; j++) for (let i = cx * per; i < (cx + 1) * per; i++) {
         const o = this.obstacles.at(i, j);
-        if (o) tall.push({ s: solids[Math.floor(o.v * solids.length)], x: o.x, y: o.y });
+        const art = o?.small && biome.smallSolids.length ? biome.smallSolids : biome.solids;
+        if (o) tall.push({ s: art[Math.floor(o.v * art.length)], x: o.x, y: o.y });
       }
     }
     flat.sort((a, b) => a.y - b.y);

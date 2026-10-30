@@ -16,10 +16,10 @@ function sim(stageId = 'viridian') {
 }
 
 /** A free-standing obstacle near the origin (no neighbours within a cell). */
-function loneObstacle(obs: Obstacles): Obstacle {
-  for (let cy = -20; cy < 20; cy++) for (let cx = -20; cx < 20; cx++) {
+function loneObstacle(obs: Obstacles, small = false): Obstacle {
+  for (let cy = -40; cy < 40; cy++) for (let cx = -40; cx < 40; cx++) {
     const o = obs.at(cx, cy);
-    if (!o) continue;
+    if (!o || !!o.small !== small) continue;
     let alone = true;
     for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) if ((i || j) && obs.at(cx + i, cy + j)) alone = false;
     if (alone) return o;
@@ -66,6 +66,21 @@ describe('scenery obstacles', () => {
     expect(shot.dead).toBe(true);
     expect(mine.dead).toBe(true);
     expect(hazard.dead).toBe(false);
+  });
+
+  it('small rocks block bodies but shots fly over them', () => {
+    const s = sim();
+    const p = s.players[0];
+    const o = loneObstacle(s.obstacles, true);
+    expect(o.r).toBeLessThan(11);
+    const mine = makeProjectile(s, { owner: 0, behavior: 'projectile', moveId: 'ember', fx: 'orb', type: 'fire', shape: 'circle', x: o.x + 50, y: o.cy, vx: -200, vy: 0, r: 4, life: 3, dmg: 1, pierce: 1 });
+    p.x = o.x - 60; p.y = o.cy;
+    p.mx = 1; p.my = 0;
+    for (let i = 0; i < 60; i++) {
+      s.update(DT);
+      expect(Math.hypot(p.x - o.x, p.y - o.cy)).toBeGreaterThanOrEqual(o.r + p.radius - 0.01);
+    }
+    expect(mine.dead).toBe(false);
   });
 
   it('foes come round a forest wall instead of piling up behind it', () => {

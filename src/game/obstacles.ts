@@ -9,6 +9,9 @@ import { fbm, hash2 } from '../engine/noise.ts';
  *
  * Each obstacle is a circle around the base of the sprite (the trunk, not the canopy), so bodies
  * slide past rounded edges and can walk "behind" a tree's crown.
+ *
+ * Loose scatter also has small obstacles (rocks, stumps, barrels…): solid to bodies, but low
+ * enough that shots fly over them. Walk-through decor (flowers, pebbles…) is render-only.
  */
 
 export const OB_CELL = 32;
@@ -24,6 +27,8 @@ export interface Obstacle {
   r: number;
   /** 0..1, picks the sprite variant. */
   v: number;
+  /** A small one: drawn from the biome's small art, and shots pass over it. */
+  small?: boolean;
 }
 
 interface Spec {
@@ -31,6 +36,8 @@ interface Spec {
   density: number;
   /** Dense clumps (forests, rock fields) where the noise is high. */
   grove?: { scale: number; thr: number; density: number };
+  /** Small obstacles in the loose scatter (outside groves), with their own radius. */
+  small?: { r: number; density: number };
   /** Keep off this terrain field (the route's paths): same noise as the ground renderer's layer. */
   avoid?: { scale: number; thr: number; seed: number };
   /** World px kept free around the spawn point. */
@@ -39,13 +46,13 @@ interface Spec {
 }
 
 const SPEC: Record<string, Spec> = {
-  viridian: { r: 11, density: 0.02, grove: { scale: 7, thr: 0.6, density: 0.8 }, avoid: { scale: 22, thr: 0.035, seed: 111 }, clear: 80, seed: 11 },
+  viridian: { r: 11, density: 0.02, grove: { scale: 7, thr: 0.6, density: 0.8 }, small: { r: 7, density: 0.03 }, avoid: { scale: 22, thr: 0.035, seed: 111 }, clear: 80, seed: 11 },
   mtmoon: { r: 8, density: 0.035, grove: { scale: 6, thr: 0.68, density: 0.5 }, clear: 72, seed: 21 },
-  seafoam: { r: 9, density: 0.03, grove: { scale: 6, thr: 0.68, density: 0.45 }, clear: 72, seed: 31 },
-  powerplant: { r: 12, density: 0.02, grove: { scale: 7, thr: 0.7, density: 0.35 }, avoid: { scale: 20, thr: 0.035, seed: 141 }, clear: 80, seed: 41 },
+  seafoam: { r: 9, density: 0.03, grove: { scale: 6, thr: 0.68, density: 0.45 }, small: { r: 10, density: 0.012 }, clear: 72, seed: 31 },
+  powerplant: { r: 12, density: 0.02, grove: { scale: 7, thr: 0.7, density: 0.35 }, small: { r: 7, density: 0.03 }, avoid: { scale: 20, thr: 0.035, seed: 141 }, clear: 80, seed: 41 },
   tower: { r: 7, density: 0.014, grove: { scale: 6, thr: 0.64, density: 0.3 }, avoid: { scale: 20, thr: 0.035, seed: 151 }, clear: 72, seed: 51 },
   cinnabar: { r: 10, density: 0.025, grove: { scale: 6, thr: 0.7, density: 0.4 }, clear: 72, seed: 61 },
-  cerulean: { r: 9, density: 0.035, grove: { scale: 6, thr: 0.66, density: 0.5 }, clear: 72, seed: 71 },
+  cerulean: { r: 9, density: 0.035, grove: { scale: 6, thr: 0.66, density: 0.5 }, small: { r: 9, density: 0.015 }, clear: 72, seed: 71 },
 };
 
 /** Direct-mapped cell cache: 256×256 slots (an 8192 px window), tagged with the cell they hold. */
@@ -66,7 +73,7 @@ export class Obstacles {
 
   constructor(stageId: string) {
     this.spec = SPEC[stageId];
-    this.reach = (this.spec?.r ?? 0) + 8;
+    this.reach = Math.max(this.spec?.r ?? 0, this.spec?.small?.r ?? 0) + 8;
   }
 
   /** The obstacle in a 32 px cell, if any. */
@@ -86,7 +93,9 @@ export class Obstacles {
     let p = s.density;
     const grove = !!s.grove && fbm(cx * 2 / s.grove.scale, cy * 2 / s.grove.scale, s.seed + 50) > s.grove.thr;
     if (grove) p = s.grove!.density;
-    if (hash2(cx, cy, s.seed + 999) >= p) return null;
+    const u = hash2(cx, cy, s.seed + 999);
+    const small = !grove && !!s.small && u >= p && u < p + s.small.density;
+    if (u >= p && !small) return null;
     // loose scatter is jittered; groves sit on the grid so canopies interlock into walls
     const jx = grove ? 0 : Math.round((hash2(cx, cy, s.seed + 5) - 0.5) * 8);
     const jy = grove ? 0 : Math.round((hash2(cx, cy, s.seed + 6) - 0.5) * 8);
@@ -100,7 +109,9 @@ export class Obstacles {
         if (Math.abs(fbm(tx / a.scale, ty / a.scale, a.seed) - 0.5) < a.thr) return null;
       }
     }
-    return { x, y, cy: y - FOOT, r: s.r, v: hash2(cx, cy, s.seed + 77) };
+    const o: Obstacle = { x, y, cy: y - FOOT, r: small ? s.small!.r : s.r, v: hash2(cx, cy, s.seed + 77) };
+    if (small) o.small = true;
+    return o;
   }
 
   /** Visit obstacles whose cells overlap a world rectangle. */
@@ -123,16 +134,17 @@ export class Obstacles {
     const s = this.spec;
     if (!s) return false;
     let hit = false;
-    const rr = s.r + br;
+    const reach = this.reach - 8 + br;
     // two passes settle the crease between two trunks
     for (let pass = 0; pass < 2; pass++) {
       let moved = false;
       // collision centres lie within ±4 px of (cell·32 + 16, cell·32 + 23)
-      const cx0 = Math.floor((b.x - rr - 20) / OB_CELL), cx1 = Math.floor((b.x + rr - 12) / OB_CELL);
-      const cy0 = Math.floor((b.y - rr - 27) / OB_CELL), cy1 = Math.floor((b.y + rr - 19) / OB_CELL);
+      const cx0 = Math.floor((b.x - reach - 20) / OB_CELL), cx1 = Math.floor((b.x + reach - 12) / OB_CELL);
+      const cy0 = Math.floor((b.y - reach - 27) / OB_CELL), cy1 = Math.floor((b.y + reach - 19) / OB_CELL);
       for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) {
         const o = this.at(cx, cy);
         if (!o) continue;
+        const rr = o.r + br;
         const dx = b.x - o.x, dy = b.y - o.cy;
         const d2 = dx * dx + dy * dy;
         if (d2 >= rr * rr) continue;
@@ -159,7 +171,7 @@ export class Obstacles {
     return clear;
   }
 
-  /** Is the point (a flying shot's centre) inside an obstacle? */
+  /** Is the point (a flying shot's centre) inside a tall obstacle? Shots fly over small ones. */
   blocks(x: number, y: number): boolean {
     const s = this.spec;
     if (!s) return false;
@@ -167,7 +179,7 @@ export class Obstacles {
     for (let cy = Math.floor((y - r - 27) / OB_CELL); cy <= Math.floor((y + r - 19) / OB_CELL); cy++) {
       for (let cx = Math.floor((x - r - 20) / OB_CELL); cx <= Math.floor((x + r - 12) / OB_CELL); cx++) {
         const o = this.at(cx, cy);
-        if (o && (x - o.x) ** 2 + (y - o.cy) ** 2 < r * r) return true;
+        if (o && !o.small && (x - o.x) ** 2 + (y - o.cy) ** 2 < r * r) return true;
       }
     }
     return false;
