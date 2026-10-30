@@ -3,7 +3,7 @@ import { ELITE_CHEST_ODDS, ELITE_CHEST_SCRIPT } from '../data/items.ts';
 import { TAU, dist2 } from '../engine/math.ts';
 import { freshStatus, makeProjectile, rawDamageEnemy } from './combat.ts';
 import { megaOnKill } from './mega.ts';
-import { RAID_MOVES, alphaNextMove, castRaid, eliteMove, markCharge, spawnHazard, type RaidMove } from './hazards.ts';
+import { RAID_MOVES, alphaNextMove, castRaid, guardianMove, markCharge, spawnHazard, type RaidMove } from './hazards.ts';
 import type { Sim } from './sim.ts';
 import { spawnEnemy, isSetPiece } from './spawner.ts';
 import { AI, type Enemy, type Player, type Projectile } from './types.ts';
@@ -368,7 +368,7 @@ function guardianRaid(sim: Sim, e: Enemy, target: Player, d: number, dt: number)
   e.raidCd = (e.raidCd ?? sim.rng.range(2, 5)) - dt;
   if (e.raidCd > 0 || d > (e.role === 'ranged' ? 260 : 170) || e.st.freeze > 0 || e.st.flinch > 0) return false;
   e.raidCd = sim.rng.range(...GUARDIAN_RAID_CD);
-  e.casting = castRaid(sim, e, eliteMove(e), target, 'elite');
+  e.casting = castRaid(sim, e, guardianMove(e), target, 'guardian');
   return true;
 }
 

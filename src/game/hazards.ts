@@ -24,8 +24,8 @@ export const HAZARD_IMPACT = 0.3;
 export type RaidMove = 'quake' | 'donut' | 'meteor' | 'beam' | 'cone' | 'cross';
 export const RAID_MOVES: ReadonlySet<string> = new Set<RaidMove>(['quake', 'donut', 'meteor', 'beam', 'cone', 'cross']);
 
-/** Who is casting: bosses get the full-size version, alphas a little less, elites a small one. */
-export type RaidTier = 'boss' | 'final' | 'alpha' | 'elite';
+/** Who is casting: bosses get the full-size version, alphas a little less, guardians a small one. */
+export type RaidTier = 'boss' | 'final' | 'alpha' | 'guardian';
 
 interface HazardSpec {
   shape: 'circle' | 'ring' | 'line' | 'cone';
@@ -165,10 +165,10 @@ export function raidMoveName(move: RaidMove, type: PType): string {
   return NAMES[move][type] ?? NAMES[move].def;
 }
 
-const SIZE: Record<RaidTier, number> = { final: 1.2, boss: 1, alpha: 0.8, elite: 0.55 };
-const POWER: Record<RaidTier, number> = { final: 2.6, boss: 2.4, alpha: 2.1, elite: 1.8 };
+const SIZE: Record<RaidTier, number> = { final: 1.2, boss: 1, alpha: 0.8, guardian: 0.55 };
+const POWER: Record<RaidTier, number> = { final: 2.6, boss: 2.4, alpha: 2.1, guardian: 1.8 };
 /** Telegraph length multiplier: small foes' attacks come out a bit faster. */
-const WIND_UP: Record<RaidTier, number> = { final: 1, boss: 1, alpha: 0.95, elite: 0.85 };
+const WIND_UP: Record<RaidTier, number> = { final: 1, boss: 1, alpha: 0.95, guardian: 0.85 };
 
 /**
  * Mark the ground for `move` and return how long the caster should stand still winding it up.
@@ -220,7 +220,7 @@ export function castRaid(sim: Sim, e: Enemy, move: RaidMove, target: Player, tie
       break;
     }
     case 'meteor': {
-      const waves = tier === 'elite' ? 1 : tier === 'alpha' ? 2 : 3;
+      const waves = tier === 'guardian' ? 1 : tier === 'alpha' ? 2 : 3;
       const r = 46 * Math.max(0.75, k);
       const t0 = 1.1 * w;
       for (const p of sim.players) {
@@ -229,7 +229,7 @@ export function castRaid(sim: Sim, e: Enemy, move: RaidMove, target: Player, tie
           const at = t0 + wv * 0.45;
           // One lands right where the partner is standing (so they must move), the rest scatter around.
           spawnHazard(sim, { shape: 'circle', x: p.x, y: p.y, r, delay: at, dmg, type });
-          const scatter = tier === 'elite' ? 1 : 3;
+          const scatter = tier === 'guardian' ? 1 : 3;
           for (let i = 0; i < scatter; i++) {
             const a = sim.rng.range(0, TAU), d = sim.rng.range(r * 1.6, 220 * k);
             spawnHazard(sim, { shape: 'circle', x: p.x + Math.cos(a) * d, y: p.y + Math.sin(a) * d, r, delay: at, dmg, type });
@@ -250,7 +250,7 @@ export function markCharge(sim: Sim, e: Enemy, tx: number, ty: number, delay: nu
   spawnHazard(sim, { shape: 'line', x: e.x, y: e.y, r: e.radius, len: Math.hypot(tx - e.x, ty - e.y) + e.radius, angle: a, delay, dmg: 0, type: e.types[0] });
 }
 
-// ─────────────────────────── alphas & elites ───────────────────────────
+// ─────────────────────────── alphas & guardians ───────────────────────────
 
 /** Alphas rotate through their signature attacks; their old shockwave ring stays in the mix. */
 const ALPHA_ROTATION: (RaidMove | 'shots')[] = ['quake', 'cone', 'shots', 'meteor', 'beam', 'shots'];
@@ -260,7 +260,7 @@ export function alphaNextMove(e: Enemy): RaidMove | 'shots' {
 }
 
 /** Guardians get one move suited to how they fight: bruisers stomp, shooters fire a beam, the rest lunge with a cone. */
-export function eliteMove(e: Enemy): RaidMove {
+export function guardianMove(e: Enemy): RaidMove {
   if (e.role === 'ranged') return 'beam';
   if (e.role === 'tank') return 'quake';
   return SPECIES[e.speciesId].base[0] >= 80 ? 'quake' : 'cone';

@@ -114,7 +114,7 @@ From the VS wiki ([Enemies](https://vampire.survivors.wiki/w/Enemies),
 
 | System | Where | Behaviour today |
 |---|---|---|
-| Trickle spawner | `src/game/enemies.ts` `Spawner.update` | Continuous: target `(24 + 26*m)` alive, spawn **rate** `3 + 1.4*m` per second (x1.4 under half target). Three species pools (`early` < 4.5 min, `mid` < 9.5 min, `late`), one species swap at 10 min. |
+| Trickle spawner | `src/game/spawner.ts` `Spawner.update` | Continuous: target `(24 + 26*m)` alive, spawn **rate** `3 + 1.4*m` per second (x1.4 under half target). Three species pools (`early` < 4.5 min, `mid` < 9.5 min, `late`), one species swap at 10 min. |
 | Spawn placement | `spawnOffscreen` | Rectangle 40 px outside the view; 55% chance to pick the side the player is heading for. Enemies left far behind are mirrored to the far side. |
 | Set pieces | `events[]`, `swarm()`, `ring()` | Swarm at 150/450/690/840 s, ring at 240/540/780 s, then one every 55 s after 10:00. Swarm = one straight line of `18 + 2m`, ring = `26 + 2m` mid-pool enemies at 0.42 view radius, both one-shot. The trickle keeps running underneath. |
 | Elites | `nextElite` | Every 48-80 s, `1 + m/7` elites (12x HP), each drops a chest (Poke 84% / Great 14% / Ultra 2%). Elites also stop to cast a telegraphed ground attack every 5-8 s when near. |
@@ -339,7 +339,7 @@ were removed for ordinary elites (they chase like big regulars) and kept for gua
 Banette sweeper 60 s after the final boss appears and every 60 s after until it dies; a minute 1-15
 wave timeline on unlocked route cards.
 
-Follow-ups noted by reviewers, not done: split `src/game/enemies.ts` into spawner and enemy AI;
-a `SimConfig.startTime` seam so tests stop poking the spawner's private boss index; a guest's
-death-pop walk frame can differ from the host's; the kill ladder and new SFX have not been heard
+Follow-ups noted by reviewers: splitting `src/game/enemies.ts` into `spawner.ts` and `enemyAI.ts` (done);
+a `SimConfig.startTime` seam so tests stop poking the spawner's private boss index (done); a guest's
+death-pop walk frame differing from the host's (done); not done: the kill ladder and new SFX have not been heard
 in a browser; the stage-card timeline has not been eyeballed at the 250 px card minimum.

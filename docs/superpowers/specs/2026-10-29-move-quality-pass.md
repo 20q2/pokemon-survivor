@@ -51,7 +51,7 @@ Hyper Beam (homing stars turn into a beam), and Mud-Slap becomes Earthquake.
 
 ### A2. Statuses: four of them are two effects
 
-From [enemies.ts:312-314](../../../src/game/enemies.ts#L312-L314):
+From `src/game/enemyAI.ts` (status speed handling, line numbers dropped after the split):
 - **slow** sets speed ×0.55 and **paralyze** sets speed ×0.5. To a player these are the same status.
 - **freeze** and **flinch** both set speed to 0 and both block elite telegraphs. The only
   difference is duration.

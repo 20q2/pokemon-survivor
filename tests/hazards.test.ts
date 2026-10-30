@@ -71,7 +71,7 @@ describe('raid hazards', () => {
   it('every boss raid move marks the ground and returns a wind-up', () => {
     const s = sim();
     const moves = ['quake', 'donut', 'meteor', 'beam', 'cone', 'cross'] as const;
-    for (const tier of ['boss', 'final', 'alpha', 'elite'] as const) {
+    for (const tier of ['boss', 'final', 'alpha', 'guardian'] as const) {
       for (const m of moves) {
         s.projectiles = [];
         const e = spawnEnemy(s, 'onix', 100, 0, { elite: true })!;

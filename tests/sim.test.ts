@@ -4,7 +4,8 @@ import { metaBonuses } from '../src/meta/shop.ts';
 import { botChoose, botSteer } from '../src/game/bot.ts';
 import { LINES } from '../src/data/pokedex.ts';
 import { STAGES, waveAt } from '../src/data/stages.ts';
-import { AI, isSetPiece, spawnEnemy } from '../src/game/spawner.ts';
+import { isSetPiece, spawnEnemy } from '../src/game/spawner.ts';
+import { AI } from '../src/game/types.ts';
 
 /** `immortal`: the simple bot can still wander into a forest pocket and get swarmed on some
  *  layouts; tests about progress (not survival) shouldn't hinge on that. */

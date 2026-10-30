@@ -7,8 +7,8 @@ import type { Enemy, Player } from '../src/game/types.ts';
 import { Obstacles } from '../src/game/obstacles.ts';
 
 /** A partner holding one move (at Lv5) in a ring of tough foes, circling slowly. */
-function arena(moveId: string, extra: string[] = [], seconds = 8, watch?: (sim: Sim, p: Player) => boolean) {
-  const sim = new Sim({ stageId: 'viridian', seed: 1, players: [{ name: 'a', lineId: 'charmander', shiny: false, meta: metaBonuses({}), tms: [] }] });
+function arena(moveId: string, extra: string[] = [], seconds = 8, watch?: (sim: Sim, p: Player) => boolean, harmless = false) {
+  const sim = new Sim({ stageId: 'viridian', seed: 7, players: [{ name: 'a', lineId: 'charmander', shiny: false, meta: metaBonuses({}), tms: [] }] });
   // open ground: these check what each move does, not how it meets the scenery
   Object.assign(sim, { obstacles: new Obstacles('') });
   const p = sim.players[0];
@@ -18,7 +18,7 @@ function arena(moveId: string, extra: string[] = [], seconds = 8, watch?: (sim: 
     const a = (i / 24) * Math.PI * 2;
     const r = 40 + (i % 4) * 45;
     const e = spawnEnemy(sim, i % 6 === 0 ? 'spearow' : 'rattata', Math.cos(a) * r, Math.sin(a) * r);
-    if (e) { e.maxHp = e.hp = 4000; foes.push(e); }
+    if (e) { e.maxHp = e.hp = 4000; if (harmless) e.dmg = 0; foes.push(e); }
   }
   let seen = false;
   for (let i = 0; i < seconds / DT; i++) {
@@ -72,11 +72,27 @@ const EFFECT: Record<string, [string[], (sim: Sim, p: Player) => boolean]> = {
   protect: [[], (_s, p) => p.protectCd > 0],
 };
 
+describe('focus punch', () => {
+  it('lands when the partner is not hurt during the 2 s wind-up', () => {
+    const { p } = arena('focus-punch', [], 5, undefined, true);
+    expect(p.ledger.dmg['focus-punch'] ?? 0).toBeGreaterThan(0);
+  });
+  it('fizzles when the partner is hurt during the wind-up', () => {
+    let hurt = false;
+    const { p } = arena('focus-punch', [], 5, (sim, pl) => {
+      if (!hurt && pl.focusAt >= 0 && sim.time - pl.focusAt > 0.5) { hurt = true; sim.hurtPlayer(pl, 5, 'normal', false); }
+      return false;
+    }, true);
+    expect(hurt).toBe(true);
+    expect(p.ledger.dmg['focus-punch'] ?? 0).toBe(0);
+  });
+});
+
 describe('every move does its thing', () => {
   for (const m of MOVE_LIST) {
     it(m.id, () => {
       const fx = EFFECT[m.id];
-      const { p, seen } = arena(m.id, fx?.[0] ?? [], m.id === 'rest' || m.id === 'dig' || m.id === 'outrage' ? 14 : 8, fx?.[1]);
+      const { p, seen } = arena(m.id, fx?.[0] ?? [], m.id === 'rest' || m.id === 'dig' || m.id === 'outrage' ? 14 : 8, fx?.[1], m.id === 'focus-punch'); // Focus Punch fizzles if hurt, so nothing may hit it here (see the two-outcome test below)
       if (fx) expect(seen, `${m.id} effect`).toBe(true);
       if (!NON_ATTACKS.has(m.id) && !['metronome', 'counter', 'cross-chop', 'mirror-coat'].includes(m.id)) {
         expect(p.ledger.dmg[m.id] ?? 0, `${m.id} damage`).toBeGreaterThan(0);

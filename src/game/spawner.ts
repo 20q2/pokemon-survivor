@@ -10,7 +10,6 @@ import { AI, animOffsetFor, type Enemy, type Player } from './types.ts';
 const ROLE_HP: Record<EnemyRole, number> = { chaser: 1, fast: 0.7, tank: 2.4, ranged: 1, bomber: 0.8, treasure: 6 };
 const ROLE_SPEED: Record<EnemyRole, number> = { chaser: 1, fast: 1.4, tank: 0.7, ranged: 0.95, bomber: 1.15, treasure: 1.25 };
 
-export { AI };
 /** Ring walls start at this fraction of the view and slowly close in. */
 const RING_RADIUS = 0.6;
 /** Past the run's end a bare minute gets a set piece this often (s), with rings lasting RING_OVERTIME_S. */
@@ -77,7 +76,8 @@ export class Spawner {
    * Test/diagnostic seam (SimConfig.startTime; the game never calls it): fast-forwards every schedule to
    * "the run reached t with nothing pending". Bosses before t are skipped, the wave at t becomes current
    * without its minute banner (set pieces later in the minute still fire), and the timed spawners restart
-   * a mid-range spacing after t. Draws no rng, so it is deterministic.
+   * a mid-range spacing after t. Draws no rng, so it is deterministic. The current minute's wave elite and
+   * any POIs are not pending after a skip.
    */
   skipTo(t: number) {
     const bosses = this.sim.stage.bosses;
