@@ -92,6 +92,7 @@ their own upgrades, fainted teammates are revived by standing next to them.
 | `src/meta/` | Save data, shop, achievements, run → save progression |
 | `scripts/balance.ts` | Headless balance runs with a kiting bot (`node scripts/balance.ts mtmoon 900`) |
 | `scripts/pacing.ts` | Pacing telemetry for a headless run: level-up gaps (actual and "potential" with floor candy counted), enemies alive / in view / peak, hits per second, ms per tick (`node scripts/pacing.ts viridian charmander 960 7`, last arg = seed) |
+| `scripts/cards.ts` | Level-up card quality: classifies every offer (real / limit / vitamin / heal) per minute for a 15-minute bot run and prints the share of level-ups with no real card (`node scripts/cards.ts viridian charmander 7`, last arg = seed) |
 | `scripts/*.mjs` | Playwright screenshot / flow / co-op / perf checks (uses installed Edge) |
 | `scripts/render-music.mjs` | Renders songs with the real synth: levels, render speed, optional WAVs, per-track stems (`--stems`), from a section (`--from drop`) |
 | `scripts/sfx-levels.mjs` | Renders every sound effect with the real synth and prints peak/RMS |
