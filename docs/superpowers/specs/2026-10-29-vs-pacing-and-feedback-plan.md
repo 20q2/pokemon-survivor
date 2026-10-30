@@ -110,7 +110,7 @@ From the VS wiki ([Enemies](https://vampire.survivors.wiki/w/Enemies),
 
 ---
 
-## 2. What we have
+## 2. What we have (as of the morning; superseded by section 6)
 
 | System | Where | Behaviour today |
 |---|---|---|
@@ -280,7 +280,7 @@ Goal: rhythm the player can feel without reading.
 
 ---
 
-## 5. Noticed along the way
+## 5. Noticed along the way (superseded by section 6)
 
 - **Fixed in this change**: Alphas lured past their leash re-enraged every tick while walking
   home (`hp < maxHp` re-triggered the enrage branch), spamming the warn banner and SFX about 60
@@ -299,13 +299,14 @@ Goal: rhythm the player can feel without reading.
 ## 6. Implementation status (2026-10-29, same day)
 
 All four phases were built the same day by Sonnet subagents (one implementer, a spec reviewer and a
-code-quality reviewer per task) in two worktrees and merged to master. What shipped, and where it
-differs from the plan above:
+code-quality reviewer per task) in two worktrees: Phase 3 on `work/feedback-beats`, Phases 1, 2 and 4
+on `work/minute-waves`, both fast-forwarded into master. What shipped, and where it differs from the
+plan above:
 
 **Phase 1 (minute waves)**: as planned. `WaveDef` per minute 0-15 for all 7 stages
 (`src/data/stages.ts`, authored through the `waves()` builder), shared `WAVE_MIN`
 `[15, 35, 60, 50, 45, 10, 110, 150, 60, 10, 260, 70, 220, 190, 280, 300]` (minutes 5 and 9 are the
-ring minutes), intervals 1 / 0.5 / 0.25 / 0.1 s, `WAVE_HP` tiers replacing the cubic (the level
+breathing ring minutes; minute 13 has a ring too but keeps its quota), intervals 1 / 0.5 / 0.25 / 0.1 s, `WAVE_HP` tiers replacing the cubic (the level
 factor is gone), regular speed capped at 110 px/s with the late +30% removed, an elite 2 s into most
 minutes (two from minute 10), swarms with repeats and rings as slow-closing walls (`AI.WALL`,
 25-35 px/s, 3x tank HP, despawn after 40-45 s) as `events` on the wave. Elite ground casts only

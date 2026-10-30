@@ -39,9 +39,11 @@ species/items to the data files): `npm run fetch-assets`.
   The Pokédex "Moves" tab lists all combinations.
 - **Abilities**: each line has one (Blaze, Static, Levitate, Guts, Multiscale,
   Speed Boost, Sand Stream, …).
-- **Routes**: 7 stages, 15 minutes each, bosses at 5:00 / 10:00, final boss at 15:00.
-  Swarms, encirclements, elites, treasure-carrying Chansey/Meowth and rare wild shinies.
-  The late game ramps hard on purpose.
+- **Routes**: 7 stages, 15 minutes each, a boss every 3 minutes, final boss at 15:00.
+  Every minute is a scripted wave (Vampire Survivors style): new species, an enemy quota that
+  spikes and breathes, an elite with a Poké Ball most minutes, swarms that sweep across and
+  rings that close in as slow walls. The route card shows the minute-by-minute timeline. Stay
+  past the final boss and an unkillable sweeper comes for you.
 - **The map**: a PMD-style minimap pins treasure caches (guarded), roaming **Alpha
   Pokémon** you can choose to hunt for big loot, bosses, teammates and the **Mega Stone**.
 - **Mega Evolution**: find the Mega Stone (appears around 5:30), then a fully evolved
@@ -75,7 +77,8 @@ their own upgrades, fainted teammates are revived by standing next to them.
 | `src/data/` | Types chart, species & learnsets, moves (data-driven behaviours), items, stages |
 | `src/game/sim.ts` | Authoritative fixed-step simulation (players, pickups, level-ups, cinematics) |
 | `src/game/combat.ts` | Move firing for 15 behaviours, projectile motion/collision, damage |
-| `src/game/enemies.ts` | Wave director, enemy roles, boss patterns, loot |
+| `src/game/enemies.ts` | Minute-wave spawner (quota backfill, set pieces, sweeper), enemy roles, boss patterns, loot |
+| `src/game/director.ts` | Tension meter on top of the wave script: surge (set piece sooner) and reprieve (backfill pause) |
 | `src/game/session.ts` | `RunSession` interface shared by solo/host/client |
 | `src/net/` | PeerJS host/client, binary snapshot protocol, client replica session |
 | `src/render/` | Canvas2D renderer, tile-map world (`background.ts`, `biomes.ts`, `pixelart.ts`), pixel particles, bitmap damage numbers |
