@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Sim, DT } from '../src/game/sim.ts';
 import { metaBonuses } from '../src/meta/shop.ts';
-import { spawnEnemy } from '../src/game/enemies.ts';
+import { spawnEnemy } from '../src/game/spawner.ts';
 import { HAZARD, castRaid, hazardEscape, inHazard, spawnHazard } from '../src/game/hazards.ts';
 import { STAGES } from '../src/data/stages.ts';
 

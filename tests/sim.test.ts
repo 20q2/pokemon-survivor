@@ -4,7 +4,7 @@ import { metaBonuses } from '../src/meta/shop.ts';
 import { botChoose, botSteer } from '../src/game/bot.ts';
 import { LINES } from '../src/data/pokedex.ts';
 import { STAGES } from '../src/data/stages.ts';
-import { AI, isSetPiece, spawnEnemy } from '../src/game/enemies.ts';
+import { AI, isSetPiece, spawnEnemy } from '../src/game/spawner.ts';
 
 /** `immortal`: the simple bot can still wander into a forest pocket and get swarmed on some
  *  layouts; tests about progress (not survival) shouldn't hinge on that. */
@@ -49,7 +49,8 @@ describe('simulation smoke', () => {
 
 describe('phase handling', () => {
   it('reaches victory when the final boss dies while another cinematic is queued', async () => {
-    const { spawnEnemy, killEnemy } = await import('../src/game/enemies.ts');
+    const { spawnEnemy } = await import('../src/game/spawner.ts');
+    const { killEnemy } = await import('../src/game/enemyAI.ts');
     const sim = new Sim({ stageId: 'viridian', seed: 3, players: [{ name: 'a', lineId: 'charmander', shiny: false, meta: metaBonuses({}), tms: [] }] });
     const boss = spawnEnemy(sim, 'scyther', 100, 0, { boss: { species: 'scyther', at: 900, patterns: ['charge'], final: true } })!;
     sim.openChest(sim.players[0]);          // chest cinematic starts
@@ -331,7 +332,7 @@ describe('hit-stop', () => {
   });
 
   it('pins interpolation (px = x) while frozen', async () => {
-    const { spawnEnemy } = await import('../src/game/enemies.ts');
+    const { spawnEnemy } = await import('../src/game/spawner.ts');
     const sim = make();
     const e = spawnEnemy(sim, 'rattata', 100, 0)!;
     sim.update(DT);
@@ -350,7 +351,8 @@ describe('hit-stop', () => {
   });
 
   it('an elite kill stops for 7 frames, a boss kill does not', async () => {
-    const { spawnEnemy, killEnemy } = await import('../src/game/enemies.ts');
+    const { spawnEnemy } = await import('../src/game/spawner.ts');
+    const { killEnemy } = await import('../src/game/enemyAI.ts');
     const sim = make();
     const e = spawnEnemy(sim, 'rattata', 100, 0, { elite: true })!;
     killEnemy(sim, e, 0);
@@ -363,7 +365,7 @@ describe('hit-stop', () => {
   });
 
   it('crits stop for 2 frames at most once per 0.5 s of sim time', async () => {
-    const { spawnEnemy } = await import('../src/game/enemies.ts');
+    const { spawnEnemy } = await import('../src/game/spawner.ts');
     const { makeProjectile } = await import('../src/game/combat.ts');
     const sim = make();
     const e = spawnEnemy(sim, 'rattata', 100, 0)!;

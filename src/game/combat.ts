@@ -2,7 +2,7 @@ import { MOVES, MOVE_LIST, NON_ATTACKS, moveStatsAt, type MoveDef, type MoveStat
 import type { PType } from '../data/types.ts';
 import { TAU, wrapAngle } from '../engine/math.ts';
 import { baseDamage, incomingDamage, resolveHit, POWER_SCALE } from './damage.ts';
-import { killEnemy } from './enemies.ts';
+import { killEnemy } from './enemyAI.ts';
 import type { Sim } from './sim.ts';
 import { megaOnHurt } from './mega.ts';
 import { creditDamage, heal } from './ledger.ts';

@@ -3,7 +3,8 @@ import { REF_QUOTA, STAGES, WAVE_MIN, XP_QUOTA_CEIL, XP_QUOTA_FLOOR } from '../s
 import { Sim, xpForLevel } from '../src/game/sim.ts';
 import { metaBonuses } from '../src/meta/shop.ts';
 import { freshSave, migrate } from '../src/meta/save.ts';
-import { killEnemy, spawnEnemy } from '../src/game/enemies.ts';
+import { spawnEnemy } from '../src/game/spawner.ts';
+import { killEnemy } from '../src/game/enemyAI.ts';
 
 const make = (eliteChests?: number, seed = 7) => new Sim({
   stageId: 'viridian', seed, eliteChests,

@@ -3,7 +3,7 @@ import { Sim, DT } from '../src/game/sim.ts';
 import { metaBonuses } from '../src/meta/shop.ts';
 import { Obstacles, type Obstacle } from '../src/game/obstacles.ts';
 import { makeProjectile } from '../src/game/combat.ts';
-import { spawnEnemy } from '../src/game/enemies.ts';
+import { spawnEnemy } from '../src/game/spawner.ts';
 import { STAGES } from '../src/data/stages.ts';
 
 function sim(stageId = 'viridian') {

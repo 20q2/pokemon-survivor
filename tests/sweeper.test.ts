@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Sim, DT, MAX_ENEMIES } from '../src/game/sim.ts';
 import { metaBonuses } from '../src/meta/shop.ts';
-import { SWEEPER_SPEED, isRegular, spawnEnemy } from '../src/game/enemies.ts';
+import { SWEEPER_SPEED, isRegular, spawnEnemy } from '../src/game/spawner.ts';
 import { WAVE_MIN } from '../src/data/stages.ts';
 import { rawDamageEnemy } from '../src/game/combat.ts';
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Sim, DT } from '../src/game/sim.ts';
 import { metaBonuses } from '../src/meta/shop.ts';
 import { MOVE_LIST, MOVES, NON_ATTACKS } from '../src/data/moves.ts';
-import { spawnEnemy } from '../src/game/enemies.ts';
+import { spawnEnemy } from '../src/game/spawner.ts';
 import type { Enemy, Player } from '../src/game/types.ts';
 import { Obstacles } from '../src/game/obstacles.ts';
 
@@ -166,7 +166,7 @@ describe('move mechanics', () => {
   });
 
   it('Burns spread when a burning foe faints', async () => {
-    const { killEnemy } = await import('../src/game/enemies.ts');
+    const { killEnemy } = await import('../src/game/enemyAI.ts');
     const sim = new Sim({ stageId: 'viridian', seed: 2, players: [{ name: 'a', lineId: 'charmander', shiny: false, meta: metaBonuses({}), tms: [] }] });
     const a = spawnEnemy(sim, 'rattata', 100, 0)!;
     const b = spawnEnemy(sim, 'rattata', 120, 0)!;

@@ -77,7 +77,8 @@ their own upgrades, fainted teammates are revived by standing next to them.
 | `src/data/` | Types chart, species & learnsets, moves (data-driven behaviours), items, stages |
 | `src/game/sim.ts` | Authoritative fixed-step simulation (players, pickups, level-ups, cinematics) |
 | `src/game/combat.ts` | Move firing for 15 behaviours, projectile motion/collision, damage |
-| `src/game/enemies.ts` | Minute-wave spawner (quota backfill, set pieces, sweeper), enemy roles, boss patterns, loot |
+| `src/game/spawner.ts` | Minute-wave spawner (quota backfill, set pieces, sweeper), `spawnEnemy`, enemy-kind predicates |
+| `src/game/enemyAI.ts` | Per-tick enemy AI and roles, boss patterns, death and loot |
 | `src/game/director.ts` | Tension meter on top of the wave script: surge (set piece sooner) and reprieve (backfill pause) |
 | `src/game/session.ts` | `RunSession` interface shared by solo/host/client |
 | `src/net/` | PeerJS host/client, binary snapshot protocol, client replica session |
