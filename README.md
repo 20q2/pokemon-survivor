@@ -75,6 +75,10 @@ its own movement (no input lag), receives 20 Hz binary snapshots of nearby enemi
 and a reliable stream of events/projectile spawns. Exp is shared, everyone picks
 their own upgrades, fainted teammates are revived by standing next to them.
 
+## Design principles
+
+The rules for pacing, rewards, feedback and builds live in [docs/survivor-principles.md](docs/survivor-principles.md). Check changes against it.
+
 ## Code map
 
 | Path | What |

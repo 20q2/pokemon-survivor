@@ -336,7 +336,7 @@ were removed for ordinary elites (they chase like big regulars) and kept for gua
 
 **Phase 4**: `Director` (surge pulls the next set piece 10-15 s earlier after 20 s of >90% HP and
 >=8 kills/s; reprieve pauses backfill 4 s under 35% HP; each once a minute, silent); an unkillable
-Banette sweeper 60 s after the final boss appears and every 60 s after until it dies; a minute 1-15
+Haunter sweeper 60 s after the final boss appears and every 60 s after until it dies; a minute 1-15
 wave timeline on unlocked route cards.
 
 Follow-ups noted by reviewers: splitting `src/game/enemies.ts` into `spawner.ts` and `enemyAI.ts` (done);
