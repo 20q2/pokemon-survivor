@@ -667,8 +667,8 @@ const builders: Record<string, () => Biome> = {
 };
 
 // ─────────────────────────── tile-sheet layouts ───────────────────────────
-// Cell coordinates in the player-supplied FRLG sheet (outdoor and cave sets; see tilesheet.ts).
-// Routes listed here use the sheet when it is present; the rest keep their painted art.
+// Cell coordinates in the FRLG sheet (outdoor and cave sets; see tilesheet.ts).
+// Routes listed here use the sheet; the rest keep their painted art.
 
 function sheetMaterial(s: Sheet, cells: readonly Cell[], weights: number[]): Material {
   return {

@@ -1,7 +1,5 @@
 # Builds the game and publishes dist/ to GitHub Pages on every push to master.
 # vite.config.ts uses base: './', so the build works under the /pokemon-survivor/ subpath as-is.
-# The player-supplied tileset (public/assets/tileset.png) is gitignored, so the deployed build
-# falls back to the procedurally painted route art.
 name: Deploy to GitHub Pages
 
 on:

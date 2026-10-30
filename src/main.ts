@@ -13,7 +13,7 @@ async function boot(screen: BootScreen) {
   await assets.init();
 
   screen.phase('Loading fonts…', 0.15, 0.25);
-  // the optional player-supplied tile sheet (absent = painted art); fonts load alongside it
+  // the FRLG tile sheet (a failed load leaves painted art); fonts load alongside it
   await within(Promise.all([...FONTS.map((f) => document.fonts?.load(f)), loadTileSheet()]), 3000);
   screen.fontsReady();
 

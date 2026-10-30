@@ -1,10 +1,9 @@
 import { T } from './pixelart.ts';
 
 /**
- * Optional tile sheet supplied by the player in public/assets/tileset.png (not shipped with the
- * repo). Cells are 16×16 on a 17 px pitch (1 px transparent gutters). When the sheet is present,
- * routes that have a sheet layout in biomes.ts draw their ground and props from it; otherwise
- * they keep the procedurally painted art.
+ * FRLG tile sheet shipped in public/assets/tileset.png. Cells are 16×16 on a 17 px pitch (1 px
+ * transparent gutters). Routes that have a sheet layout in biomes.ts draw their ground and props
+ * from it; the rest (or all, if the sheet fails to load) keep the procedurally painted art.
  */
 
 export const SHEET_URL = 'assets/tileset.png';
