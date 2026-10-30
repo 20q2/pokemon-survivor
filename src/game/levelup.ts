@@ -86,6 +86,10 @@ export function generateOffers(
     }
   }
 
+  // A finished moveset can limit-break while items still level: the endgame power should not wait on seven item tiers.
+  if (p.moves.length >= p.moveSlots && !p.moves.some((m) => m.level < MAX_MOVE_LEVEL && !MOVES[m.id].mastery))
+    for (const c of limitBreaks(p)) cands.push({ o: c, w: 4 });
+
   const out: UpgradeOffer[] = [];
   while (out.length < count && cands.length) {
     const pick = rng.weighted(cands, (c) => c.w);
@@ -94,17 +98,21 @@ export function generateOffers(
     cands.splice(cands.indexOf(pick), 1);
   }
   // Nothing left to upgrade: keep every level meaningful with limit breaks and vitamins
-  // (both grow logarithmically, so they never run out but never explode either).
+  // (both grow linearly for a while, then logarithmically, so they never run out).
   if (out.length < count && p.hp < p.stats.maxHp * 0.4) out.push({ kind: 'heal', id: 'oran-berry', level: 0 });
   if (out.length < count) out.push(...pickFillers(p, rng, count - out.length));
   return out;
 }
 
-function pickFillers(p: Player, rng: Rng, n: number): UpgradeOffer[] {
-  const cands: { o: UpgradeOffer; w: number }[] = p.moves
+function limitBreaks(p: Player): UpgradeOffer[] {
+  return p.moves
     .filter((m) => m.level >= MAX_MOVE_LEVEL || MOVES[m.id].mastery)
     .filter((m) => MOVES[m.id].cat !== 'status' && !p.banished.has(m.id))
-    .map((m) => ({ o: { kind: 'moveUp', id: m.id, level: Math.max(m.level, MAX_MOVE_LEVEL) + 1 }, w: 2.2 }));
+    .map((m): UpgradeOffer => ({ kind: 'moveUp', id: m.id, level: Math.max(m.level, MAX_MOVE_LEVEL) + 1 }));
+}
+
+function pickFillers(p: Player, rng: Rng, n: number): UpgradeOffer[] {
+  const cands: { o: UpgradeOffer; w: number }[] = limitBreaks(p).map((o) => ({ o, w: 2.2 }));
   for (const o of pickVitamins(p, rng, VITAMINS.length)) cands.push({ o, w: 1 });
   const out: UpgradeOffer[] = [];
   while (out.length < n && cands.length) {

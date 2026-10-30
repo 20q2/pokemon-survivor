@@ -113,12 +113,12 @@ describe('late-game systems', () => {
   it('never runs out of meaningful level-ups: limit breaks and vitamins fill in, with diminishing returns', async () => {
     const { generateOffers, applyOffer } = await import('../src/game/levelup.ts');
     const { MAX_MOVE_LEVEL, moveStatsAt, MOVES } = await import('../src/data/moves.ts');
-    const { vitaminBonus } = await import('../src/data/items.ts');
+    const { vitaminBonus, MAX_ITEM_LEVEL } = await import('../src/data/items.ts');
     const { Rng } = await import('../src/engine/math.ts');
     const sim = solo('charmander');
     const p = sim.players[0];
     p.moves = ['ember', 'flamethrower', 'fire-spin', 'flame-wheel'].map((id) => ({ id, level: MAX_MOVE_LEVEL, cd: 1, dmgDealt: 0, kills: 0 }));
-    p.items = ['charcoal', 'scope-lens', 'wide-lens', 'leftovers'].map((id) => ({ id, level: 5 }));
+    p.items = ['charcoal', 'scope-lens', 'wide-lens', 'leftovers'].map((id) => ({ id, level: MAX_ITEM_LEVEL }));
     const rng = new Rng(1);
     for (let i = 0; i < 40; i++) {
       const offers = generateOffers(p, rng, 3, []);
@@ -129,14 +129,15 @@ describe('late-game systems', () => {
     // Limit breaks stack (each one is a real level) with diminishing returns.
     const ember = p.moves.find((m) => m.id === 'ember')!;
     ember.level = MAX_MOVE_LEVEL;
-    for (let i = 1; i <= 3; i++) {
+    const B = 6; // limit breaks are linear up to +6, diminishing after
+    for (let i = 1; i <= B + 2; i++) {
       applyOffer(p, { kind: 'moveUp', id: 'ember', level: MAX_MOVE_LEVEL + i });
       expect(ember.level).toBe(MAX_MOVE_LEVEL + i);
     }
     const pw = (lv: number) => moveStatsAt(MOVES.ember, lv).power;
-    expect(pw(MAX_MOVE_LEVEL + 3)).toBeGreaterThan(pw(MAX_MOVE_LEVEL + 2));
-    expect(pw(MAX_MOVE_LEVEL + 3) - pw(MAX_MOVE_LEVEL + 2)).toBeLessThan(pw(MAX_MOVE_LEVEL + 1) - pw(MAX_MOVE_LEVEL));
-    expect(vitaminBonus('protein', 2) - vitaminBonus('protein', 1)).toBeLessThan(vitaminBonus('protein', 1));
+    expect(pw(MAX_MOVE_LEVEL + B + 2)).toBeGreaterThan(pw(MAX_MOVE_LEVEL + B + 1));
+    expect(pw(MAX_MOVE_LEVEL + B + 2) - pw(MAX_MOVE_LEVEL + B + 1)).toBeLessThan(pw(MAX_MOVE_LEVEL + B + 1) - pw(MAX_MOVE_LEVEL + B));
+    expect(vitaminBonus('protein', 10) - vitaminBonus('protein', 9)).toBeLessThan(vitaminBonus('protein', 9) - vitaminBonus('protein', 8));
   });
 
   it('treasure for a complete build: a berry when hurt, otherwise gold or limit breaks / vitamins', async () => {
@@ -144,7 +145,7 @@ describe('late-game systems', () => {
     const sim = solo('charmander');
     const p = sim.players[0];
     p.moves = ['ember', 'flamethrower', 'fire-spin', 'flame-wheel'].map((id) => ({ id, level: MAX_MOVE_LEVEL, cd: 1, dmgDealt: 0, kills: 0 }));
-    p.items = ['scope-lens', 'wide-lens', 'leftovers', 'quick-claw'].map((id) => ({ id, level: 5 }));
+    p.items = ['scope-lens', 'wide-lens', 'leftovers', 'quick-claw'].map((id) => ({ id, level: 7 }));
     sim.refreshStats();
     const rewardsOf = () => { sim.events.length = 0; sim.openChest(p, 4); return (sim.events.find((e) => e.e === 'chest') as { rewards: { kind: string; level?: number }[] }).rewards; };
 

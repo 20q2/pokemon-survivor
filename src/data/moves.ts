@@ -146,18 +146,24 @@ const LATE_UP: Record<Behavior, Partial<MoveStats>[]> = {
 /** Stats that combine multiplicatively in upgrade tables. */
 const MULT_KEYS = new Set<keyof MoveStats>(['cd', 'area', 'range', 'duration', 'speed']);
 
-/** Power multiplier for levels past the max ("limit break"): keeps growing, ever more slowly. */
+/** Limit breaks grow linearly up to this many, then logarithmically. */
+export const LIMIT_LINEAR = 6;
+const LIMIT_POWER = 0.08, LIMIT_AREA = 0.04;
+
+/** Power multiplier for levels past the max ("limit break"): +8% each up to +6, then ever more slowly
+ *  (the first extra break is worth the same +8%, each later one less). */
 export function overLevelMult(level: number) {
-  return level > MAX_MOVE_LEVEL ? 1 + 0.35 * Math.log(1 + level - MAX_MOVE_LEVEL) : 1;
+  const n = Math.max(0, level - MAX_MOVE_LEVEL);
+  const lin = Math.min(n, LIMIT_LINEAR);
+  const extra = n - lin;
+  return 1 + LIMIT_POWER * lin + (extra > 0 ? (LIMIT_POWER * Math.log(1 + extra)) / Math.LN2 : 0);
 }
 
 export function moveStatsAt(def: MoveDef, level: number): MoveStats {
   const s: MoveStats = { ...DEFAULT_STATS, ...def.stats };
-  s.power *= overLevelMult(level);
-  // Mastered moves are a finished form: only limit-break levels change them.
-  if (def.mastery) return s;
   const ups = def.up ?? DEFAULT_UP[def.behavior];
-  for (let i = 0; i < Math.min(level, MAX_MOVE_LEVEL) - 1; i++) {
+  // Mastered moves are a finished form: only limit-break levels change them.
+  for (let i = 0; !def.mastery && i < Math.min(level, MAX_MOVE_LEVEL) - 1; i++) {
     const late = i >= ups.length;
     const up = late ? LATE_UP[def.behavior][i - ups.length] : ups[i];
     if (!up) break;
@@ -166,6 +172,12 @@ export function moveStatsAt(def: MoveDef, level: number): MoveStats {
       else s[k] += v;
     }
   }
+  // Limit breaks come last so their power bonus multiplies the whole table, not just the base power.
+  s.power *= overLevelMult(level);
+  // The first six also widen the move, or add a projectile every third break if it has count upgrades.
+  const breaks = Math.min(LIMIT_LINEAR, Math.max(0, level - MAX_MOVE_LEVEL));
+  if (ups.some((u) => u.count)) s.count += Math.floor(breaks / 3);
+  else s.area *= 1 + LIMIT_AREA * breaks;
   return s;
 }
 

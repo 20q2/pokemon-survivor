@@ -1,7 +1,7 @@
 import type { PType } from './types.ts';
 import type { ChestTier } from '../game/types.ts';
 
-export const MAX_ITEM_LEVEL = 5;
+export const MAX_ITEM_LEVEL = 7;
 
 /** Tiers of a save's first six elite chests (Poké, Poké, Great, Poké, Poké, Ultra), then the odds below. */
 export const ELITE_CHEST_SCRIPT: readonly ChestTier[] = [1, 1, 2, 1, 1, 3];
@@ -72,18 +72,23 @@ export const ITEM_LIST: ItemDef[] = [
 ];
 
 /** Infinite in-run stat boosts offered once the build has nothing left to upgrade ("EV training").
- *  Each one is worth a little less than the last: total bonus = scale × ln(1 + doses). */
-export interface VitaminDef { id: string; name: string; scale: number; what: string }
+ *  Linear up to rank 8, then each dose is worth a little less than the last (logarithmic). */
+export interface VitaminDef { id: string; name: string; /** Bonus per rank up to `VITAMIN_LINEAR`. */ rank: number; what: string }
+export const VITAMIN_LINEAR = 8;
 export const VITAMINS: VitaminDef[] = [
-  { id: 'protein', name: 'Protein', scale: 0.14, what: 'Attack' },
-  { id: 'calcium', name: 'Calcium', scale: 0.14, what: 'Sp. Atk' },
-  { id: 'hp-up', name: 'HP Up', scale: 0.16, what: 'max HP' },
-  { id: 'iron', name: 'Iron', scale: 0.12, what: 'contact damage resistance' },
-  { id: 'zinc', name: 'Zinc', scale: 0.12, what: 'projectile damage resistance' },
-  { id: 'carbos', name: 'Carbos', scale: 0.08, what: 'movement speed' },
-  { id: 'pp-up', name: 'PP Up', scale: 0.08, what: 'move recharge speed' },
+  { id: 'protein', name: 'Protein', rank: 0.06, what: 'Attack' },
+  { id: 'calcium', name: 'Calcium', rank: 0.06, what: 'Sp. Atk' },
+  { id: 'hp-up', name: 'HP Up', rank: 0.06, what: 'max HP' },
+  { id: 'iron', name: 'Iron', rank: 0.05, what: 'contact damage resistance' },
+  { id: 'zinc', name: 'Zinc', rank: 0.05, what: 'projectile damage resistance' },
+  { id: 'carbos', name: 'Carbos', rank: 0.03, what: 'movement speed' },
+  { id: 'pp-up', name: 'PP Up', rank: 0.03, what: 'move recharge speed' },
 ];
-export const vitaminBonus = (id: string, doses: number) => (doses > 0 ? VITAMIN[id].scale * Math.log(1 + doses) : 0);
+export function vitaminBonus(id: string, doses: number) {
+  const r = VITAMIN[id].rank, lin = Math.min(doses, VITAMIN_LINEAR), extra = Math.max(0, doses - VITAMIN_LINEAR);
+  // The first dose past rank 8 is worth one more rank, each later one less.
+  return r * lin + (extra > 0 ? (r * Math.log(1 + extra)) / Math.LN2 : 0);
+}
 export function vitaminDesc(id: string, doses: number): string {
   const v = VITAMIN[id];
   const now = vitaminBonus(id, doses - 1), next = vitaminBonus(id, doses);
