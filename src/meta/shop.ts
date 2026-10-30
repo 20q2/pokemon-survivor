@@ -23,14 +23,14 @@ export interface ShopUpgrade {
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 
 export const SHOP: ShopUpgrade[] = [
-  { id: 'protein', cat: 'stats', name: 'Protein', icon: 'protein', maxRank: 5, baseCost: 120, growth: 1.6, desc: (r) => `+${pct(0.05 * r)} Attack` },
-  { id: 'calcium', cat: 'stats', name: 'Calcium', icon: 'calcium', maxRank: 5, baseCost: 120, growth: 1.6, desc: (r) => `+${pct(0.05 * r)} Sp. Atk` },
-  { id: 'hp-up', cat: 'stats', name: 'HP Up', icon: 'hp-up', maxRank: 5, baseCost: 100, growth: 1.6, desc: (r) => `+${pct(0.08 * r)} max HP` },
-  { id: 'iron', cat: 'stats', name: 'Iron', icon: 'iron', maxRank: 5, baseCost: 110, growth: 1.6, desc: (r) => `-${pct(0.04 * r)} contact damage taken` },
-  { id: 'zinc', cat: 'stats', name: 'Zinc', icon: 'zinc', maxRank: 5, baseCost: 110, growth: 1.6, desc: (r) => `-${pct(0.05 * r)} projectile damage taken` },
-  { id: 'carbos', cat: 'stats', name: 'Carbos', icon: 'carbos', maxRank: 5, baseCost: 100, growth: 1.6, desc: (r) => `+${pct(0.03 * r)} move speed` },
-  { id: 'pp-up', cat: 'boosts', name: 'PP Up', icon: 'pp-up', maxRank: 5, baseCost: 180, growth: 1.7, desc: (r) => `Moves recharge ${pct(0.03 * r)} faster` },
-  { id: 'exp-share', cat: 'boosts', name: 'Exp. Share', icon: 'exp-share', maxRank: 5, baseCost: 150, growth: 1.6, desc: (r) => `+${pct(0.05 * r)} Exp.` },
+  { id: 'protein', cat: 'stats', name: 'Protein', icon: 'protein', maxRank: 10, baseCost: 120, growth: 1.48, desc: (r) => `+${pct(0.05 * r)} Attack` },
+  { id: 'calcium', cat: 'stats', name: 'Calcium', icon: 'calcium', maxRank: 10, baseCost: 120, growth: 1.48, desc: (r) => `+${pct(0.05 * r)} Sp. Atk` },
+  { id: 'hp-up', cat: 'stats', name: 'HP Up', icon: 'hp-up', maxRank: 10, baseCost: 100, growth: 1.5, desc: (r) => `+${pct(0.08 * r)} max HP` },
+  { id: 'iron', cat: 'stats', name: 'Iron', icon: 'iron', maxRank: 8, baseCost: 110, growth: 1.65, desc: (r) => `-${pct(0.04 * r)} contact damage taken` },
+  { id: 'zinc', cat: 'stats', name: 'Zinc', icon: 'zinc', maxRank: 8, baseCost: 110, growth: 1.65, desc: (r) => `-${pct(0.05 * r)} projectile damage taken` },
+  { id: 'carbos', cat: 'stats', name: 'Carbos', icon: 'carbos', maxRank: 6, baseCost: 100, growth: 2, desc: (r) => `+${pct(0.03 * r)} move speed` },
+  { id: 'pp-up', cat: 'boosts', name: 'PP Up', icon: 'pp-up', maxRank: 8, baseCost: 180, growth: 1.55, desc: (r) => `Moves recharge ${pct(0.03 * r)} faster` },
+  { id: 'exp-share', cat: 'boosts', name: 'Exp. Share', icon: 'exp-share', maxRank: 8, baseCost: 150, growth: 1.6, desc: (r) => `+${pct(0.05 * r)} Exp.` },
   { id: 'amulet-coin', cat: 'boosts', name: 'Amulet Coin', icon: 'amulet-coin', maxRank: 5, baseCost: 150, growth: 1.6, desc: (r) => `+${pct(0.1 * r)} Poké Dollars` },
   { id: 'big-root', cat: 'boosts', name: 'Big Root', icon: 'big-root', maxRank: 3, baseCost: 90, growth: 1.7, desc: (r) => `+${pct(0.15 * r)} pickup range` },
   { id: 'wide-lens', cat: 'boosts', name: 'Wide Lens', icon: 'wide-lens', maxRank: 3, baseCost: 200, growth: 1.8, desc: (r) => `+${pct(0.05 * r)} move area` },

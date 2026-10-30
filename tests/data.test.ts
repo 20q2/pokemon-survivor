@@ -8,6 +8,7 @@ import { LINES, SPECIES, finalForms, lineSpecies } from '../src/data/pokedex.ts'
 import { STAGES, ENEMY_ROLE, eventTimes } from '../src/data/stages.ts';
 import { TYPES, effectiveness, typeMult } from '../src/data/types.ts';
 import manifest from '../public/assets/manifest.json';
+import { SHOP, metaBonuses, upgradeCost } from '../src/meta/shop.ts';
 
 describe('data integrity', () => {
   it('every learnset / starter / form move exists and is not a mastery move', () => {
@@ -175,5 +176,23 @@ describe('wave newcomers', () => {
         expect(fresh || !!st.waves[i].headline, `${st.id} minute ${i}`).toBe(true);
       }
     }
+  });
+});
+
+describe('meta shop caps', () => {
+  // Amulet Coin and the small boosts keep their cheaper caps.
+  const RAISED = ['protein', 'calcium', 'hp-up', 'iron', 'zinc', 'carbos', 'pp-up', 'exp-share'];
+  it('last rank of each raised stat / boost costs 2,000-6,000', () => {
+    for (const u of SHOP.filter((x) => RAISED.includes(x.id))) {
+      const c = upgradeCost(u, u.maxRank - 1);
+      expect(c, u.id).toBeGreaterThanOrEqual(2000);
+      expect(c, u.id).toBeLessThanOrEqual(6000);
+    }
+  });
+
+  it('maxed vitamins reach +50% attack and +80% HP', () => {
+    const b = metaBonuses(Object.fromEntries(SHOP.map((u) => [u.id, u.maxRank])));
+    expect(b.atk).toBeGreaterThanOrEqual(0.5);
+    expect(b.hp).toBeGreaterThanOrEqual(0.8);
   });
 });
