@@ -73,6 +73,32 @@ export class Spawner {
     this.director = new Director((lo, hi) => sim.rng.range(lo, hi));
   }
 
+  /**
+   * Test/diagnostic seam (SimConfig.startTime; the game never calls it): fast-forwards every schedule to
+   * "the run reached t with nothing pending". Bosses before t are skipped, the wave at t becomes current
+   * without its minute banner (set pieces later in the minute still fire), and the timed spawners restart
+   * a mid-range spacing after t. Draws no rng, so it is deterministic.
+   */
+  skipTo(t: number) {
+    const bosses = this.sim.stage.bosses;
+    this.bossIdx = bosses.findIndex((b) => b.at >= t);
+    if (this.bossIdx < 0) this.bossIdx = bosses.length;
+    const { idx, wave } = waveAt(this.sim.stage, t);
+    this.waveIdx = idx;
+    this.nextQuota = t; // the quota fills on the first tick
+    this.pendingElites = [];
+    this.pendingEvents = eventTimes(idx, wave.events).filter((p) => p.at >= t);
+    this.backfillResumeAt = 0;
+    this.nextTreasure = Math.max(this.nextTreasure, t + 105);
+    this.nextItemBall = Math.max(this.nextItemBall, t + 40);
+    this.nextCache = Math.max(this.nextCache, t + 120);
+    this.nextAlpha = Math.max(this.nextAlpha, t + 150);
+    this.megaStoneAt = Math.max(this.megaStoneAt, t);
+    while (this.nextSweeper < t) this.nextSweeper += SWEEPER_PERIOD;
+    this.nextOvertime = 0;
+    this.director = new Director((lo, hi) => this.sim.rng.range(lo, hi));
+  }
+
   get minute() {
     return this.sim.time / 60;
   }

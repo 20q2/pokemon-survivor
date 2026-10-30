@@ -36,6 +36,8 @@ export interface SimConfig {
   seed?: number;
   /** Elite chests the save has earned before this run (the host's, in co-op); drives the scripted first treasures. */
   eliteChests?: number;
+  /** Test/diagnostic seam: begin the run at this many seconds with every schedule fast-forwarded (see Spawner.skipTo). */
+  startTime?: number;
 }
 
 export type Phase = 'play' | 'levelup' | 'cine' | 'over' | 'victory';
@@ -200,6 +202,10 @@ export class Sim {
     this.eliteChestsAtStart = cfg.eliteChests ?? 0;
     this.rng = new Rng(cfg.seed);
     this.spawner = new Spawner(this);
+    if (cfg.startTime) {
+      this.time = cfg.startTime;
+      this.spawner.skipTo(cfg.startTime);
+    }
     cfg.players.forEach((pi, slot) => this.addPlayer(pi, slot));
     for (const p of this.players) {
       if (p.meta.friendStartItem) {

@@ -3,7 +3,7 @@ import { Sim, DT, DIG_TIME } from '../src/game/sim.ts';
 import { metaBonuses } from '../src/meta/shop.ts';
 import { botChoose, botSteer } from '../src/game/bot.ts';
 import { LINES } from '../src/data/pokedex.ts';
-import { STAGES } from '../src/data/stages.ts';
+import { STAGES, waveAt } from '../src/data/stages.ts';
 import { AI, isSetPiece, spawnEnemy } from '../src/game/spawner.ts';
 
 /** `immortal`: the simple bot can still wander into a forest pocket and get swarmed on some
@@ -457,9 +457,7 @@ describe('minute waves', () => {
 
   /** Starts a run partway in with an unkillable player so set pieces can be watched alone. */
   function runFrom(start: number, until: number, onTick: (sim: Sim) => void) {
-    const sim = new Sim({ stageId: 'viridian', seed: 99, players: [{ name: 'P', lineId: 'charmander', shiny: false, meta: metaBonuses({}), tms: [] }] });
-    sim.time = start;
-    (sim.spawner as unknown as { bossIdx: number }).bossIdx = 99; // no backlog of boss cinematics from the time jump
+    const sim = new Sim({ stageId: 'viridian', seed: 99, startTime: start, players: [{ name: 'P', lineId: 'charmander', shiny: false, meta: metaBonuses({}), tms: [] }] });
     for (let steps = 0; sim.time < until && steps < 200000; steps++) {
       if (sim.phase === 'levelup') { sim.choose(sim.players[0].id, botChoose(sim, sim.players[0])); continue; }
       if (sim.phase === 'cine') { sim.update(DT); continue; }
@@ -471,6 +469,15 @@ describe('minute waves', () => {
     return sim;
   }
   const warns = (sim: Sim, text: string) => sim.events.filter((ev) => ev.e === 'warn' && ev.text === text).length;
+
+  it('startTime skips the boss backlog and the minute banner, and the wave at that time is active', () => {
+    const sim = runFrom(400, 400.02, (s) => { expect(s.spawner.wave).toBe(waveAt(s.stage, 400).wave); });
+    expect(sim.events.some((ev) => ev.e === 'boss')).toBe(false);
+    expect(sim.events.some((ev) => ev.e === 'wave')).toBe(false);
+    expect(sim.enemies.some((e) => e.boss)).toBe(false);
+    expect(sim.spawner.wave).toBe(waveAt(sim.stage, 400).wave);
+    expect(Math.floor(sim.time / 60)).toBe(6);
+  });
 
   it('fires each swarm of the minute once, at its offset and repeat spacing', () => {
     const times: number[] = [];
