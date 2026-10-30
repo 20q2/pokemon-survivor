@@ -1486,7 +1486,7 @@ export class Renderer {
       const c = document.createElement('canvas');
       c.width = w; c.height = h;
       const vg = c.getContext('2d')!;
-      const grad = vg.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.3, w / 2, h / 2, Math.max(w, h) * 0.65);
+      const grad = vg.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.25, w / 2, h / 2, Math.max(w, h) * 0.62);
       grad.addColorStop(0, 'rgba(200,0,0,0)');
       grad.addColorStop(1, 'rgba(200,0,0,1)');
       vg.fillStyle = grad;

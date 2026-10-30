@@ -250,7 +250,7 @@ describe('playtest regressions', () => {
     const banked = sim.money * p.stats.money + runBonus({ stageId: 'viridian', time: sim.time, bosses: sim.bossesDefeated, cleared: false } as never);
     expect(banked, `banked ₽${Math.round(banked)}`).toBeLessThan(1000);
     expect(realAt6, 'real build upgrades still on offer at 6:00').toBeGreaterThan(0);
-  }, 60_000);
+  }, 180_000); // ~50-70 s now that waves fill their quota; a loaded machine must not turn it into a flake
 });
 
 describe('evolution move learning', () => {

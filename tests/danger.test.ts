@@ -3,12 +3,12 @@ import { dangerStrength, heartbeatInterval } from '../src/render/danger.ts';
 import { freshSave, migrate } from '../src/meta/save.ts';
 
 describe('danger cues', () => {
-  it('vignette is off above 30% HP and ramps to 0.45 at 10%', () => {
+  it('vignette is off above 30% HP and ramps to 0.55 at 10%', () => {
     expect(dangerStrength(1)).toBe(0);
     expect(dangerStrength(0.3)).toBe(0);
     expect(dangerStrength(0.2)).toBeCloseTo(0.225);
-    expect(dangerStrength(0.1)).toBeCloseTo(0.45);
-    expect(dangerStrength(0.02)).toBeCloseTo(0.45);
+    expect(dangerStrength(0.1)).toBeCloseTo(0.55);
+    expect(dangerStrength(0.02)).toBeCloseTo(0.55);
   });
   it('heartbeat is 0.9 s at <=30%, 0.6 s under 15%, silent above', () => {
     expect(heartbeatInterval(0.5)).toBe(0);

@@ -3,9 +3,9 @@ const DANGER_HP = 0.3;
 /** HP fraction at which the vignette is at full strength. */
 const FULL_HP = 0.1;
 const CRITICAL_HP = 0.15;
-const MAX_VIGNETTE = 0.45;
+const MAX_VIGNETTE = 0.55;
 
-/** Red vignette alpha: 0 at 30% HP rising linearly to 0.45 at 10% HP and below. */
+/** Red vignette alpha: 0 at 30% HP rising linearly to 0.55 at 10% HP and below (a 0.45 cap read as a faint tint in screenshots). */
 export function dangerStrength(hpFrac: number): number {
   if (hpFrac >= DANGER_HP) return 0;
   return Math.min(MAX_VIGNETTE, ((DANGER_HP - hpFrac) / (DANGER_HP - FULL_HP)) * MAX_VIGNETTE);
