@@ -83,6 +83,42 @@ describe('scenery obstacles', () => {
     expect(mine.dead).toBe(false);
   });
 
+  it("never overlap each other's art (Viridian trees are 48 px wide and 47 px tall)", () => {
+    const obs = new Obstacles('viridian');
+    const trees: Obstacle[] = [];
+    for (let cy = -60; cy < 60; cy++) for (let cx = -60; cx < 60; cx++) {
+      const o = obs.at(cx, cy);
+      if (o && !o.small) trees.push(o);
+    }
+    expect(trees.length).toBeGreaterThan(300);
+    for (const a of trees) for (const b of trees) {
+      if (a === b || Math.abs(a.x - b.x) >= 48) continue;
+      expect(Math.abs(a.y - b.y), `trees at ${a.x},${a.y} and ${b.x},${b.y}`).toBeGreaterThanOrEqual(47);
+    }
+  });
+
+  it("a row of trees is a wall a partner can't slip between", () => {
+    const s = sim();
+    const p = s.players[0];
+    const obs = s.obstacles;
+    // two side-by-side trees with nothing below them
+    let pair: [Obstacle, Obstacle] | null = null;
+    for (let cy = -40; cy < 40 && !pair; cy++) for (let cx = -40; cx < 40 && !pair; cx++) {
+      const a = obs.at(cx, cy), b = obs.at(cx + 1, cy);
+      if (a && b && !a.small && !b.small && !obs.at(cx, cy + 1) && !obs.at(cx + 1, cy + 1) && !obs.at(cx, cy + 2) && !obs.at(cx + 1, cy + 2)) pair = [a, b];
+    }
+    expect(pair).not.toBeNull();
+    const [a, b] = pair!;
+    const gap = (a.x + b.x) / 2;
+    p.x = gap; p.y = a.cy + 60;
+    p.mx = 0; p.my = -1;
+    for (let i = 0; i < 90; i++) {
+      s.update(DT);
+      p.x = gap;
+      expect(p.y).toBeGreaterThanOrEqual(a.cy + a.r + p.radius - 0.01);
+    }
+  });
+
   it('foes come round a forest wall instead of piling up behind it', () => {
     const s = sim();
     const p = s.players[0];
@@ -90,9 +126,14 @@ describe('scenery obstacles', () => {
     const wall = new Set<string>();
     for (let j = -4; j <= 4; j++) wall.add(`3,${j}`);
     const at = s.obstacles.at.bind(s.obstacles);
-    s.obstacles.at = (cx, cy) => (wall.has(`${cx},${cy}`) ? { x: cx * 32 + 16, y: cy * 32 + 28, cy: cy * 32 + 23, r: 11, v: 0 } : at(cx, cy) && null);
+    const c = s.obstacles.cell;
+    const tree = (cx: number, cy: number) => {
+      const x = cx * c + c / 2, y = cy * c + c - 4;
+      return { x, y, cy: y - 5, x0: x, x1: x, y0: y - 5 - c / 2, y1: y - 5 + c / 2, r: 11, v: 0 };
+    };
+    s.obstacles.at = (cx, cy) => (wall.has(`${cx},${cy}`) ? tree(cx, cy) : at(cx, cy) && null);
     p.x = 0; p.y = 16;
-    const e = spawnEnemy(s, 'rattata', 200, 16)!;
+    const e = spawnEnemy(s, 'rattata', 6 * c, 16)!;
     e.maxHp = e.hp = 1e6;
     let reached = false;
     for (let i = 0; i < 60 * 12 && !reached; i++) {

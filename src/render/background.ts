@@ -1,5 +1,5 @@
 import type { StageDef } from '../data/stages.ts';
-import { OB_CELL, Obstacles } from '../game/obstacles.ts';
+import { Obstacles } from '../game/obstacles.ts';
 import { biomeFor, type Biome, type Field, type Material, type PropSprite } from './biomes.ts';
 import { fbm, hash2, T } from './pixelart.ts';
 
@@ -203,8 +203,9 @@ export class Background {
     }
     // solid obstacles whose foot lies in this chunk
     if (biome.solids.length) {
-      const per = CPX / OB_CELL;
-      for (let j = cy * per; j < (cy + 1) * per; j++) for (let i = cx * per; i < (cx + 1) * per; i++) {
+      // the cells whose top-left corner lies in this chunk
+      const cell = this.obstacles.cell, c0 = (n: number) => Math.ceil((n * CPX) / cell);
+      for (let j = c0(cy); j < c0(cy + 1); j++) for (let i = c0(cx); i < c0(cx + 1); i++) {
         const o = this.obstacles.at(i, j);
         const art = o?.small && biome.smallSolids.length ? biome.smallSolids : biome.solids;
         if (o) tall.push({ s: art[Math.floor(o.v * art.length)], x: o.x, y: o.y });
@@ -219,7 +220,8 @@ export class Background {
   private propAt(TX: number, TY: number): (Placed & { spec: Biome['props'][number] }) | null {
     const { biome } = this;
     // scenery owns its cell
-    if (this.obstacles.at(Math.floor(TX / 2), Math.floor(TY / 2))) return null;
+    const cell = this.obstacles.cell;
+    if (this.obstacles.at(Math.floor((TX * T) / cell), Math.floor((TY * T) / cell))) return null;
     const u = hash2(TX, TY, biome.seed + 999);
     let acc = 0;
     for (let i = 0; i < biome.props.length; i++) {

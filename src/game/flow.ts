@@ -1,12 +1,12 @@
-import { OB_CELL, type Obstacles } from './obstacles.ts';
+import type { Obstacles } from './obstacles.ts';
 
 /**
- * Walking route to one partner around the scenery: a breadth-first fill over the 32 px obstacle
+ * Walking route to one partner around the scenery: a breadth-first fill over the obstacle grid's
  * cells in a window around them. Foes that bump into a tree follow it downhill instead of
  * grinding against the trunk, so they come round forest walls rather than piling up behind them.
  */
 
-const N = 56; // cells per side (~1800 px), a little more than a screen in every direction
+const N = 56; // cells per side (1800+ px), a little more than a screen in every direction
 const FAR = 0xffff;
 /** 8 neighbours: dx, dy (orthogonals first). */
 const NB = [1, 0, -1, 0, 0, 1, 0, -1, 1, 1, -1, 1, 1, -1, -1, -1];
@@ -19,12 +19,16 @@ export class FlowField {
   private tx = NaN;
   private ty = NaN;
   private age = Infinity;
+  /** The obstacle grid's cell size (px), from the last update. */
+  private cell = 32;
 
   /** Refresh when the partner changes cell, and every so often regardless. */
   update(obs: Obstacles, x: number, y: number, dt: number) {
-    const tx = Math.floor(x / OB_CELL), ty = Math.floor(y / OB_CELL);
+    const cell = obs.cell;
+    const tx = Math.floor(x / cell), ty = Math.floor(y / cell);
     this.age += dt;
     if (tx === this.tx && ty === this.ty && this.age < 0.5) return;
+    this.cell = cell;
     this.tx = tx;
     this.ty = ty;
     this.age = 0;
@@ -59,7 +63,8 @@ export class FlowField {
    * from the open cell nearest to it, i.e. the side of the trunk it is actually on.
    */
   dir(x: number, y: number): { x: number; y: number } | null {
-    let i = Math.floor(x / OB_CELL) - this.ox, j = Math.floor(y / OB_CELL) - this.oy;
+    const { cell } = this;
+    let i = Math.floor(x / cell) - this.ox, j = Math.floor(y / cell) - this.oy;
     if (i < 0 || j < 0 || i >= N || j >= N) return null;
     const { dist } = this;
     if (dist[j * N + i] === FAR) {
@@ -67,7 +72,7 @@ export class FlowField {
       for (let n = 0; n < 8; n += 2) {
         const ni = i + NB[n], nj = j + NB[n + 1];
         if (ni < 0 || nj < 0 || ni >= N || nj >= N || dist[nj * N + ni] === FAR) continue;
-        const d = ((this.ox + ni + 0.5) * OB_CELL - x) ** 2 + ((this.oy + nj + 0.5) * OB_CELL - y) ** 2;
+        const d = ((this.ox + ni + 0.5) * cell - x) ** 2 + ((this.oy + nj + 0.5) * cell - y) ** 2;
         if (d < bd) { bd = d; bi = ni; bj = nj; }
       }
       if (bi < 0) return null;
@@ -84,7 +89,7 @@ export class FlowField {
       if (d < best) { best = d; bx = dx; by = dy; }
     }
     if (!bx && !by) return null;
-    const dx = (this.ox + i + bx + 0.5) * OB_CELL - x, dy = (this.oy + j + by + 0.5) * OB_CELL - y;
+    const dx = (this.ox + i + bx + 0.5) * cell - x, dy = (this.oy + j + by + 0.5) * cell - y;
     const l = Math.hypot(dx, dy) || 1;
     return { x: dx / l, y: dy / l };
   }
