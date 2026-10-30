@@ -822,8 +822,8 @@ function dropCandy(sim: Sim, e: Enemy) {
 }
 
 /**
- * Per-kill pickup chances. A run is now 20-40k kills (dense minute waves), so these are small:
- * a Magnet or Repel every minute or so, a Rare Candy a few times a run.
+ * Per-kill pickup chances. Quota waves make a run tens of thousands of kills, so these are tiny;
+ * the timed item balls in Spawner.update carry the steady supply. Retune against scripts/pacing.ts.
  */
 const DROP = { coin: 0.0035, oran: 0.002, magnet: 0.00015, repel: 0.00008, rareCandy: 0.00004 } as const;
 

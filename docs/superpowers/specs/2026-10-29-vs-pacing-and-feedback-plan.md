@@ -293,3 +293,52 @@ Goal: rhythm the player can feel without reading.
 - Ranged enemies appear in `early` pools of five stages (Horsea, Magnemite, Drowzee, Vulpix,
   Oddish). If Phase 3's "no telegraphs before minute 6" is accepted, move shooters to minute >= 4
   in the wave tables.
+
+---
+
+## 6. Implementation status (2026-10-29, same day)
+
+All four phases were built the same day by Sonnet subagents (one implementer, a spec reviewer and a
+code-quality reviewer per task) in two worktrees and merged to master. What shipped, and where it
+differs from the plan above:
+
+**Phase 1 (minute waves)**: as planned. `WaveDef` per minute 0-15 for all 7 stages
+(`src/data/stages.ts`, authored through the `waves()` builder), shared `WAVE_MIN`
+`[15, 35, 60, 50, 45, 10, 110, 150, 60, 10, 260, 70, 220, 190, 280, 300]` (minutes 5 and 9 are the
+ring minutes), intervals 1 / 0.5 / 0.25 / 0.1 s, `WAVE_HP` tiers replacing the cubic (the level
+factor is gone), regular speed capped at 110 px/s with the late +30% removed, an elite 2 s into most
+minutes (two from minute 10), swarms with repeats and rings as slow-closing walls (`AI.WALL`,
+25-35 px/s, 3x tank HP, despawn after 40-45 s) as `events` on the wave. Elite ground casts only
+from 6:00 with a 12-16 s cooldown. Measured (viridian/charmander bot): peak in view 58-94 in
+minute 2, 185 in minute 10; about 0.5-0.8 ms of sim per tick at the minute-10 backfill.
+
+**Phase 2 (reward cadence)**: XP per regular is a per-wave value, `(1 + 0.25m)` scaled by
+`sqrt(45 / quota)` clamped to 0.75-2.5, so income is flatter across thin and thick minutes; the
+curve keeps levels 1-11 and continues `206 + 90m + 26m^2` from level 12 (a gentle quadratic; no
+near-linear slope landed in the band). Candy merges into piles above 120 pickups unless it lands in
+a pickup radius. The first six elite chests of a *save* are Poke, Poke, Great, Poke, Poke, Ultra.
+Per-kill item drops were cut hard because kills per run went up 3-6x. Measured on seeds 7/8/9: a
+pile-fetching player ("potential level" line in `scripts/pacing.ts`) gets gap p50 18-21 s, p90
+33-51 s, max 59-77 s and level 37-44 at 15:00; the kiting bot itself leaves XP on the floor and
+reads worse (p50 12-19 s, max up to 200 s). The p90 and max targets were **not** met by the
+letter; the remaining stalls are the two ring minutes plus the bot's refusal to walk to piles.
+
+**Phase 3 (feedback beats)**: minute banner (species portrait + line + sting) that yields to alert
+banners, quiet notices for treasure carriers and Alphas, timer pulse on the minute, kill-streak
+pitch ladder sharing a `Ladder` helper with the candy ladder, crit sparkle, white-flash death pop
+(`src/render/pops.ts`), hit-stop as sim time-scale (2 frames on crit at most every 0.5 s, 7 on elite
+or alpha kills; peers freeze on the same tick; interpolation pinned), zoom punch, low-HP red vignette
+and heartbeat, options for effects opacity (hostile telegraphs never dim) and a damage-number cap of
+40 / 80 / 160. Deviation: the number thinning is a manual cap, not an auto-thin by hit rate. Co-op
+guests see the freeze through stalled snapshots rather than an explicit flag. The elite ground casts
+are kept (rarer and later); the user decision on removing them is still open.
+
+**Phase 4**: `Director` (surge pulls the next set piece 10-15 s earlier after 20 s of >90% HP and
+>=8 kills/s; reprieve pauses backfill 4 s under 35% HP; each once a minute, silent); an unkillable
+Banette sweeper 60 s after the final boss appears and every 60 s after until it dies; a minute 1-15
+wave timeline on unlocked route cards.
+
+Follow-ups noted by reviewers, not done: split `src/game/enemies.ts` into spawner and enemy AI;
+a `SimConfig.startTime` seam so tests stop poking the spawner's private boss index; a guest's
+death-pop walk frame can differ from the host's; the kill ladder and new SFX have not been heard
+in a browser; the stage-card timeline has not been eyeballed at the 250 px card minimum.

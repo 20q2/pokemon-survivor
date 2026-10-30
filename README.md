@@ -57,7 +57,8 @@ species/items to the data files): `npm run fetch-assets`.
 - **46 achievements** unlock new Pokémon (10 locked lines), TMs and money.
 - **Friendship** per Pokémon line grows with every run and grants perks. Clear a
   route at max friendship (or clear Cerulean Cave) to unlock that line's **Shiny** form.
-- Save lives in `localStorage`; export/import a save code in Options.
+- Save lives in `localStorage`; export/import a save code in Options. Options also has an
+  effects-opacity slider and a damage-number cap for busy late waves (hostile telegraphs never dim).
 
 ## Online co-op
 
@@ -84,7 +85,7 @@ their own upgrades, fainted teammates are revived by standing next to them.
 | `src/ui/` | DOM menus, HUD, level-up cards, lobby; keyboard/gamepad menu navigation |
 | `src/meta/` | Save data, shop, achievements, run → save progression |
 | `scripts/balance.ts` | Headless balance runs with a kiting bot (`node scripts/balance.ts mtmoon 900`) |
-| `scripts/pacing.ts` | Pacing telemetry for a headless run: level-up gaps, enemies alive / in view, hits per second (`node scripts/pacing.ts viridian charmander 900`) |
+| `scripts/pacing.ts` | Pacing telemetry for a headless run: level-up gaps (actual and "potential" with floor candy counted), enemies alive / in view / peak, hits per second, ms per tick (`node scripts/pacing.ts viridian charmander 960 7`, last arg = seed) |
 | `scripts/*.mjs` | Playwright screenshot / flow / co-op / perf checks (uses installed Edge) |
 | `scripts/render-music.mjs` | Renders every song with the real synth (levels report + optional WAVs) |
 | `scripts/sfx-levels.mjs` | Renders every sound effect with the real synth and prints peak/RMS |
