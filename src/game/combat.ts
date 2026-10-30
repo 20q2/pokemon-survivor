@@ -1012,7 +1012,7 @@ function updateFieldEffects(sim: Sim, pr: Projectile, dt: number) {
   // Whirlpool: drag foes toward the eye.
   if (pr.flags & PF_PULL) {
     sim.grid.query(pr.x, pr.y, pr.r * 1.6, (e) => {
-      if (!e.alive || e.boss) return;
+      if (!e.alive || e.boss || e.sweeper) return;
       const dx = pr.x - e.x, dy = pr.y - e.y;
       const d = Math.hypot(dx, dy);
       if (d > pr.r * 1.6 || d < 4) return;
@@ -1093,7 +1093,7 @@ function mostHurt(sim: Sim, p: Player): Player {
 
 export function hitEnemy(sim: Sim, pr: Projectile, e: Enemy) {
   const owner = sim.players[pr.owner];
-  if (!owner) return;
+  if (!owner || e.sweeper) return;
   const st = e.st;
   const id = pr.moveId;
   // Sticky bombs latch on instead of hitting.
@@ -1309,7 +1309,7 @@ export function applyStatus(sim: Sim, e: Enemy, kind: StatusKind, dmg: number, o
 
 /** Damage to an enemy that doesn't come from a projectile (DoTs, thorns, abilities). */
 export function rawDamageEnemy(sim: Sim, e: Enemy, dmg: number, type: PType, ownerId: number, src: string) {
-  if (!e.alive) return;
+  if (!e.alive || e.sweeper) return;
   if (e.st.vuln > 0) dmg *= 1.25;
   e.hp -= dmg;
   e.flash = Math.max(e.flash, 0.05);

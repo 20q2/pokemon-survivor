@@ -5,6 +5,7 @@ import { TAU, dist2 } from '../engine/math.ts';
 import { freshStatus, makeProjectile, rawDamageEnemy } from './combat.ts';
 import { megaOnKill } from './mega.ts';
 import { RAID_MOVES, alphaNextMove, castRaid, eliteMove, markCharge, spawnHazard, type RaidMove } from './hazards.ts';
+import { Director } from './director.ts';
 import type { Sim } from './sim.ts';
 import { MAX_ENEMIES } from './sim.ts';
 import type { Enemy, Player, Projectile } from './types.ts';
@@ -25,6 +26,12 @@ const RING_RADIUS = 0.6;
 /** Past the run's end a bare minute gets a set piece this often (s), with rings lasting RING_OVERTIME_S. */
 const OVERTIME_PERIOD = 35;
 const RING_OVERTIME_S = 40;
+/** The Reaper arrives this long after the final boss spawned, then another every SWEEPER_PERIOD. */
+const SWEEPER_FROM = RUN_LENGTH + 60;
+const SWEEPER_PERIOD = 60;
+const SWEEPER_SPECIES = 'banette'; // ghost, and no stage's boss
+/** About 1.15x the fastest starter. */
+const SWEEPER_SPEED = 165;
 
 export interface SpawnOpts {
   elite?: boolean;
@@ -36,6 +43,8 @@ export interface SpawnOpts {
   alpha?: boolean;
   /** Guards map treasure: drops no treasure of its own. */
   guardian?: boolean;
+  /** Overtime Reaper: immune to everything, relentless, heavy contact damage, outside the quota. */
+  sweeper?: boolean;
 }
 
 export class Spawner {
@@ -49,6 +58,10 @@ export class Spawner {
   private pendingEvents: { at: number; ev: WaveEvent }[] = [];
   private nextOvertime = 0;
   private overtimeRing = false;
+  private nextSweeper = SWEEPER_FROM;
+  private director: Director;
+  /** The Director's reprieve: no quota backfill until this time (elites, bosses and set pieces carry on). */
+  private trickleResumeAt = 0;
   private bossIdx = 0;
   /** Far-off treasure on the map (shown on the minimap); guardians appear as you get close. */
   private pois: { kind: 'cache' | 'mega-stone'; id: number; x: number; y: number; guarded: boolean }[] = [];
@@ -59,6 +72,7 @@ export class Spawner {
   private sim: Sim;
   constructor(sim: Sim) {
     this.sim = sim;
+    this.director = new Director((lo, hi) => sim.rng.range(lo, hi));
   }
 
   get minute() {
@@ -88,11 +102,12 @@ export class Spawner {
     return grace * (1 + 0.06 * m + 0.004 * m * m) * (0.75 + 0.25 * this.stageFactor()) * (this.sim.elite ? 1.3 : 1);
   }
 
-  update() {
+  update(dt: number) {
     // updateEvents must stay after updateWave: pendingEvents is rebuilt there on a minute change.
     const sim = this.sim;
     const t = sim.time;
     this.updateWave(t);
+    this.updateDirector(dt, t);
     if (t >= this.nextTreasure) {
       this.nextTreasure += sim.rng.range(80, 130);
       if (sim.rng.chance(0.65)) {
@@ -111,6 +126,7 @@ export class Spawner {
     }
     this.updatePois(t);
     this.updateEvents(t);
+    this.updateSweeper(t);
     const bosses = sim.stage.bosses;
     if (this.bossIdx < bosses.length && t >= bosses[this.bossIdx].at) {
       const b = bosses[this.bossIdx++];
@@ -144,9 +160,10 @@ export class Spawner {
     }
     if (t < this.nextQuota) return;
     this.nextQuota = t + w.interval;
+    if (t < this.trickleResumeAt) return;
     // Only filler counts toward the quota; set pieces and carriers have their own pacing.
     let alive = 0;
-    for (const e of sim.enemies) if (e.alive && !e.boss && !e.elite && !e.alpha && e.role !== 'treasure' && !isSetPiece(e)) alive++;
+    for (const e of sim.enemies) if (e.alive && !e.boss && !e.elite && !e.alpha && !e.sweeper && e.role !== 'treasure' && !isSetPiece(e)) alive++;
     const min = Math.round(w.min * (1 + 0.35 * (n - 1)) * (sim.elite ? 1.25 : 1));
     if (alive < min) {
       // Instant backfill; spawnEnemy stops at MAX_ENEMIES.
@@ -156,6 +173,24 @@ export class Spawner {
     } else {
       for (const e of w.species) this.spawnOffscreen(e.species);
     }
+  }
+
+  /** Left 4 Dead-style pacing: a dominant party gets its next set piece early, a struggling one a breather. */
+  private updateDirector(dt: number, t: number) {
+    const sim = this.sim;
+    const up = sim.players.filter((p) => !p.fainted);
+    const hpFrac = up.length ? up.reduce((s, p) => s + p.hp / p.stats.maxHp, 0) / up.length : 0;
+    const act = this.director.update(dt, { minute: this.waveIdx, hpFrac, kills: sim.kills, eventPending: this.pendingEvents.length > 0 });
+    if (act.pullForward) this.pendingEvents[0].at -= act.pullForward;
+    if (act.pauseTrickle) this.trickleResumeAt = t + act.pauseTrickle;
+  }
+
+  /** Overtime: the final boss still stands a minute after arriving, so the Reaper starts walking. */
+  private updateSweeper(t: number) {
+    const sim = this.sim;
+    if (t < this.nextSweeper || sim.finalDefeated) return;
+    this.nextSweeper = t + SWEEPER_PERIOD;
+    if (this.spawnOffscreen(SWEEPER_SPECIES, { sweeper: true })) sim.emit({ e: 'warn', text: 'Something terrible approaches…' });
   }
 
   /** Fires the wave's set pieces once each; past the run's end a bare minute gets an alternating swarm/ring. */
@@ -288,12 +323,12 @@ export class Spawner {
 }
 
 export function spawnEnemy(sim: Sim, speciesId: string, x: number, y: number, opts: SpawnOpts = {}): Enemy | undefined {
-  if (sim.enemies.length >= MAX_ENEMIES && !opts.boss && !opts.elite && !opts.alpha) return;
+  if (sim.enemies.length >= MAX_ENEMIES && !opts.boss && !opts.elite && !opts.alpha && !opts.sweeper) return;
   const sp = SPECIES[speciesId];
   const role: EnemyRole = opts.boss ? 'chaser' : ENEMY_ROLE[speciesId] ?? 'chaser';
   const m = sim.time / 60;
   const shinyOdds = Math.max(...sim.players.map((p) => p.meta.shinyOdds));
-  const shiny = opts.shiny ?? (!opts.boss && !opts.alpha && sim.rng.chance((1 / 3000) * shinyOdds));
+  const shiny = opts.shiny ?? (!opts.boss && !opts.alpha && !opts.sweeper && sim.rng.chance((1 / 3000) * shinyOdds));
   const [bhp, batk, , bspa, , bspe] = sp.base;
   let hp = (4 + bhp * 0.12) * ROLE_HP[role] * sim.spawner.hpMult();
   // Regulars never outrun the slowest starter (~130 px/s) by much, so kiting stays honest all run.
@@ -321,12 +356,16 @@ export function spawnEnemy(sim: Sim, speciesId: string, x: number, y: number, op
     // Pushing through is worth it: three times a tank's hp for three times a tank's xp; walls ignore separation shoves.
     hp = (4 + bhp * 0.12) * ROLE_HP.tank * 3 * sim.spawner.hpMult(); xp = baseXp * 6; knockResist = 0.6; speed = opts.wall.speed;
   }
+  if (opts.sweeper) {
+    // Three hits fell a full-hp player; hp is only a placeholder since damage never lands.
+    hp = 1e9; dmg = 0.4 * Math.max(...sim.players.map((p) => p.stats.maxHp)); xp = 0; scale = 2.4; radius = 26; knockResist = 1; speed = SWEEPER_SPEED;
+  }
   if (role === 'treasure') { speed = Math.max(speed, 80); xp = 5; }
   if (shiny) { hp *= 3; xp *= 5; }
   const e: Enemy = {
     id: sim.id(), speciesId, types: sp.types, role, x, y, radius, vx: 0, vy: 0, dirX: 0, dirY: 1,
     hp, maxHp: hp, speed, dmg, special: bspa > batk, xp, elite: !!opts.elite, boss: !!opts.boss,
-    final: !!opts.boss?.final, shiny, alpha: !!opts.alpha, guardian: !!opts.guardian, homeX: x, homeY: y, alive: true, flash: 0,
+    final: !!opts.boss?.final, shiny, alpha: !!opts.alpha, guardian: !!opts.guardian, sweeper: opts.sweeper, homeX: x, homeY: y, alive: true, flash: 0,
     st: freshStatus(),
     contactCd: 0, ai: sim.rng.range(0, 2), aiState: opts.swarmDir ? AI.CROSSER : opts.wall ? AI.WALL : 0, aiX: opts.swarmDir?.x ?? 0, aiY: opts.swarmDir?.y ?? 0,
     patterns: opts.boss?.patterns ?? [], patternIdx: 0, minions: opts.boss?.minions ?? [], knockResist, scale,
@@ -406,10 +445,11 @@ export function updateEnemies(sim: Sim, dt: number) {
     // Paralysis locks a foe up in random stutters (~35% of the time).
     const stutter = st.paralyze > 0 && ((sim.time * 3.1 + e.id * 0.618) % 1) < 0.35;
     // Can it do anything at all? (frozen, asleep, airborne or stuttering)
-    const helpless = st.freeze > 0 || st.sleep > 0 || st.air > 0 || stutter;
+    const helpless = !e.sweeper && (st.freeze > 0 || st.sleep > 0 || st.air > 0 || stutter);
     if (st.slow > 0) mult *= 0.55;
     if (st.chill > 0) mult *= 1 - 0.15 * st.chill;
     if (helpless || st.root > 0) mult = 0;
+    if (e.sweeper) mult = 1;
     let mx = 0, my = 0;
     if (target && player) {
       const dx = target.x - e.x, dy = target.y - e.y;
@@ -498,7 +538,7 @@ export function updateEnemies(sim: Sim, dt: number) {
     e.vy *= damp;
     if ((mx || my) && mult > 0) { e.dirX = mx; e.dirY = my; }
     // ─ recycle enemies left far behind
-    if (!e.boss && !e.alpha && !isSetPiece(e) && player) {
+    if (!e.boss && !e.alpha && !e.sweeper && !isSetPiece(e) && player) {
       const lim = Math.max(player.viewW, player.viewH) * 0.9 + 150;
       if (Math.abs(e.x - player.x) > lim || Math.abs(e.y - player.y) > lim) {
         if (e.role === 'treasure') { e.alive = false; continue; }

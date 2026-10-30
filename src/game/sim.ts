@@ -291,7 +291,7 @@ export class Sim {
     for (const pr of this.projectiles) { pr.px = pr.x; pr.py = pr.y; }
     this.refreshStats();
     this.updatePlayers(dt);
-    this.spawner.update();
+    this.spawner.update(dt);
     for (const p of this.players) (this.flow[p.id] ??= new FlowField()).update(this.obstacles, p.x, p.y, dt);
     updateEnemies(this, dt);
     this.rebuildGrid();
@@ -444,7 +444,7 @@ export class Sim {
       case 'repel':
         this.emit({ e: 'repel' });
         for (const e of this.enemies) {
-          if (!e.alive || e.boss || e.elite) continue;
+          if (!e.alive || e.boss || e.elite || e.sweeper) continue;
           if (Math.abs(e.x - p.x) < p.viewW / 2 + 40 && Math.abs(e.y - p.y) < p.viewH / 2 + 40) killEnemy(this, e, p.id);
         }
         break;

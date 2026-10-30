@@ -180,6 +180,8 @@ export interface Enemy {
   /** Alpha Pokémon: huge, territorial, marked on the minimap. */
   alpha: boolean;
   guardian?: boolean;
+  /** Overtime Reaper: unkillable, walks straight at the nearest player. Host-only; guests just draw a big ghost. */
+  sweeper?: boolean;
   homeX: number; homeY: number;
   alive: boolean;
   flash: number;
