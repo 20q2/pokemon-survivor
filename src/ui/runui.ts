@@ -175,7 +175,10 @@ export class LevelUpUI {
     // Levels left to pick, this one included: pendingLevels only drops in afterChoice, after the pick.
     const pending = mart || learning ? 0 : me.pendingLevels;
     // Cascade: the jingle climbs a semitone per card already taken (the audio engine caps it).
-    audio.sfx(learning ? 'evolved' : 'levelup', mart || learning ? 0 : this.cascade.step(pending));
+    const step = mart || learning ? 0 : this.cascade.step(pending);
+    audio.sfx(learning ? 'evolved' : 'levelup', step);
+    // The label names the whole cascade on every card of it, so "×3 LEVEL UP!" stays up through all three picks.
+    const label = mart || learning ? null : cascadeLabel(this.cascade.size);
     const cards = h('div', { class: `cards${learning ? ' learn' : ''}` }, offers.map((o, i) => offerCard(o, me, i, () => this.pick(i), session.world.money)));
     if (this.banishMode) cards.querySelectorAll('.card').forEach((c) => c.classList.add('banish-mode'));
     const actions = learning || mart ? null : h('div', { class: 'lu-actions' },
@@ -201,7 +204,7 @@ export class LevelUpUI {
       ? h('div', { class: 'learn-head' }, h('h2', null, 'Poké Mart stop'), h('div', { class: 'hint' }, `You have ₽${Math.floor(session.world.money)} to spend. Pick one.`))
       : h('div', { class: 'lu-head' },
         h('h2', null, this.banishMode ? 'Banish which?' : `Level ${session.world.level}!`),
-        cascadeLabel(pending) ? h('div', { class: 'cascade' }, cascadeLabel(pending)) : null);
+        label ? h('div', { class: 'cascade' }, label) : null);
     // Your current build and stats stay live in the HUD above this overlay (see Hud 'lifted').
     this.el = h('div', { class: 'levelup' }, heading, cards, actions);
     this.root.appendChild(this.el);

@@ -26,3 +26,16 @@ describe('level-up cascade', () => {
     expect(t.step(1)).toBe(CASCADE_MAX_STEP);
   });
 });
+
+describe('cascade size', () => {
+  it('remembers the cascade size through every card of it', () => {
+    const t = new CascadeTracker();
+    t.step(3);
+    expect(t.size).toBe(3);
+    t.step(2);
+    t.step(1);
+    expect(t.size).toBe(3);
+    t.reset();
+    expect(t.size).toBe(0);
+  });
+});

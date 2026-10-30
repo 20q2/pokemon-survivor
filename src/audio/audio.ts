@@ -475,8 +475,8 @@ export class AudioEngine {
         this.phrase('tick', Math.round(arg) + this.jitterSemis());
         break;
       case 'ding': this.phrase('ding', arg * 2); break;
-      // arg = steps already taken in a level-up cascade: one semitone each, capped at four.
-      case 'levelup': this.phrase('levelup', Math.max(0, Math.min(4, Math.round(arg)))); break;
+      // arg = steps already taken in a level-up cascade (capped by CascadeTracker): one semitone each.
+      case 'levelup': this.phrase('levelup', Math.max(0, Math.round(arg))); break;
       // arg = number of rewards in the chest.
       case 'reveal': this.phrase(arg >= 5 ? 'reveal5' : arg >= 3 ? 'reveal3' : 'reveal1'); break;
       case 'fire':

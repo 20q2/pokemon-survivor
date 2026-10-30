@@ -2,9 +2,9 @@
 
 export const CASCADE_MAX_STEP = 4;
 
-/** The second heading line for a card screen with `pending` level-ups left (this one included). */
-export function cascadeLabel(pending: number): string | null {
-  return pending > 1 ? `×${pending} LEVEL UP!` : null;
+/** The second heading line for a cascade of `size` level-ups; null for an ordinary single level-up. */
+export function cascadeLabel(size: number): string | null {
+  return size > 1 ? `×${size} LEVEL UP!` : null;
 }
 
 /**
@@ -14,6 +14,9 @@ export function cascadeLabel(pending: number): string | null {
  */
 export class CascadeTracker {
   private start = 0;
+
+  /** Size of the current cascade: the biggest pending count seen since the last reset. */
+  get size() { return this.start; }
 
   step(pending: number): number {
     this.start = Math.max(this.start, pending);
