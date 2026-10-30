@@ -532,7 +532,15 @@ export function resultsScreen(app: App, data: { session: RunSession; summary: Ru
   const moves = [...me.moves].sort((a, b) => b.dmgDealt - a.dmgDealt);
   const totalDmg = Math.max(1, me.dmgDealt);
   const title = r.cleared ? 'STAGE CLEAR!' : 'You blacked out…';
-  const retry = () => void app.startSolo(r.lineId, r.stageId, r.elite);
+  let started = false;
+  let stopKeys = () => {};
+  const retry = () => {
+    // startSolo preloads asynchronously; a second trigger (click then R) must not start another run.
+    if (started) return;
+    started = true;
+    stopKeys();
+    void app.startSolo(r.lineId, r.stageId, r.elite);
+  };
   const near = nearMissLines(r);
   const root = screen('',
     h('div', { class: `big-title ${r.cleared ? 'win' : 'lose'}` }, title, r.elite ? h('div', { class: 'hint', style: 'color:#ffd94a;font-size:12px;margin-top:8px' }, 'ELITE MODE') : null),
@@ -583,10 +591,10 @@ export function resultsScreen(app: App, data: { session: RunSession; summary: Ru
       if (e.code === 'Enter' && t && t.tagName === 'BUTTON') return;
       if (e.code !== 'KeyR' && e.code !== 'Enter') return;
       e.preventDefault();
-      window.removeEventListener('keydown', onKey);
       retry();
     };
     window.addEventListener('keydown', onKey);
+    stopKeys = () => window.removeEventListener('keydown', onKey);
   }
   return root;
 }

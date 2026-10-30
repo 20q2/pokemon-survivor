@@ -126,7 +126,7 @@ img.px, .px img { image-rendering: pixelated; }
 .upg img { width: 44px; image-rendering: pixelated; grid-row: span 2; }
 .upg .nm { font-weight: 600; }
 .upg .ds { font-size: 14px; color: var(--ink-soft); grid-column: 1 / -1; min-height: 34px; }
-.pips { display: flex; gap: 3px; }
+.pips { display: flex; flex-wrap: wrap; gap: 3px; }
 .pips i { width: 12px; height: 8px; background: #cfcfc2; border-radius: 2px; border: 1px solid #9c9c8e; }
 .pips i.on { background: var(--blue); border-color: #1d4c8a; }
 .upg .btn { grid-column: 1 / -1; }
@@ -281,7 +281,7 @@ table.dmg td.n { text-align: right; font-variant-numeric: tabular-nums; }
 .big-title { font-family: var(--head); font-size: clamp(20px, 4vw, 40px); text-shadow: 3px 3px 0 #000; margin: 10px 0 18px; }
 .big-title.win { color: var(--accent-2); }
 .big-title.lose { color: #ff7b7b; }
-.near-miss { margin: -8px 0 14px; text-align: center; color: var(--muted, #9aa4b8); font-size: 13px; }
+.near-miss { margin: -8px 0 14px; text-align: center; color: var(--ink-soft); font-size: 13px; }
 .near-miss div { white-space: nowrap; }
 
 /* lobby */

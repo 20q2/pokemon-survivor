@@ -18,7 +18,7 @@ describe('nearMissLines', () => {
     expect(nearMissLines(r)).toEqual([
       'Next level was 20 XP away',
       'Beedrill was 00:18 away',
-      'Minute 8 was 18 s away',
+      'Minute 9 was 18 s away',
     ]);
   });
 
@@ -28,6 +28,14 @@ describe('nearMissLines', () => {
 
   it('reports only the level when only it was close', () => {
     expect(nearMissLines(summary({ time: 90, xp: 60 }))).toEqual(['Next level was 40 XP away']);
+  });
+
+  it('skips the minute line when the run ended on the mark', () => {
+    expect(nearMissLines(summary({ time: 480, nextWaveAt: 480 }))).toEqual([]);
+  });
+
+  it('stays silent on a quit', () => {
+    expect(nearMissLines(summary({ died: false, xp: 99 }))).toEqual([]);
   });
 
   it('stays silent on a clear', () => {
