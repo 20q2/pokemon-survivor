@@ -186,7 +186,7 @@ export class App {
     this.save.lastLine = lineId;
     this.save.lastStage = stageId;
     this.persist();
-    const s = new LocalSession({ stageId, elite, players: [this.playerInit(lineId)] });
+    const s = new LocalSession({ stageId, elite, players: [this.playerInit(lineId)], eliteChests: this.save.stats.eliteChests });
     await this.preload(s);
     this.beginSession(s);
   }

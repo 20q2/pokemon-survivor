@@ -26,6 +26,7 @@ export interface RunSummary {
   elite: boolean;
   megas: number;          // Mega Evolutions this run
   alphas: number;         // Alpha Pokémon defeated by the team this run
+  eliteChests: number;    // elite chests dropped this run
 }
 
 export type Reward = { line: string } | { money: number } | { tm: string };

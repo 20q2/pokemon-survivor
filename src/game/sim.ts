@@ -33,6 +33,8 @@ export interface SimConfig {
   elite?: boolean;
   players: PlayerInit[];
   seed?: number;
+  /** Elite chests the save has earned before this run (the host's, in co-op); drives the scripted first treasures. */
+  eliteChests?: number;
 }
 
 export type Phase = 'play' | 'levelup' | 'cine' | 'over' | 'victory';
@@ -106,10 +108,17 @@ export function newMoveState(hiddenType: PType) {
   };
 }
 
+/** Candy pickups merge into the nearest candy once the field holds more pickups than this. */
+const CANDY_MERGE_ABOVE = 120;
+
 export function xpForLevel(level: number): number {
-  // Snappy first levels, then a quadratic curve so the build fills out over the whole run.
+  // Snappy first levels (quadratic up to level 11), then a flatter climb.
   const k = level - 1;
-  return Math.round(6 + 5 * k + 1.2 * k * k + (k > 24 ? 0.08 * (k - 24) ** 3 : 0));
+  if (k < 11) return Math.round(6 + 5 * k + 1.2 * k * k);
+  // From level 12 the climb is a gentle parabola (the old cubic made late levels a wall). Enemy xp grows
+  // each minute, so costs must rise too or the cadence would speed up as the horde thickens.
+  const m = k - 11;
+  return 206 + 70 * m + 12 * m * m;
 }
 
 /** Crit hit-stop: 2 frames, at most once per half second. */
@@ -121,6 +130,9 @@ const ELITE_STOP = 7 / 60;
 export class Sim {
   readonly stage: StageDef;
   readonly elite: boolean;
+  /** Elite chests dropped this run, and the save's count at run start. */
+  eliteChestsDropped = 0;
+  readonly eliteChestsBase: number;
   readonly rng: Rng;
   readonly grid = new SpatialGrid<Enemy>(48);
   /** Trees, boulders… that block walking and flying shots (generated from the stage). */
@@ -181,6 +193,7 @@ export class Sim {
     this.stage = STAGE[cfg.stageId];
     this.obstacles = new Obstacles(cfg.stageId);
     this.elite = !!cfg.elite;
+    this.eliteChestsBase = cfg.eliteChests ?? 0;
     this.rng = new Rng(cfg.seed);
     this.spawner = new Spawner(this);
     cfg.players.forEach((pi, slot) => this.addPlayer(pi, slot));
@@ -337,9 +350,15 @@ export class Sim {
 
   // ───────────────────────────── pickups ─────────────────────────────
 
+  /** Candy this close to a player is vacuumed next tick, so it never needs merging (and must not vanish into a far pile). */
+  private inPickupRange(x: number, y: number) {
+    return this.players.some((p) => !p.fainted && dist2(p.x, p.y, x, y) < p.stats.pickup * p.stats.pickup);
+  }
+
   spawnPickup(kind: PickupKind, x: number, y: number, value = 1) {
-    if (kind === 'candy' && this.pickups.length > 380) {
-      // Merge into an existing nearby candy to keep things cheap.
+    if (kind === 'candy' && this.pickups.length > CANDY_MERGE_ABOVE && !this.inPickupRange(x, y)) {
+      // Past a modest field, fold into a nearby candy: the floor fills with a few fat piles (XL at 40+)
+      // instead of hundreds of crumbs, and a Magnet turns each pile into a level-up cascade.
       let best: Pickup | undefined;
       let bd = 260 * 260;
       for (const pk of this.pickups) {

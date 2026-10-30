@@ -6,13 +6,16 @@ import { megaOnKill } from './mega.ts';
 import { RAID_MOVES, alphaNextMove, castRaid, eliteMove, markCharge, spawnHazard, type RaidMove } from './hazards.ts';
 import type { Sim } from './sim.ts';
 import { MAX_ENEMIES } from './sim.ts';
-import type { Enemy, Player, Projectile } from './types.ts';
+import type { ChestTier, Enemy, Player, Projectile } from './types.ts';
 import { heal } from './ledger.ts';
 
 const ROLE_HP: Record<EnemyRole, number> = { chaser: 1, fast: 0.7, tank: 2.4, ranged: 1, bomber: 0.8, treasure: 6 };
 const ROLE_SPEED: Record<EnemyRole, number> = { chaser: 1, fast: 1.4, tank: 0.7, ranged: 0.95, bomber: 1.15, treasure: 1.25 };
 
 /** aiState doubles as per-role state (bosses, bombers, alphas); these are the shared values. */
+/** Tiers of a save's first six elite chests: Poké, Poké, Great, Poké, Poké, Ultra. */
+const ELITE_CHEST_SCRIPT: readonly ChestTier[] = [1, 1, 2, 1, 1, 3];
+
 export const AI = { BOMBER_FUSE: 1, CROSSER: 9, WALL: 10 } as const;
 /** Elites cast raid attacks only after this run time; the first half is pure crowd-shepherding. */
 const ELITE_RAID_FROM = 360;
@@ -298,7 +301,9 @@ export function spawnEnemy(sim: Sim, speciesId: string, x: number, y: number, op
   // Regulars never outrun the slowest starter (~130 px/s) by much, so kiting stays honest all run.
   let speed = Math.min(110, (48 + bspe * 0.42) * ROLE_SPEED[role]);
   let dmg = (3 + Math.max(batk, bspa) * 0.055) * sim.spawner.dmgMult();
-  let xp = role === 'tank' ? 2 : 1;
+  // Foes pay more as the waves climb (a step each minute), so levels keep coming against thicker hordes.
+  const baseXp = (1 + 0.25 * Math.floor(m)) ;
+  let xp = role === 'tank' ? baseXp * 2 : baseXp;
   let scale = role === 'tank' ? 1.15 : 1;
   let radius = 9 * scale;
   let knockResist = role === 'tank' ? 0.6 : 0;
@@ -316,7 +321,7 @@ export function spawnEnemy(sim: Sim, speciesId: string, x: number, y: number, op
   }
   if (opts.wall) {
     // Pushing through is worth it: three times a tank's hp for tank xp; walls ignore separation shoves.
-    hp = (4 + bhp * 0.12) * ROLE_HP.tank * 3 * sim.spawner.hpMult(); xp = 2; knockResist = 0.6; speed = opts.wall.speed;
+    hp = (4 + bhp * 0.12) * ROLE_HP.tank * 3 * sim.spawner.hpMult(); xp = baseXp * 2; knockResist = 0.6; speed = opts.wall.speed;
   }
   if (role === 'treasure') { speed = Math.max(speed, 80); xp = 5; }
   if (shiny) { hp *= 3; xp *= 5; }
@@ -799,8 +804,10 @@ export function killEnemy(sim: Sim, e: Enemy, killerId: number) {
     for (let i = 0; i < 5; i++) sim.spawnPickup('coin', e.x, e.y, 4);
   }
   if (e.elite && !e.guardian) {
+    // A save's first elite chests are scripted (a taste of every ball); after that the odds are random.
+    const scripted = ELITE_CHEST_SCRIPT[sim.eliteChestsBase + sim.eliteChestsDropped++];
     const roll = r.next();
-    sim.spawnPickup('chest', e.x, e.y, roll < 0.02 ? 3 : roll < 0.16 ? 2 : 1);
+    sim.spawnPickup('chest', e.x, e.y, scripted ?? (roll < 0.02 ? 3 : roll < 0.16 ? 2 : 1));
   }
   if (e.alpha) {
     sim.spawnPickup('chest', e.x, e.y, 3);

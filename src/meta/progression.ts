@@ -34,6 +34,7 @@ export function applyRun(save: SaveData, r: RunSummary, seen: Iterable<string>, 
   st.shiniesDefeated += r.shinyKills;
   st.superEffective += r.superEff;
   st.maxLevel = Math.max(st.maxLevel, r.level);
+  st.eliteChests += r.eliteChests;
   if (r.coop) st.coopRuns++;
   const money = Math.round((r.moneyEarned + runBonus(r)) * (r.elite ? 1.75 : 1));
   save.money += money;

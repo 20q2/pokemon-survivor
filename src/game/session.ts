@@ -144,5 +144,6 @@ export function summarize(session: RunSession, p: Player, cleared: boolean, extr
     elite: !!(session.world as { elite?: boolean }).elite,
     megas: p.megas,
     alphas: extra.alphas,
+    eliteChests: (w as { eliteChestsDropped?: number }).eliteChestsDropped ?? 0,
   };
 }

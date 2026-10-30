@@ -59,6 +59,8 @@ export class NetHost {
   lobbyInit: PlayerInit;
   stage = 'viridian';
   elite = false;
+  /** The host's save count of elite chests (guests replicate the host's run). */
+  eliteChests = 0;
   session: LocalSession | null = null;
   onLobby: (() => void) | null = null;
   onError: ((msg: string) => void) | null = null;
@@ -192,7 +194,7 @@ export class NetHost {
     const remap = new Map<number, number>();
     slots.forEach((s, i) => { remap.set(s.slot, i); inits.push(bySlot.get(s.slot)!); });
     for (const r of this.remotes.values()) r.slot = remap.get(r.slot)!;
-    const cfg: SimConfig = { stageId: this.stage, elite: this.elite, players: inits, seed: (Math.random() * 2 ** 31) | 0 };
+    const cfg: SimConfig = { stageId: this.stage, elite: this.elite, players: inits, eliteChests: this.eliteChests, seed: (Math.random() * 2 ** 31) | 0 };
     const session = new LocalSession(cfg, true);
     this.session = session;
     session.sim.eventTap = (e) => this.evBuf.push(e);

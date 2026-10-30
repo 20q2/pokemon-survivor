@@ -48,6 +48,7 @@ async function hostGame(app: App, lineId: string) {
   app.endRun();
   const host = new NetHost(app.playerInit(lineId));
   app.net = host;
+  host.eliteChests = app.save.stats.eliteChests;
   host.stage = stageUnlocked(app.save, app.save.lastStage) ? app.save.lastStage : 'viridian';
   const wrap = screen(h('h2', null, 'Opening room…'));
   app.show(wrap);
