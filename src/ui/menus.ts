@@ -37,6 +37,9 @@ function topbar(title: string, onBack: () => void, extra?: Node) {
 
 // ─────────────────────────── title ───────────────────────────
 
+/** package.json's version (vite.config.ts define). */
+declare const __APP_VERSION__: string;
+
 export function titleScreen(app: App) {
   const s = app.save;
   const done = Object.keys(s.achievements).length;
@@ -54,6 +57,7 @@ export function titleScreen(app: App) {
       btn('Credits', () => app.show(creditsScreen(app))),
     ),
     h('div', { class: 'title-foot' }, 'Move with WASD / arrows / gamepad / touch, C for your stats. Everything else is automatic. A non-commercial fan game.'),
+    h('div', { class: 'title-version' }, `v${__APP_VERSION__}`),
   );
 }
 
