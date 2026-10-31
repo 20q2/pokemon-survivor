@@ -231,7 +231,7 @@ describe('late-game systems', () => {
 });
 
 describe('playtest regressions', () => {
-  it('a 14-minute no-meta Raichu run (even untouchable) neither floods gold nor runs out of upgrades by 6:00 and 10:00, nor of something to level by 14:00', async () => {
+  it('a full 12-minute no-meta Raichu run (even untouchable) neither floods gold nor runs out of upgrades by 6:00 and 10:00, nor of something to level by 11:30', async () => {
     const { generateOffers } = await import('../src/game/levelup.ts');
     const { runBonus } = await import('../src/meta/progression.ts');
     const { MAX_MOVE_LEVEL } = await import('../src/data/moves.ts');
@@ -245,22 +245,23 @@ describe('playtest regressions', () => {
       const real = offers.filter((o) => o.kind !== 'vitamin' && o.kind !== 'heal' && !(o.kind === 'moveUp' && o.level > MAX_MOVE_LEVEL)).length;
       return { real, level: real + offers.filter((o) => o.kind === 'moveUp' && o.level > MAX_MOVE_LEVEL).length };
     };
-    let realAt6 = -1, realAt10 = -1, levelAt14 = -1, banked = Infinity;
-    while (sim.time < 840) {
+    let realAt6 = -1, realAt10 = -1, levelAt11 = -1, banked = Infinity;
+    // Until the final boss arrives (the run may end in victory right after; time stops there).
+    while (sim.time < 720 && sim.phase !== 'victory' && sim.phase !== 'over') {
       if (sim.phase === 'levelup') { sim.choose(0, botChoose(sim, p)); continue; }
       const m = botSteer(sim, p); p.mx = m.x; p.my = m.y;
       sim.update(DT);
       sim.events.length = 0;
       if (realAt6 < 0 && sim.time >= 360) realAt6 = cards().real;
       if (realAt10 < 0 && sim.time >= 600) realAt10 = cards().real;
-      // The gold guard keeps its 12:00 budget.
-      if (banked === Infinity && sim.time >= 720) banked = sim.money * p.stats.money + runBonus({ stageId: 'viridian', time: sim.time, bosses: sim.bossesDefeated, cleared: false } as never);
-      if (levelAt14 < 0 && sim.time >= 840) levelAt14 = cards().level;
+      // The gold guard keeps its 12:00 budget (now the whole run).
+      if (banked === Infinity && sim.time >= 719.9) banked = sim.money * p.stats.money + runBonus({ stageId: 'viridian', time: sim.time, bosses: sim.bossesDefeated, cleared: false } as never);
+      if (levelAt11 < 0 && sim.time >= 690) levelAt11 = cards().level;
     }
     expect(banked, `banked ₽${Math.round(banked)}`).toBeLessThan(1000);
     expect(realAt6, 'real build upgrades still on offer at 6:00').toBeGreaterThan(0);
     expect(realAt10, 'real build upgrades still on offer at 10:00').toBeGreaterThan(0);
-    expect(levelAt14, 'upgrades or limit breaks still on offer at 14:00').toBeGreaterThan(0);
+    expect(levelAt11, 'upgrades or limit breaks still on offer at 11:30').toBeGreaterThan(0);
   }, 240_000); // ~50-70 s now that waves fill their quota; a loaded machine must not turn it into a flake
 });
 

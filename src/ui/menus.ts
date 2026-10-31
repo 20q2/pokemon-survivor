@@ -225,7 +225,7 @@ function matchupHint(lineId: string, routeTypes: PType[]) {
   return h('div', { class: `matchup ${score > 0.25 ? 'good' : score < -0.25 ? 'bad' : ''}` }, text);
 }
 
-/** One row of minute 1-15 newcomers; swarm and ring minutes are ringed, boss minutes carry a dot. */
+/** One row of minute 1-12 newcomers; swarm and ring minutes are ringed, boss minutes carry a dot. */
 function waveStrip(stage: StageDef) {
   return h('div', { class: 'wave-strip' }, waveTimeline(stage).map((c) => {
     const name = SPECIES[c.focus].name;

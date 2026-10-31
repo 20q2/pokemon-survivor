@@ -3,7 +3,7 @@ import { ARPS, KIT } from './common.ts';
 import { MOTIF } from './finale.ts';
 
 // ───────────── Final boss: "Legend's End" (C minor, 156 bpm) ─────────────
-// The fifteen-minute showdown. A sixteenth-note bass ostinato and organ under a new battle
+// The twelve-minute showdown. A sixteenth-note bass ostinato and organ under a new battle
 // theme with a Neapolitan D♭ climb, the title's leitmotif in C minor over choir, a frenzy of
 // arpeggio runs on double kick, and a last-stand drop that loops back into the battle.
 // Roots for K (from C2): A♭ -4, F 5, G -5, E♭ 3, D♭ 1.

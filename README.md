@@ -40,7 +40,7 @@ species/items to the data files): `npm run fetch-assets`.
   The Pokédex "Moves" tab lists all combinations.
 - **Abilities**: each line has one (Blaze, Static, Levitate, Guts, Multiscale,
   Speed Boost, Sand Stream, …).
-- **Routes**: 7 stages, 15 minutes each, a boss every 3 minutes, final boss at 15:00.
+- **Routes**: 7 stages, 12 minutes each, a boss every 3 minutes, final boss at 12:00.
   Every minute is a scripted wave (Vampire Survivors style): new species, an enemy quota that
   spikes and breathes, an elite with a Poké Ball most minutes, swarms that sweep across and
   rings that close in as slow walls. The route card shows the minute-by-minute timeline. Stay
@@ -52,7 +52,7 @@ species/items to the data files): `npm run fetch-assets`.
   you Mega Evolve for 20 seconds: real Mega sprites where PMD Sprite Collab has them
   (Charizard X, Gengar, Alakazam, Tyranitar, Gardevoir, Sceptile), a Mega aura otherwise.
 
-In Elite Mode every non-final boss is followed by a Poké Mart stop: the run pauses on four priced cards (a berry, an upgrade, something new, or "Leave the mart") paid for from the team's ₽ (purchases come out of the run's banked ₽); each stop costs 1.5x the last.
+In Elite Mode every non-final boss is followed by a Poké Mart stop: the run pauses (in co-op, just that player) on four priced cards (a berry, an upgrade, something new, or "Leave the mart") paid for from the team's ₽ (purchases come out of the run's banked ₽); each stop costs 1.5x the last.
 
 Shooters and bombers only join the crowd from minute 6, and regular shooters fire from close range and no faster than every 3.5 s; bosses and elites keep their own patterns.
 
@@ -74,6 +74,12 @@ free PeerJS broker. The host runs the authoritative simulation; each client owns
 its own movement (no input lag), receives 20 Hz binary snapshots of nearby enemies
 and a reliable stream of events/projectile spawns. Exp is shared, everyone picks
 their own upgrades, fainted teammates are revived by standing next to them.
+
+A co-op run never pauses. Level-up cards, Gym Badges and Elite Mode mart stops are dealt to each
+player on their own, and evolutions and treasures play as that player's own show while the run
+goes on. Whoever is choosing stands in a shield bubble: rooted, not attacking, and immune, with
+1.5 s of protection after stepping out. Cards left open for 20 s pick the first one. Hit-stop is
+off in co-op; only the final boss's fall stops the run, because it ends it.
 
 ## Design principles
 
@@ -100,7 +106,7 @@ The rules for pacing, rewards, feedback and builds live in [docs/survivor-princi
 | `src/meta/` | Save data, shop, achievements, run → save progression |
 | `scripts/balance.ts` | Headless balance runs with a kiting bot (`node scripts/balance.ts mtmoon 900`) |
 | `scripts/pacing.ts` | Pacing telemetry for a headless run: level-up gaps (actual and "potential" with floor candy counted), enemies alive / in view / peak, hits per second, ms per tick (`node scripts/pacing.ts viridian charmander 960 7`, last arg = seed) |
-| `scripts/cards.ts` | Level-up card quality: classifies every offer (real / limit / vitamin / heal) per minute for a 15-minute bot run and prints the share of level-ups with no real card (`node scripts/cards.ts viridian charmander 7`, last arg = seed) |
+| `scripts/cards.ts` | Level-up card quality: classifies every offer (real / limit / vitamin / heal) per minute for a 12-minute bot run and prints the share of level-ups with no real card (`node scripts/cards.ts viridian charmander 7`, last arg = seed) |
 | `scripts/*.mjs` | Playwright screenshot / flow / co-op / perf checks (uses installed Edge) |
 | `scripts/render-music.mjs` | Renders songs with the real synth: levels, render speed, optional WAVs, per-track stems (`--stems`), from a section (`--from drop`) |
 | `scripts/sfx-levels.mjs` | Renders every sound effect with the real synth and prints peak/RMS |

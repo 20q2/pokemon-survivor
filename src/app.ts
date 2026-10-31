@@ -445,13 +445,13 @@ export class App {
     const dt = Math.min(0.1, (t - this.last) / 1000);
     this.last = t;
     this.input.pollPads();
-    this.nav.enabled = !this.session || !!this.pauseEl || this.session.phase() === 'levelup' || this.ended;
+    this.nav.enabled = !this.session || !!this.pauseEl || this.session.phase() === 'levelup' || !!this.session.offers() || this.ended;
     this.nav.pollPads(dt);
     const s = this.session;
     if (s) {
       if (this.input.consume('KeyT')) this.toggleMeter();
       if (this.input.consume('KeyC')) this.hud.toggleSheet();
-      if ((this.input.consume('Escape') || this.input.consume('PadStart') || this.input.consume('KeyP')) && s.phase() !== 'levelup') this.togglePause();
+      if ((this.input.consume('Escape') || this.input.consume('PadStart') || this.input.consume('KeyP')) && s.phase() !== 'levelup' && !s.offers()) this.togglePause();
       const m = s.paused || this.ended ? { x: 0, y: 0 } : this.input.move();
       s.step(dt, m.x, m.y, this.renderer.viewW, this.renderer.viewH);
       for (const ev of s.drainEvents()) this.handleEvent(ev, s);
@@ -463,13 +463,15 @@ export class App {
         audio.playMusic(STAGE[s.stage.id].music);
       }
       this.renderer.render(s.world, s.paused ? 0 : dt);
-      if (this.chest && s.world.cine?.kind !== 'chest' && performance.now() - this.chestAt > 500) {
+      // The treasure show is global in solo and the opener's own show in co-op (the run goes on around it).
+      const show = s.world.cine ?? s.world.shows?.get(s.localId);
+      if (this.chest && show?.kind !== 'chest' && performance.now() - this.chestAt > 500) {
         this.chest.dispose();
         this.chest = null;
       }
       if (!this.ended) {
         this.hud.update(s, dt);
-        if (this.save.options.autoPick && s.phase() === 'levelup' && s.offers()) {
+        if (this.save.options.autoPick && s.offers()) {
           this.autoT += dt;
           if (this.autoT > 0.35) { this.autoT = 0; s.choose(autoChoice(s)); }
         }

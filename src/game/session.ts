@@ -59,7 +59,8 @@ export class LocalSession implements RunSession {
   onTick: (() => void) | null = null;
 
   constructor(cfg: SimConfig, coop = false) {
-    this.sim = new Sim(cfg);
+    // Co-op never stops the run for one player (see Sim.live).
+    this.sim = new Sim({ ...cfg, live: coop });
     this.coop = coop;
     this.sim.replicate = coop;
   }

@@ -25,12 +25,13 @@ interface PlayerState {
 type HostMsg =
   | { t: 'lobby'; players: LobbyPlayer[]; stage: string; you: number; elite: boolean }
   | { t: 'start'; cfg: SimConfig; you: number }
-  | { t: 'tick'; ph: Phase; cine: Cinematic | null; lv: number; xp: number; xn: number; m: number; k: number; b: number; ec: number; tm: number;
+  | { t: 'tick'; ph: Phase; cine: Cinematic | null; sh: Cinematic | null; lv: number; xp: number; xn: number; m: number; k: number; b: number; ec: number; tm: number;
       of: UpgradeOffer[] | null; wait: string[]; ev: GameEvent[]; np: unknown[][]; dp: number[]; nk: unknown[][]; dk: [number, number][]; ps?: PlayerState[] }
   | { t: 'full'; reason: string }
   | { t: 'bye' };
 
-const LEVELUP_TIMEOUT_MS = 30000;
+/** A player who leaves their cards open this long gets the first card. Co-op never waits on them, but they sit shielded. */
+const LEVELUP_TIMEOUT_MS = 20000;
 
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 export function makeCode() {
@@ -245,7 +246,7 @@ export class NetHost {
       const R = Math.max(p.viewW, p.viewH) * 0.75 + 120;
       const ev = events.filter((e) => e.e !== 'enemyShot' && (e.e !== 'hit' || ((e.x - p.x) ** 2 + (e.y - p.y) ** 2 < R * R)));
       this.send(r, {
-        t: 'tick', ph: sim.phase, cine: sim.cine, lv: sim.level, xp: sim.xp, xn: sim.xpNext, m: sim.money, k: sim.kills,
+        t: 'tick', ph: sim.phase, cine: sim.cine, sh: sim.shows.get(r.slot) ?? null, lv: sim.level, xp: sim.xp, xn: sim.xpNext, m: sim.money, k: sim.kills,
         b: sim.bossesDefeated, ec: sim.eliteChestsDropped, tm: sim.time, of: sim.offers.get(r.slot) ?? null,
         wait: [...sim.offers.keys()].filter((id) => id !== r.slot).map((id) => sim.players[id]?.name ?? '?'),
         ev: ev.map(roundEvent), np, dp, nk, dk, ps,
@@ -424,6 +425,8 @@ export class ClientSession implements RunSession {
     this.hostPhase = m.ph;
     sim.phase = m.ph;
     sim.cine = m.cine;
+    // Our own show (evolution, treasure, Mega): the run goes on around it.
+    if (m.sh) sim.shows.set(this.localId, m.sh); else sim.shows.delete(this.localId);
     sim.level = m.lv;
     sim.xp = m.xp;
     sim.xpNext = m.xn;
@@ -492,6 +495,7 @@ export class ClientSession implements RunSession {
       p.fainted = sp.fainted;
       p.connected = sp.connected;
       p.reviveProgress = sp.revive;
+      if (i !== this.localId) p.busy = sp.busy; // our own comes from our offers and show (step)
       applyMoveBits(p, sp.mv);
       if (sp.hurt) p.hurtT = Math.max(p.hurtT, 0.1);
       if (i === this.localId) {
@@ -531,7 +535,10 @@ export class ClientSession implements RunSession {
     const me = sim.players[this.localId];
     if (this.hostPhase === 'play') sim.time += dt;
     // local movement (client-authoritative for own position)
-    if (me && !me.fainted && this.hostPhase === 'play') {
+    // Rooted while picking cards or watching our own show (the host keeps the run going).
+    const busy = !!this.hostOffers || this.sim.shows.has(this.localId);
+    if (me) me.busy = busy;
+    if (me && !me.fainted && this.hostPhase === 'play' && !busy) {
       const len = Math.hypot(mx, my);
       me.moving = len > 0.05 && !(me.sleepT > 0 || me.digWind > 0);
       if (me.moving) {

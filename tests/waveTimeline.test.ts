@@ -3,10 +3,10 @@ import { STAGES, waveHeadline, waveTimeline } from '../src/data/stages.ts';
 import { SPECIES } from '../src/data/pokedex.ts';
 
 describe('waveTimeline', () => {
-  it('lists minutes 1-15 of every stage with known species', () => {
+  it('lists minutes 1-12 of every stage with known species', () => {
     for (const st of STAGES) {
       const tl = waveTimeline(st);
-      expect(tl.map((c) => c.minute)).toEqual(Array.from({ length: 15 }, (_, i) => i + 1));
+      expect(tl.map((c) => c.minute)).toEqual(Array.from({ length: 12 }, (_, i) => i + 1));
       for (const c of tl) {
         expect(SPECIES[c.species]).toBeDefined();
         expect(SPECIES[c.focus]).toBeDefined();

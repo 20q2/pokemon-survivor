@@ -85,6 +85,10 @@ export interface Player {
   hurtT: number;          // flash timer
   lastHit: number;        // sim time of last damage taken
   pendingLevels: number;  // level-ups waiting for a choice
+  /** Co-op: picking cards or watching their own evolution / treasure while the run goes on. Rooted, not attacking, can't be hurt. */
+  busy: boolean;
+  /** Co-op: seconds of protection left after stepping out of a choice, so the crowd that gathered can't land a free hit. */
+  graceT: number;
   /** Gym Badge ids held (rule changes for the rest of the run; see data/badges.ts). */
   badges: string[];
   /** A move the partner wants to learn after evolving, while all move slots are full. */

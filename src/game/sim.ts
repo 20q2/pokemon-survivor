@@ -39,6 +39,8 @@ export interface SimConfig {
   eliteChests?: number;
   /** Test/diagnostic seam: begin the run at this many seconds with every schedule fast-forwarded (see Spawner.skipTo). */
   startTime?: number;
+  /** Co-op: the run never stops for one player's level-up, treasure, evolution, badge or mart (see Sim.live). */
+  live?: boolean;
 }
 
 export type Phase = 'play' | 'levelup' | 'cine' | 'over' | 'victory';
@@ -133,6 +135,8 @@ const CRIT_STOP = 2 / 60;
 const CRIT_STOP_GAP = 0.5;
 /** Elite / alpha kill hit-stop: 7 frames. Bosses have their own cinematic. */
 const ELITE_STOP = 7 / 60;
+/** Co-op: protection after a player steps out of a choice or their own cinematic. */
+export const LIVE_GRACE = 1.5;
 /** Team kill totals that earn a quiet "N Pokémon defeated!" notice, once each per run. */
 export const KILL_MILESTONES: readonly number[] = [100, 250, 500, 1_000, 2_500, 5_000, 10_000, 25_000, 50_000, 100_000];
 /** One tick felling at least this many foes pops a gold "×N!" over them, at most every WIPEOUT_GAP sim seconds. */
@@ -197,6 +201,19 @@ export class Sim {
   megaStone = false;
   offers = new Map<number, UpgradeOffer[]>();
   tms = new Map<number, string[]>();
+  /**
+   * Co-op: nothing stops the run for everyone. Level-up cards, Gym Badges and mart stops are dealt to each
+   * player on their own, and evolutions, treasures and Mega Evolution play as that player's own show
+   * (`shows`) while the world keeps moving. Whoever is choosing or watching is `busy`: rooted, not attacking,
+   * and can't be hurt. Only the final boss's fall still stops the run (it ends it).
+   */
+  readonly live: boolean;
+  /** Co-op: each player's current show, and the ones queued behind it. */
+  shows = new Map<number, Cinematic>();
+  private showQueue = new Map<number, Cinematic[]>();
+  /** Co-op: Gym Badge picks owed after a boss, and mart stops owed (value: that stop's visit index, for its prices). */
+  private badgeOwed = new Set<number>();
+  private martOwed = new Map<number, number>();
   spawner: Spawner;
   /** Replication outboxes (filled only when `replicate` is on, drained by the host). */
   replicate = false;
@@ -220,6 +237,7 @@ export class Sim {
     this.stage = STAGE[cfg.stageId];
     this.obstacles = new Obstacles(cfg.stageId);
     this.elite = !!cfg.elite;
+    this.live = !!cfg.live;
     this.eliteChestsAtStart = cfg.eliteChests ?? 0;
     this.rng = new Rng(cfg.seed);
     this.spawner = new Spawner(this);
@@ -265,7 +283,7 @@ export class Sim {
       moveSlots: 4, itemSlots: 4 + pi.meta.itemSlots,
       rerolls: pi.meta.rerolls, skips: pi.meta.skips, banishes: pi.meta.banishes, banished: new Set(),
       revives: pi.meta.revives, fainted: false, reviveProgress: 0, hurtT: 0, lastHit: -99,
-      pendingLevels: 0, badges: [], kills: 0, dmgDealt: 0, dmgTaken: 0, bossKills: 0, superEff: 0, shinyKills: 0,
+      pendingLevels: 0, busy: false, graceT: 0, badges: [], kills: 0, dmgDealt: 0, dmgTaken: 0, bossKills: 0, superEff: 0, shinyKills: 0,
       vitamins: {}, ledger: newLedger(), evolutions: 0, masteries: 0, connected: true, viewW: 960, viewH: 540, mega: 0, megaT: 0, megas: 0,
       ...newMoveState(this.rng.pick(TYPES.filter((t) => t !== 'normal'))),
     };
@@ -287,8 +305,8 @@ export class Sim {
     this.eventTap?.(e);
   }
 
-  /** Freeze the sim for `seconds` (never shortens a longer freeze already running). */
-  stop(seconds: number) { if (seconds > this._hitStop) this._hitStop = seconds; }
+  /** Freeze the sim for `seconds` (never shortens a longer freeze already running). Off in co-op: it would freeze everyone. */
+  stop(seconds: number) { if (!this.live && seconds > this._hitStop) this._hitStop = seconds; }
 
   /** An elite or alpha died. */
   eliteStop() { this.stop(ELITE_STOP); }
@@ -339,6 +357,7 @@ export class Sim {
       return;
     }
     this.time += dt;
+    if (this.live) this.updateLive(dt);
     for (const p of this.players) { p.px = p.x; p.py = p.y; }
     for (const e of this.enemies) { e.px = e.x; e.py = e.y; }
     for (const pr of this.projectiles) { pr.px = pr.x; pr.py = pr.y; }
@@ -363,6 +382,7 @@ export class Sim {
   private updatePlayers(dt: number) {
     for (const p of this.players) {
       p.hurtT = Math.max(0, p.hurtT - dt);
+      p.graceT = Math.max(0, p.graceT - dt);
       if (p.fainted) {
         // Teammates standing close revive a fainted player.
         const helper = this.players.find((o) => o !== p && !o.fainted && dist2(o.x, o.y, p.x, p.y) < 50 * 50);
@@ -379,8 +399,8 @@ export class Sim {
       updatePlayerMoves(this, p, dt);
       if (!this.remoteControlled.has(p.id)) {
         const len = Math.hypot(p.mx, p.my);
-        // Asleep (Rest) or digging in (Dig wind-up): rooted to the spot.
-        const locked = p.sleepT > 0 || p.digWind > 0;
+        // Asleep (Rest), digging in (Dig wind-up) or choosing (co-op): rooted to the spot.
+        const locked = p.sleepT > 0 || p.digWind > 0 || p.busy;
         p.moving = len > 0.05 && !locked;
         if (p.moving) {
           p.x += p.mx * p.stats.speed * dt;
@@ -529,6 +549,8 @@ export class Sim {
       this.emit({ e: 'levelup', level: this.level });
       this.queueEvolutions();
       this.refreshStats();
+      // Co-op: updateLive deals the cards to each player next tick; evolutions already started as their own shows.
+      if (this.live) return;
       if (this.cineQueue.length) this.startNextCine();
       else this.beginLevelUp();
       return;
@@ -545,7 +567,9 @@ export class Sim {
       if (need === undefined || this.level < need) continue;
       const to = p.stage + 1 === line.evoLevels.length ? this.pickFinalForm(p) : line.stages[p.stage + 1];
       if (!to) continue;
-      this.cineQueue.push({ kind: 'evolve', t: 0, dur: 3.2, player: p.id, from: p.speciesId, to });
+      const c: Cinematic = { kind: 'evolve', t: 0, dur: 3.2, player: p.id, from: p.speciesId, to };
+      if (this.live) this.queueCine(c);
+      else this.cineQueue.push(c);
     }
   }
 
@@ -613,6 +637,7 @@ export class Sim {
 
   /** What follows a cinematic or a finished choice: Gym Badges, then the mart, then pending level-ups, then play. */
   private resume() {
+    if (this.live) return this.refillOffers();
     if (this.badgeDue && this.beginBadges()) return;
     if (this.martDue && this.beginMart()) return;
     if (this.players.some(needsChoice)) this.beginLevelUp();
@@ -625,14 +650,20 @@ export class Sim {
     this.offers.clear();
     for (const p of this.players) {
       if (p.fainted || !p.connected) continue;
-      const pool = BADGES.filter((b) => !hasBadge(p, b.id)).map((b) => b.id);
-      const picks: string[] = [];
-      while (picks.length < 3 && pool.length) picks.push(pool.splice(this.rng.int(0, pool.length - 1), 1)[0]);
-      if (picks.length) this.offers.set(p.id, picks.map((id): UpgradeOffer => ({ kind: 'badge', id, level: 1 })));
+      const picks = this.badgeOffers(p);
+      if (picks) this.offers.set(p.id, picks);
     }
     if (!this.offers.size) return false;
     this.phase = 'levelup';
     return true;
+  }
+
+  /** Up to 3 Gym Badges the player doesn't hold yet, or null once they hold them all. */
+  private badgeOffers(p: Player): UpgradeOffer[] | null {
+    const pool = BADGES.filter((b) => !hasBadge(p, b.id)).map((b) => b.id);
+    const picks: string[] = [];
+    while (picks.length < 3 && pool.length) picks.push(pool.splice(this.rng.int(0, pool.length - 1), 1)[0]);
+    return picks.length ? picks.map((id): UpgradeOffer => ({ kind: 'badge', id, level: 1 })) : null;
   }
 
   /** True while the offers on screen are Gym Badge picks. */
@@ -640,12 +671,96 @@ export class Sim {
     return this.phase === 'levelup' && [...this.offers.values()].some((o) => o[0]?.kind === 'badge');
   }
 
+  /** This player's cards are a badge pick or a mart stop: no reroll, skip or banish there. */
+  private special(playerId: number) {
+    const first = this.offers.get(playerId)?.[0];
+    return first?.kind === 'badge' || first?.cost !== undefined;
+  }
+
   queueCine(c: Cinematic) {
+    if (this.live && c.kind !== 'bossDown') {
+      // Co-op: the player's own show. It waits behind the show they are watching and the cards they have open.
+      // The Mega trigger fires every tick until its show ends (solo stops the run at once), so keep just one.
+      if (c.kind === 'mega' && (this.shows.get(c.player)?.kind === 'mega' || this.showQueue.get(c.player)?.some((x) => x.kind === 'mega'))) return;
+      const q = this.showQueue.get(c.player);
+      if (q) q.push(c); else this.showQueue.set(c.player, [c]);
+      this.nextShow(c.player);
+      return;
+    }
+    if (this.live && !this.finalDefeated) return this.owePicks();
     this.cineQueue.push(c);
     if (this.phase === 'play') this.startNextCine();
   }
 
+  // ───────────────────────────── co-op (live) ─────────────────────────────
+
+  /** Start the player's next queued show if they are free (no show running, no cards open). */
+  private nextShow(id: number) {
+    if (this.shows.has(id) || this.offers.has(id)) return;
+    const c = this.showQueue.get(id)?.shift();
+    if (!c) return;
+    this.shows.set(id, c);
+    if (c.kind === 'evolve') this.emit({ e: 'evolve', player: id, from: c.from!, to: c.to! });
+    if (c.kind === 'chest') this.emit({ e: 'chest', player: id, rewards: c.rewards!, tier: c.tier! });
+  }
+
+  /** A non-final boss fell in co-op: everyone gets a Gym Badge pick (and in Elite Mode a mart stop) without the run stopping. */
+  private owePicks() {
+    for (const p of this.players) {
+      if (!p.connected) continue;
+      this.badgeOwed.add(p.id);
+      if (this.elite) this.martOwed.set(p.id, this.martVisits);
+    }
+    if (this.elite) this.martVisits++;
+  }
+
+  /** Runs each co-op tick: advance every player's show, deal the next cards to anyone free, and mark who is busy. */
+  private updateLive(dt: number) {
+    for (const p of this.players) {
+      const c = this.shows.get(p.id);
+      if (c) {
+        c.t += dt;
+        if (c.t < c.dur) continue;
+        this.shows.delete(p.id);
+        if (c.kind === 'evolve') this.applyEvolution(p, c.to!);
+        if (c.kind === 'mega') activateMega(this, p);
+      }
+      this.nextShow(p.id);
+    }
+    this.refillOffers();
+    for (const p of this.players) {
+      const busy = this.offers.has(p.id) || this.shows.has(p.id);
+      if (p.busy && !busy) p.graceT = LIVE_GRACE;
+      p.busy = busy;
+    }
+  }
+
+  /** Co-op: hand each free player their next choice: an owed badge, then an owed mart stop, then level-ups. */
+  private refillOffers() {
+    for (const p of this.players) {
+      // A queued show (treasure, evolution) goes before more cards.
+      if (!p.connected || this.offers.has(p.id) || this.shows.has(p.id) || this.showQueue.get(p.id)?.length) continue;
+      const next = this.nextOffers(p);
+      if (next) this.offers.set(p.id, next);
+    }
+  }
+
+  private nextOffers(p: Player): UpgradeOffer[] | null {
+    // A fainted player keeps their badge and mart stop for when they are revived; level-up cards can be picked while down.
+    if (!p.fainted && this.badgeOwed.delete(p.id)) {
+      const picks = this.badgeOffers(p);
+      if (picks) return picks;
+    }
+    const visit = this.martOwed.get(p.id);
+    if (!p.fainted && visit !== undefined) {
+      this.martOwed.delete(p.id);
+      return martOffers(p, this.rng, visit, this.tms.get(p.id) ?? [], this.stage.types);
+    }
+    return needsChoice(p) ? this.makeOffers(p) : null;
+  }
+
   beginLevelUp() {
+    if (this.live) return this.refillOffers();
     this.phase = 'levelup';
     for (const p of this.players) {
       if (needsChoice(p) && !this.offers.has(p.id)) this.offers.set(p.id, this.makeOffers(p));
@@ -707,7 +822,7 @@ export class Sim {
 
   skip(playerId: number) {
     const p = this.players[playerId];
-    if (!p || p.skips <= 0 || !this.offers.has(playerId) || p.pendingLearn || this.inMart() || this.inBadges()) return;
+    if (!p || p.skips <= 0 || !this.offers.has(playerId) || p.pendingLearn || this.special(playerId)) return;
     p.skips--;
     heal(p, p.stats.maxHp * 0.1, 'skip');
     this.afterChoice(p);
@@ -715,7 +830,7 @@ export class Sim {
 
   reroll(playerId: number) {
     const p = this.players[playerId];
-    if (!p || p.rerolls <= 0 || !this.offers.has(playerId) || p.pendingLearn || this.inMart() || this.inBadges()) return;
+    if (!p || p.rerolls <= 0 || !this.offers.has(playerId) || p.pendingLearn || this.special(playerId)) return;
     p.rerolls--;
     this.offers.set(playerId, this.makeOffers(p));
   }
@@ -723,7 +838,7 @@ export class Sim {
   banish(playerId: number, index: number) {
     const p = this.players[playerId];
     const offers = this.offers.get(playerId);
-    if (!p || !offers || p.banishes <= 0 || !offers[index] || this.inMart() || this.inBadges()) return;
+    if (!p || !offers || p.banishes <= 0 || !offers[index] || this.special(playerId)) return;
     const o = offers[index];
     if (o.kind === 'heal' || o.kind === 'vitamin') return;
     p.banishes--;
@@ -793,7 +908,8 @@ export class Sim {
     // A mastery always shows as a Master Ball.
     const shown: ChestTier = rewards.some((r) => r.kind === 'mastery') ? 4 : tier;
     this.refreshStats();
-    this.emit({ e: 'chest', player: p.id, rewards, tier: shown });
+    // Co-op announces the treasure when the opener's show starts (it may wait behind open cards).
+    if (!this.live) this.emit({ e: 'chest', player: p.id, rewards, tier: shown });
     // A little gold rides along with every treasure.
     this.money += 2 + tier * 2;
     // Solo: wait for the player to dismiss it (auto after 5 s). Co-op pauses everyone, so it moves on sooner.

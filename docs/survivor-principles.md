@@ -60,13 +60,14 @@ moment, not a fade.
 
 - Show the route's timeline before the run starts.
 - After the final boss, an unkillable sweeper arrives, the way VS uses the Reaper.
-- *Ours:* the 15-minute run, the route-card wave strip in `src/ui/menus.ts`, and the Haunter
+- *Ours:* the 12-minute run (a boss at 3, 6 and 9 minutes, the final boss at 12:00), the route-card wave strip in `src/ui/menus.ts`, and the Haunter
   sweeper in `src/game/spawner.ts`.
 
 ### 2.5 Explicit pauses are allowed
 Level-up screens, chest reels and the Elite Mode mart are rests the player is glad of, not
 interruptions. Brotato builds its whole rhythm on short waves with a shop between them. Use
-pauses on purpose, but never two back to back.
+pauses on purpose, but never two back to back. In co-op one player's pause must not stop the
+others: their cards and shows play inside a shield bubble while the run goes on (Sim.live in src/game/sim.ts).
 
 ---
 
@@ -196,7 +197,8 @@ ladder, the candy ladder. Rising pitch on a streak is one of the genre's cheapes
 
 ### 7.2 Impact is short and tiered
 - **Hit-stop.** 2 frames on a crit, at most every half second. About 7 frames on an elite or Alpha
-  kill. A full cinematic is for bosses only. It is a slowdown of sim time, so co-op peers stay in sync.
+  kill. A full cinematic is for bosses only. It is a slowdown of sim time, so it is off in co-op, where it
+  would freeze every teammate.
 - **Death pop.** A white flash before the puff, so kills read at a glance in a dense crowd.
 - **Shake and zoom.** Both are tiered and fade fast. Never shake on ordinary hits.
 

@@ -84,7 +84,7 @@ describe('raid hazards', () => {
 
   it('a boss every 3 minutes on every route, ending in the final boss', () => {
     for (const st of STAGES) {
-      expect(st.bosses.map((b) => b.at), st.id).toEqual([180, 360, 540, 720, 900]);
+      expect(st.bosses.map((b) => b.at), st.id).toEqual([180, 360, 540, 720]);
       expect(st.bosses.at(-1)!.final, st.id).toBe(true);
       expect(st.bosses.every((b) => b.patterns.some((p) => ['quake', 'donut', 'meteor', 'beam', 'cone', 'cross'].includes(p))), st.id).toBe(true);
     }

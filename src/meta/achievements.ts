@@ -1,4 +1,4 @@
-import { STAGES } from '../data/stages.ts';
+import { RUN_LENGTH, STAGES } from '../data/stages.ts';
 import type { SaveData } from './save.ts';
 
 export interface RunSummary {
@@ -54,7 +54,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   A({ id: 'first-run', name: 'First Steps', desc: 'Finish your first run.', icon: 'poke-ball', reward: { money: 100 }, check: (s) => s.stats.runs >= 1 }),
   A({ id: 'survive-5', name: 'Holding On', desc: 'Survive 5 minutes in a run.', icon: 'oran-berry', reward: { money: 100 }, check: (_s, r) => !!r && r.time >= 300 }),
   A({ id: 'survive-10', name: 'Mind over Matter', desc: 'Survive 10 minutes in a run.', icon: 'species:abra', reward: { line: 'abra' }, check: (_s, r) => !!r && r.time >= 600 }),
-  A({ id: 'survive-15', name: 'Endurance', desc: 'Survive 15 minutes in a run.', icon: 'sitrus-berry', reward: { money: 500 }, check: (_s, r) => !!r && r.time >= 900 }),
+  A({ id: 'survive-12', name: 'Endurance', desc: 'Survive 12 minutes in a run.', icon: 'sitrus-berry', reward: { money: 500 }, check: (_s, r) => !!r && r.time >= RUN_LENGTH }),
   A({ id: 'level-20', name: 'Bruiser', desc: 'Reach level 20 in a single run.', icon: 'species:machop', reward: { line: 'machop' }, check: (_s, r) => !!r && r.level >= 20 }),
   A({ id: 'level-40', name: 'Veteran Trainer', desc: 'Reach level 40 in a single run.', icon: 'rare-candy', reward: { money: 200 }, check: (_s, r) => !!r && r.level >= 40 }),
   A({ id: 'level-60', name: 'Elite Trainer', desc: 'Reach level 60 in a single run.', icon: 'rare-candy', reward: { money: 1000 }, check: (_s, r) => !!r && r.level >= 60 }),

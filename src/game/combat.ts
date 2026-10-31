@@ -204,7 +204,7 @@ export function fireMoves(sim: Sim, dt: number) {
   for (const p of sim.players) {
     if (p.fainted || !p.connected) continue;
     if (p.protectCd > 0) p.protectCd -= dt;
-    const busy = p.burrowT > 0 || p.digWind > 0 || p.sleepT > 0;
+    const busy = p.burrowT > 0 || p.digWind > 0 || p.sleepT > 0 || p.busy;
     for (const m of p.moves) {
       const def = MOVES[m.id];
       if (def.behavior === 'passive') continue;
@@ -1327,6 +1327,8 @@ export function rawDamageEnemy(sim: Sim, e: Enemy, dmg: number, type: PType, own
 export function damagePlayer(sim: Sim, p: Player, raw: number, type: PType, special: boolean) {
   if (p.fainted || raw <= 0 || sim.invulnerable) return;
   if (p.burrowT > 0 || p.vanishT > 0) return;
+  // Co-op: picking cards or watching their own show, and a moment after stepping out of it.
+  if (p.busy || p.graceT > 0) return;
   // Protect: the barrier eats the whole hit.
   const prot = p.moves.find((m) => m.id === 'protect');
   if (prot && p.protectCd <= 0) {

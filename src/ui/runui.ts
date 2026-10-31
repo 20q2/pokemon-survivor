@@ -164,7 +164,8 @@ export class LevelUpUI {
     this.session = session;
     const phase = session.phase();
     const offers = session.offers();
-    if (phase !== 'levelup') { this.cascade.reset(); return this.close(); }
+    // Co-op deals cards while the run goes on (phase stays play), so offers alone open the panel.
+    if (phase !== 'levelup' && !offers) { this.cascade.reset(); return this.close(); }
     // Offers arrive as fresh arrays every network tick: compare by content.
     if (offers && this.el && this.shownSig === offerSig(offers, session.world.money) && this.shownFor) return;
     if (!offers) {

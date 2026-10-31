@@ -8,7 +8,7 @@ import { botChoose, botSteer } from '../src/game/bot.ts';
 
 const stage = process.argv[2] ?? 'viridian';
 const line = process.argv[3] ?? 'charmander';
-const secs = +(process.argv[4] ?? 900);
+const secs = +(process.argv[4] ?? 720);
 const seed = +(process.argv[5] ?? 7);
 const rng = new Rng(seed);
 const sim = new Sim({ stageId: stage, seed, players: [{ name: 'bot', lineId: line, shiny: false, meta: metaBonuses({}), tms: [] }] });

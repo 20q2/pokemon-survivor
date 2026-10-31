@@ -180,7 +180,7 @@ export class Hud {
     this.effects.update(me, w.time);
     // On the level-up screen your card, build and stats stay sharp above the overlay so they can
     // be hovered while choosing; the overlay pads itself clear of them via --hud-rx / --hud-ry.
-    const lifted = s.phase() === 'levelup';
+    const lifted = s.phase() === 'levelup' || !!s.offers();
     this.el.classList.toggle('lifted', lifted);
     if (lifted) {
       const r = this.left.getBoundingClientRect();

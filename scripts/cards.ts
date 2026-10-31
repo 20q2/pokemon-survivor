@@ -1,5 +1,5 @@
 // Level-up card quality: node scripts/cards.ts [stageId] [lineId] [seed]
-// Runs the seeded bot for 15 minutes and classifies every offered card:
+// Runs the seeded bot for 12 minutes and classifies every offered card:
 //   real = new move/item or an upgrade below the max, limit = move limit break, vitamin, heal, other.
 // Per minute: level-ups, cards by class and level-ups with no real card. Zero-real level-ups before 12:00 should stay under 10 %.
 import { Sim, DT } from '../src/game/sim.ts';
@@ -12,7 +12,7 @@ import type { UpgradeOffer } from '../src/game/types.ts';
 const stage = process.argv[2] ?? 'viridian';
 const line = process.argv[3] ?? 'charmander';
 const seed = +(process.argv[4] ?? 7);
-const SECS = 900;
+const SECS = 720;
 const CLASSES = ['real', 'limit', 'vitamin', 'heal', 'other'] as const;
 type Cls = (typeof CLASSES)[number];
 

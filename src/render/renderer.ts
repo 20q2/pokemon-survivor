@@ -24,6 +24,8 @@ export interface WorldView {
   pickups: Pickup[];
   phase: Phase;
   cine: Cinematic | null;
+  /** Co-op: each player's own show (evolution, treasure, Mega) that runs while the world keeps going. */
+  shows?: Map<number, Cinematic>;
   /** Render interpolation fraction between the previous and current sim step (1 = no interpolation). */
   alpha?: number;
   weather?: WeatherKind | null;
@@ -343,8 +345,9 @@ export class Renderer {
       g.fillRect(0, 0, this.canvas.width, this.canvas.height);
       g.globalAlpha = 1;
     }
-    if (world.cine?.kind === 'evolve') this.drawEvolution(world.cine, world);
-    if (world.cine?.kind === 'mega') this.drawMegaEvolution(world.cine, world);
+    const show = world.cine ?? world.shows?.get(this.localId) ?? null;
+    if (show?.kind === 'evolve') this.drawEvolution(show, world);
+    if (show?.kind === 'mega') this.drawMegaEvolution(show, world);
     this.restore();
   }
 
@@ -566,11 +569,29 @@ export class Renderer {
     const jitter = p.digWind > 0 ? (Math.random() - 0.5) * 3 : 0;
     this.drawAnim(p.sleepT > 0 ? set.idle : anim, p.x + jitter, p.y, p.sleepT > 0 ? 0 : time * (p.moving ? 1.2 : 1), dirRow(p.fx, p.fy), scale, blink, p.vanishT > 0 ? 0.25 : 1);
     this.drawMoveStatesFront(p, time);
+    if (p.busy) this.drawChoosing(p, time, grow);
     if (p.shiny && Math.random() < 0.12) this.particles.spawn(p.x + (Math.random() - 0.5) * 22, p.y - 6 - Math.random() * 22, 0, -24, 0.6, 3, '#fff6a8', 0, true, Shape.SPARK);
     for (const b of p.buffs) {
       if (b.kind === 'shield') { g.strokeStyle = 'rgba(160,220,255,0.6)'; g.lineWidth = 1.5; g.beginPath(); g.arc(p.x, p.y - 12 * grow, 18 * grow, 0, TAU); g.stroke(); }
       if (b.kind === 'dodge' && Math.floor(time * 10) % 2 === 0) this.drawAnim(anim, p.x + 8 * grow, p.y, time, dirRow(p.fx, p.fy), scale, 0, 0.3);
     }
+  }
+
+  /** Co-op: a teammate (or you) picking cards inside a shield bubble while the run goes on. */
+  private drawChoosing(p: Player, time: number, grow: number) {
+    const g = this.g;
+    const r = 20 * grow, cy = p.y - 12 * grow;
+    g.globalAlpha = 0.18;
+    g.fillStyle = '#bfe8ff';
+    g.beginPath(); g.arc(p.x, cy, r, 0, TAU); g.fill();
+    g.globalAlpha = 0.55 + 0.25 * Math.sin(time * 5);
+    g.strokeStyle = '#e6f6ff';
+    g.lineWidth = 1.5;
+    g.beginPath(); g.arc(p.x, cy, r, 0, TAU); g.stroke();
+    g.globalAlpha = 1;
+    // three dots bobbing above the head: "thinking"
+    g.fillStyle = '#fff';
+    for (let i = 0; i < 3; i++) g.fillRect(Math.round(p.x - 6 + i * 5), Math.round(cy - r - 6 + Math.sin(time * 6 + i) * 1.5), 2, 2);
   }
 
   /** Rainbow Mega Evolution energy: a pulsing ring, rising sparks and a shimmer. */

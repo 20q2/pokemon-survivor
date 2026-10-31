@@ -12,30 +12,30 @@ function sim() {
   return s;
 }
 const sweepers = (s: Sim) => s.enemies.filter((e) => e.sweeper && e.alive);
-/** Steps only the spawner (a full minute-16 sim is slow) from the current time to `t`. */
+/** Steps only the spawner (a full minute-13 sim is slow) from the current time to `t`. */
 const runTo = (s: Sim, t: number) => {
   while (s.time < t) { s.time += 0.25; s.spawner.update(0.25); }
 };
 
 describe('overtime sweeper', () => {
-  it('appears at 960 s while the final boss stands, and again a minute later', () => {
-    // Counts sweepers only: the stage's boss table (final boss at 900 s) also spawns things at this time.
+  it('appears at 780 s while the final boss stands, and again a minute later', () => {
+    // Counts sweepers only: the stage's boss table (final boss at 720 s) also spawns things at this time.
     const s = sim();
-    s.time = 955;
+    s.time = 775;
     s.spawner.update(0);
-    runTo(s, 959);
+    runTo(s, 779);
     expect(sweepers(s)).toHaveLength(0);
-    runTo(s, 961);
+    runTo(s, 781);
     expect(sweepers(s)).toHaveLength(1);
-    runTo(s, 1021);
+    runTo(s, 841);
     expect(sweepers(s)).toHaveLength(2);
   });
 
   it('never appears once the final boss is down', () => {
     const s = sim();
-    s.time = 955;
+    s.time = 775;
     s.finalDefeated = true;
-    runTo(s, 1030);
+    runTo(s, 850);
     expect(sweepers(s)).toHaveLength(0);
   });
 
@@ -93,7 +93,7 @@ describe('co-op quota', () => {
     });
     s.phase = 'play';
     s.offers.clear();
-    s.time = 14 * 60 + 1; // quota 280 x 2.05 would be 574
+    s.time = 12 * 60 + 1; // quota 300 x 2.05 would be 615
     s.spawner.update(0.1);
     expect(s.enemies.filter(isRegular)).toHaveLength(MAX_ENEMIES - 60);
     expect(s.enemies.length).toBeLessThan(MAX_ENEMIES);

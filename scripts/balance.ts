@@ -8,7 +8,7 @@ import { generateOffers } from '../src/game/levelup.ts';
 import { Rng } from '../src/engine/math.ts';
 
 const stage = process.argv[2] ?? 'viridian';
-const secs = +(process.argv[3] ?? 900);
+const secs = +(process.argv[3] ?? 720);
 const lines = process.argv[4] ? process.argv[4].split(',') : LINES.map((l) => l.id);
 const rank = +(process.argv[5] ?? 0);
 const react = +(process.env.REACT ?? 0.25);

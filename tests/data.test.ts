@@ -96,11 +96,11 @@ describe('data integrity', () => {
     for (const s of Object.keys(ENEMY_ROLE)) expect(SPECIES[s], s).toBeTruthy();
   });
 
-  it('every stage has 16 minute waves that each change the species line-up', () => {
+  it('every stage has 13 minute waves (0-12) that each change the species line-up', () => {
     for (const st of STAGES) {
-      expect(st.waves.length, st.id).toBe(16);
+      expect(st.waves.length, st.id).toBe(13);
       const set = (i: number) => st.waves[i].species.map((e) => e.species).sort().join();
-      for (let i = 1; i < 16; i++) expect(set(i), `${st.id} minute ${i}`).not.toBe(set(i - 1));
+      for (let i = 1; i < 13; i++) expect(set(i), `${st.id} minute ${i}`).not.toBe(set(i - 1));
     }
   });
 
@@ -114,7 +114,7 @@ describe('data integrity', () => {
 
   it('wave quotas follow the shared non-monotonic table', () => {
     // Intentional change-detector: update this golden table in tandem with any WAVE_MIN retune.
-    const table = [15, 35, 60, 50, 45, 10, 110, 150, 60, 10, 260, 70, 220, 190, 280, 300];
+    const table = [15, 35, 60, 50, 45, 10, 110, 150, 60, 10, 260, 70, 300];
     for (const st of STAGES) {
       expect(st.waves.map((w) => w.min), st.id).toEqual(table);
       for (const w of st.waves) if (w.elite) expect(st.elites, st.id).toContain(w.elite);
@@ -123,8 +123,8 @@ describe('data integrity', () => {
 });
 
 describe('wave set pieces', () => {
-  const RING_MINUTES = [5, 9, 13];
-  const SWARM_MINUTES = [2, 4, 7, 11, 14];
+  const RING_MINUTES = [5, 9];
+  const SWARM_MINUTES = [2, 4, 7, 11];
   it('events live only in the authored minutes, on every stage', () => {
     for (const st of STAGES) {
       const withEvents = st.waves.flatMap((w, m) => (w.events?.length ? [m] : []));

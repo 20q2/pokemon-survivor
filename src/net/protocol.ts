@@ -11,7 +11,7 @@ export const SNAP_HZ = 20;
 const SPECIES_INDEX = new Map(SPECIES_LIST.map((s, i) => [s.id, i]));
 export const PICKUP_KINDS: PickupKind[] = ['candy', 'coin', 'oran', 'sitrus', 'magnet', 'repel', 'chest', 'rare-candy', 'mega-stone', 'dig'];
 
-export interface SnapPlayer { x: number; y: number; hp: number; fx: number; fy: number; moving: boolean; fainted: boolean; connected: boolean; hurt: boolean; revive: number; mv: number }
+export interface SnapPlayer { x: number; y: number; hp: number; fx: number; fy: number; moving: boolean; fainted: boolean; connected: boolean; hurt: boolean; busy: boolean; revive: number; mv: number }
 
 /** Move-state bits sent per player (for drawing Dig, Rest, Protect…). */
 export const MV = { DIG: 1, BURROW: 2, SLEEP: 4, PROTECT: 8, RAGE: 16, STATIC: 32, FOCUS: 64, VANISH: 128 } as const;
@@ -51,7 +51,7 @@ export function encodeSnapshot(time: number, players: Player[], enemies: Enemy[]
     v.setFloat32(o, p.hp); o += 4;
     v.setInt8(o, q8(p.fx)); o += 1;
     v.setInt8(o, q8(p.fy)); o += 1;
-    v.setUint8(o, (p.moving ? 1 : 0) | (p.fainted ? 2 : 0) | (p.connected ? 4 : 0) | (p.hurtT > 0 ? 8 : 0)); o += 1;
+    v.setUint8(o, (p.moving ? 1 : 0) | (p.fainted ? 2 : 0) | (p.connected ? 4 : 0) | (p.hurtT > 0 ? 8 : 0) | (p.busy ? 16 : 0)); o += 1;
     v.setUint8(o, Math.round(Math.min(3, p.reviveProgress) * 80)); o += 1;
     v.setUint8(o, (p.digWind > 0 ? MV.DIG : 0) | (p.burrowT > 0 ? MV.BURROW : 0) | (p.sleepT > 0 ? MV.SLEEP : 0)
       | (p.protectCd <= 0 && p.moves.some((m) => m.id === 'protect') ? MV.PROTECT : 0) | (p.rageT > 0 ? MV.RAGE : 0)
@@ -101,7 +101,7 @@ export function decodeSnapshot(buf: ArrayBuffer): Snapshot | null {
     const f = v.getUint8(o); o += 1;
     const revive = v.getUint8(o) / 80; o += 1;
     const mv = v.getUint8(o); o += 1;
-    players.push({ x, y, hp, fx, fy, moving: !!(f & 1), fainted: !!(f & 2), connected: !!(f & 4), hurt: !!(f & 8), revive, mv });
+    players.push({ x, y, hp, fx, fy, moving: !!(f & 1), fainted: !!(f & 2), connected: !!(f & 4), hurt: !!(f & 8), busy: !!(f & 16), revive, mv });
   }
   const ne = v.getUint16(o); o += 2;
   const cx = v.getFloat32(o); o += 4;
